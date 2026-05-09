@@ -70,7 +70,7 @@ export default function PracownikDashboard() {
                   <ClipboardList className="h-8 w-8" />
                 </div>
                 <div className="space-y-1">
-                  <p className="font-black text-slate-800 text-lg group-hover:text-emerald-600 transition-colors">Akcesoria</p>
+                  <p className="font-black text-slate-800 text-lg group-hover:text-emerald-600 transition-colors">Magazyn</p>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Sprawdź stany</p>
                 </div>
               </div>

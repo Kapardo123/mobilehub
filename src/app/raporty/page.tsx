@@ -75,21 +75,21 @@ const salesData = {
 
 const categoryData = {
   all: [
-    { name: 'Akcesoria', value: 55, color: '#2563eb' },
+    { name: 'Magazyn', value: 55, color: '#2563eb' },
     { name: 'Telefony', value: 40, color: '#9333ea' },
     { name: 'Części', value: 5, color: '#10b981' },
   ],
   'trzy-stawy': [
-    { name: 'Akcesoria', value: 75, color: '#2563eb' },
+    { name: 'Magazyn', value: 75, color: '#2563eb' },
     { name: 'Telefony', value: 25, color: '#9333ea' },
   ],
   'galeria-katowicka': [
     { name: 'Telefony', value: 50, color: '#9333ea' },
-    { name: 'Akcesoria', value: 40, color: '#2563eb' },
+    { name: 'Magazyn', value: 40, color: '#2563eb' },
     { name: 'Części', value: 10, color: '#10b981' },
   ],
   'silesia-city': [
-    { name: 'Akcesoria', value: 45, color: '#2563eb' },
+    { name: 'Magazyn', value: 45, color: '#2563eb' },
     { name: 'Telefony', value: 55, color: '#9333ea' },
   ]
 };
@@ -140,7 +140,7 @@ export default function RaportyPage() {
       profit: '45 zł', 
       shop: 'Silesia City',
       items: [
-        { name: 'Szkło hartowane 9H', category: 'Akcesoria', price: 50 }
+        { name: 'Szkło hartowane 9H', category: 'Magazyn', price: 50 }
       ]
     },
     { 
@@ -151,7 +151,7 @@ export default function RaportyPage() {
       profit: '60 zł', 
       shop: 'Silesia City',
       items: [
-        { name: 'Etui MagSafe', category: 'Akcesoria', price: 120 }
+        { name: 'Etui MagSafe', category: 'Magazyn', price: 120 }
       ]
     },
   ];

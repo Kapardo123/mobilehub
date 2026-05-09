@@ -96,7 +96,7 @@ export function Navbar() {
               <DropdownMenuItem className="cursor-pointer p-0">
                 <Link href="/magazyn" className="flex items-center w-full px-2 py-1.5">
                   <ClipboardList className="mr-2 h-4 w-4" />
-                  <span>Akcesoria</span>
+                  <span>Magazyn</span>
                 </Link>
               </DropdownMenuItem>
 

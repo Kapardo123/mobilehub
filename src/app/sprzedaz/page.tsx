@@ -47,18 +47,18 @@ export default function SprzedazPage() {
       profit: "45 zł",
       paymentMethod: "Karta",
       items: [
-        { name: "Etui iPhone 13", category: "Akcesoria", price: 89 }
+        { name: "Etui iPhone 13", category: "Magazyn", price: 89 }
       ]
     },
     { 
-      id: "s2",
-      time: "13:15", 
-      user: "Piotr Zakrzewski", 
+      id: "2", 
+      time: "12:15", 
+      user: "Anna Nowak", 
       price: "129 zł", 
-      profit: "80 zł",
+      profit: "70 zł",
       paymentMethod: "Gotówka",
       items: [
-        { name: "Etui MagSafe iPhone 14", category: "Akcesoria", price: 129 }
+        { name: "Etui MagSafe iPhone 14", category: "Magazyn", price: 129 }
       ]
     },
   ]);
@@ -90,7 +90,7 @@ export default function SprzedazPage() {
   const [saleProfit, setSaleProfit] = useState("");
 
   const categories = [
-    { id: "akcesoria", label: "Akcesoria" },
+    { id: "akcesoria", label: "Magazyn" },
     { id: "telefony", label: "Telefony" },
     { id: "czesci", label: "Części" },
   ];
@@ -199,7 +199,7 @@ export default function SprzedazPage() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <h1 className="text-xl font-bold">Sprzedaż i Skup</h1>
+          <h1 className="text-xl font-bold">Sprzedaż</h1>
         </div>
 
         <Card className="border-none shadow-sm bg-white overflow-hidden rounded-2xl">
@@ -247,18 +247,7 @@ export default function SprzedazPage() {
           </CardContent>
         </Card>
 
-        <section className="space-y-4">
-          <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Koszty i Transfery</h2>
-          <Card className="border-none shadow-sm bg-white overflow-hidden rounded-2xl">
-            <CardContent className="p-8 text-center space-y-3">
-              <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center mx-auto">
-                <DollarSign className="h-6 w-6 text-slate-300" />
-              </div>
-              <p className="text-sm font-bold text-slate-400 uppercase tracking-tighter">Brak zarejestrowanych kosztów</p>
-              <Button variant="outline" size="sm" className="text-[10px] font-bold uppercase h-8 border-slate-100">Dodaj koszt</Button>
-            </CardContent>
-          </Card>
-        </section>
+
 
         <div className="fixed bottom-6 right-6 flex flex-col gap-3">
           <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>

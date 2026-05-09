@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { CreditCard, Banknote, FileText, ArrowRight } from "lucide-react";
+import { CreditCard, Banknote, FileText, ArrowRight, DollarSign } from "lucide-react";
 
 export default function Home() {
   const router = useRouter();
@@ -157,7 +157,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-3">
             {[
               { href: "/sprzedaz", label: "Sprzedaż", icon: ShoppingCart, color: "bg-blue-600", shadow: "shadow-blue-100" },
-              { href: "/magazyn", label: "Akcesoria", icon: ClipboardList, color: "bg-slate-800", shadow: "shadow-slate-100" },
+              { href: "/magazyn", label: "Magazyn", icon: ClipboardList, color: "bg-slate-800", shadow: "shadow-slate-100" },
               { href: "/pracownicy", label: "Pracownicy", icon: Users, color: "bg-purple-600", shadow: "shadow-purple-100" },
               { href: "/raporty", label: "Raporty", icon: Search, color: "bg-emerald-600", shadow: "shadow-emerald-100" },
             ].map((item) => (
@@ -172,6 +172,8 @@ export default function Home() {
             ))}
           </div>
         </section>
+
+
 
         {/* Quick Access List - More Refined */}
         <section className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-50">

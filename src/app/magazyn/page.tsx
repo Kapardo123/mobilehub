@@ -45,14 +45,14 @@ export default function MagazynPage() {
   });
 
   const categories = [
-    { id: "akcesoria", label: "Akcesoria", count: 124, icon: Package, color: "text-blue-600", bg: "bg-blue-50" },
+    { id: "akcesoria", label: "Magazyn", count: 124, icon: Package, color: "text-blue-600", bg: "bg-blue-50" },
     { id: "telefony", label: "Telefony", count: 15, icon: Smartphone, color: "text-purple-600", bg: "bg-purple-50" },
     { id: "czesci", label: "Części", count: 56, icon: Settings, color: "text-orange-600", bg: "bg-orange-50" },
   ];
 
   const [inventory, setInventory] = useState([
-    { name: "Szkło hartowane iPhone 15", category: "akcesoria", stock: 12, price: "49 zł", alert: false },
-    { name: "Etui MagSafe iPhone 14", category: "akcesoria", stock: 3, price: "129 zł", alert: true },
+    { name: "Szkło hartowane iPhone 15", category: "Magazyn", stock: 12, price: "49 zł", alert: false },
+    { name: "Etui MagSafe iPhone 14", category: "Magazyn", stock: 3, price: "129 zł", alert: true },
     { name: "Bateria Samsung S21", category: "czesci", stock: 5, price: "89 zł", alert: false },
     { name: "iPhone 13 128GB Blue", category: "telefony", stock: 1, price: "2499 zł", alert: false },
   ]);
