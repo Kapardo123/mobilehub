@@ -84,7 +84,7 @@ export default function RaportDniaPage() {
               />
             </div>
 
-            <Select value={selectedShop} onValueChange={setSelectedShop}>
+            <Select value={selectedShop} onValueChange={(val) => setSelectedShop(val || "all")}>
               <SelectTrigger className="w-full sm:w-[220px] bg-slate-900 border-none h-12 rounded-2xl font-black text-[10px] uppercase tracking-widest text-white hover:bg-slate-800 transition-colors px-6">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-3.5 w-3.5 text-blue-400" />

@@ -86,7 +86,7 @@ export default function Home() {
                 </div>
                 
                 <div className="w-full sm:w-auto flex-1 max-w-[200px]">
-                  <Select value={selectedShop} onValueChange={setSelectedShop}>
+                  <Select value={selectedShop} onValueChange={(val) => setSelectedShop(val || "all")}>
                     <SelectTrigger className="bg-white/5 border-white/5 h-10 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-white/10 transition-colors px-4">
                       <div className="flex items-center gap-2">
                         <MapPin className="h-3.5 w-3.5 text-blue-400" />

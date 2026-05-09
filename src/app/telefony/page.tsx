@@ -149,7 +149,7 @@ export default function TelefonyPage() {
               <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Filtruj Punkt</span>
             </div>
             
-            <Select value={selectedShop} onValueChange={setSelectedShop}>
+            <Select value={selectedShop} onValueChange={(val) => setSelectedShop(val || "all")}>
               <SelectTrigger className="min-w-[140px] w-fit bg-slate-900 border-none h-12 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest text-white hover:bg-slate-800 transition-colors px-6 gap-4">
                 <SelectValue placeholder="Zmień punkt">
                   {selectedShop === "all" ? "Wszystkie" : selectedShop}
