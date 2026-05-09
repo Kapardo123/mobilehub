@@ -431,11 +431,13 @@ export default function SprzedazPage() {
               setSelectedCategory(null);
             }
           }}>
-            <DialogTrigger asChild>
-              <div className={cn(buttonVariants({ variant: "default", size: "lg" }), "h-14 w-14 rounded-full shadow-2xl bg-blue-600 hover:bg-blue-500 hover:scale-110 transition-all cursor-pointer p-0 flex items-center justify-center text-white")}>
-                <Plus className="h-8 w-8" />
-              </div>
-            </DialogTrigger>
+            <DialogTrigger 
+              render={
+                <div className={cn(buttonVariants({ variant: "default", size: "lg" }), "h-14 w-14 rounded-full shadow-2xl bg-blue-600 hover:bg-blue-500 hover:scale-110 transition-all cursor-pointer p-0 flex items-center justify-center text-white")}>
+                  <Plus className="h-8 w-8" />
+                </div>
+              }
+            />
             <DialogContent className="sm:max-w-[500px] rounded-3xl border-none p-0 overflow-hidden flex flex-col max-h-[90vh]">
               <DialogHeader className="p-6 pb-0">
                 <DialogTitle className="text-xl font-black text-slate-900">Nowa Sprzedaż</DialogTitle>

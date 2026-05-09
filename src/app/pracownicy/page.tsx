@@ -131,12 +131,14 @@ export default function PracownicyPage() {
           {selectedShop && (
             <>
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <div className={cn(buttonVariants({ variant: "default", size: "default" }), "bg-blue-600 hover:bg-blue-500 rounded-xl font-bold shadow-lg shadow-blue-100 h-10 px-4 text-xs cursor-pointer text-white")}>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Dodaj
-                  </div>
-                </DialogTrigger>
+                <DialogTrigger 
+                  render={
+                    <div className={cn(buttonVariants({ variant: "default", size: "default" }), "bg-blue-600 hover:bg-blue-500 rounded-xl font-bold shadow-lg shadow-blue-100 h-10 px-4 text-xs cursor-pointer text-white")}>
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Dodaj
+                    </div>
+                  }
+                />
                 <DialogContent className="sm:max-w-[425px] rounded-3xl border-none">
                   <DialogHeader>
                     <DialogTitle className="text-xl font-black text-slate-900">Nowy Pracownik</DialogTitle>
@@ -205,7 +207,7 @@ export default function PracownicyPage() {
                       <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Rola</Label>
                       <UISelect 
                         value={newEmployee.role}
-                        onValueChange={(val) => setNewEmployee({ ...newEmployee, role: val })}
+                        onValueChange={(val) => val && setNewEmployee({ ...newEmployee, role: val })}
                       >
                         <UISelectTrigger className="h-12 bg-slate-50 border-none rounded-xl font-bold text-slate-700">
                           <UISelectValue placeholder="Wybierz rolę" />

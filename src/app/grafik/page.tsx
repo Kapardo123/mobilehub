@@ -147,9 +147,8 @@ export default function GrafikPage() {
           </div>
         </div>
 
-        {/* Premium Shop Selector */}
         <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-100">
-          <Select value={selectedShop} onValueChange={setSelectedShop}>
+          <Select value={selectedShop} onValueChange={(val) => val && setSelectedShop(val)}>
             <SelectTrigger className="border-none bg-transparent h-12 focus:ring-0 font-bold text-slate-700">
               <div className="flex items-center gap-2 pl-2">
                 <MapPin className="h-4 w-4 text-blue-600" />

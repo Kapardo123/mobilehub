@@ -97,12 +97,14 @@ export default function MagazynPage() {
           </div>
           
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <div className={cn(buttonVariants({ variant: "default", size: "default" }), "bg-blue-600 hover:bg-blue-500 rounded-xl font-bold shadow-lg shadow-blue-100 h-10 px-4 text-xs cursor-pointer text-white")}>
-                <Plus className="h-4 w-4 mr-2" />
-                Dodaj
-              </div>
-            </DialogTrigger>
+            <DialogTrigger 
+              render={
+                <div className={cn(buttonVariants({ variant: "default", size: "default" }), "bg-blue-600 hover:bg-blue-500 rounded-xl font-bold shadow-lg shadow-blue-100 h-10 px-4 text-xs cursor-pointer text-white")}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Dodaj
+                </div>
+              }
+            />
             <DialogContent className="sm:max-w-[425px] rounded-3xl border-none">
               <DialogHeader>
                 <DialogTitle className="text-xl font-black text-slate-900">Nowy Przedmiot</DialogTitle>
@@ -122,7 +124,7 @@ export default function MagazynPage() {
                   <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Kategoria</Label>
                   <UISelect 
                     value={newItem.category}
-                    onValueChange={(val) => setNewItem({ ...newItem, category: val })}
+                    onValueChange={(val) => val && setNewItem({ ...newItem, category: val })}
                   >
                     <UISelectTrigger className="h-12 bg-slate-50 border-none rounded-xl font-bold text-slate-700">
                       <UISelectValue placeholder="Wybierz kategorię" />

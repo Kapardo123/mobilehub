@@ -106,12 +106,14 @@ export default function SklepyPage() {
           </div>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black uppercase text-[10px] tracking-widest h-10 gap-2 shadow-lg shadow-blue-100">
-                <Plus className="h-4 w-4" />
-                Dodaj Sklep
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger 
+              render={
+                <Button className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black uppercase text-[10px] tracking-widest h-10 gap-2 shadow-lg shadow-blue-100">
+                  <Plus className="h-4 w-4" />
+                  Dodaj Sklep
+                </Button>
+              }
+            />
             <DialogContent className="sm:max-w-[425px] rounded-3xl border-none p-0 overflow-hidden">
               <DialogHeader className="p-8 bg-blue-600 text-white text-left">
                 <DialogTitle className="text-2xl font-black mb-1">Nowy Sklep</DialogTitle>
