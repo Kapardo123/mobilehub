@@ -45,7 +45,7 @@ CREATE TABLE phones (
   condition TEXT, -- 'nowy', 'uzywany'
   price_buy DECIMAL(10,2),
   price_sell_target DECIMAL(10,2),
-  status TEXT DEFAULT 'w_magazynie', -- 'w_magazynie', 'sprzedany', 'serwis'
+  status TEXT DEFAULT 'w_magazynie', -- 'w_magazynie', 'sprzedany'
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -63,7 +63,7 @@ CREATE TABLE sales (
 CREATE TABLE sale_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   sale_id UUID REFERENCES sales(id) ON DELETE CASCADE,
-  item_type TEXT, -- 'inventory', 'phone', 'service'
+  item_type TEXT, -- 'inventory', 'phone'
   item_id UUID, -- Reference to inventory or phones
   description TEXT,
   quantity INTEGER DEFAULT 1,

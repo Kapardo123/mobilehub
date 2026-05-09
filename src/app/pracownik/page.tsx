@@ -1,5 +1,5 @@
 import { Navbar } from "@/components/navbar";
-import { Wrench, ShoppingCart, Search, ClipboardList } from "lucide-react";
+import { ShoppingCart, Search, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ export default function PracownikDashboard() {
         {/* Action Grid for Employee */}
         <section>
           <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-4 px-1">Twoje Narzędzia</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Link href="/sprzedaz" className="group">
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 group-hover:border-blue-200 group-hover:shadow-md transition-all flex flex-col items-center text-center space-y-4">
                 <div className="h-16 w-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-100 group-hover:scale-110 transition-transform">
@@ -40,18 +40,6 @@ export default function PracownikDashboard() {
                 <div className="space-y-1">
                   <p className="font-black text-slate-800 text-lg group-hover:text-blue-600 transition-colors">Sprzedaż</p>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Nowa transakcja</p>
-                </div>
-              </div>
-            </Link>
-
-            <Link href="/serwis" className="group">
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 group-hover:border-orange-200 group-hover:shadow-md transition-all flex flex-col items-center text-center space-y-4">
-                <div className="h-16 w-16 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-100 group-hover:scale-110 transition-transform">
-                  <Wrench className="h-8 w-8" />
-                </div>
-                <div className="space-y-1">
-                  <p className="font-black text-slate-800 text-lg group-hover:text-orange-600 transition-colors">Serwis</p>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Przyjmij urządzenie</p>
                 </div>
               </div>
             </Link>

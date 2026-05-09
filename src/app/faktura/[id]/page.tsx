@@ -47,7 +47,6 @@ function InvoiceContent() {
           <div className="space-y-4">
             <div className="flex flex-col">
               <span className="text-2xl font-black tracking-tighter text-slate-900 italic leading-none">MOBILE HUB</span>
-              <span className="text-[9px] font-black tracking-[0.4em] text-slate-400 leading-none uppercase mt-1">Professional GSM Service</span>
             </div>
             <div className="space-y-0.5">
               <h1 className="text-4xl font-light text-slate-900 tracking-tight">Faktura <span className="font-black">VAT</span></h1>

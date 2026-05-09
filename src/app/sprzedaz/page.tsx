@@ -54,11 +54,11 @@ export default function SprzedazPage() {
       id: "s2",
       time: "13:15", 
       user: "Piotr Zakrzewski", 
-      price: "350 zł", 
-      profit: "150 zł",
+      price: "129 zł", 
+      profit: "80 zł",
       paymentMethod: "Gotówka",
       items: [
-        { name: "Wymiana szybki S21", category: "Serwis", price: 350 }
+        { name: "Etui MagSafe iPhone 14", category: "Akcesoria", price: 129 }
       ]
     },
   ]);
@@ -93,7 +93,6 @@ export default function SprzedazPage() {
     { id: "akcesoria", label: "Akcesoria" },
     { id: "telefony", label: "Telefony" },
     { id: "czesci", label: "Części" },
-    { id: "serwis", label: "Serwis" },
   ];
 
   useEffect(() => {

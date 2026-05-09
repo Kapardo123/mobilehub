@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Wrench, ShoppingCart, Users, Search, ClipboardList, Calendar as CalendarIcon, MapPin } from "lucide-react";
+import { ShoppingCart, Users, Search, ClipboardList, Calendar as CalendarIcon, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
@@ -95,7 +95,7 @@ export default function Home() {
         </section>
 
         {/* Quick Stats Grid */}
-        <section className="grid grid-cols-2 gap-3">
+        <section>
           <Card className="border-none shadow-sm bg-white hover:shadow-md transition-all rounded-2xl group cursor-pointer">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center group-hover:bg-blue-600 transition-colors">
@@ -104,17 +104,6 @@ export default function Home() {
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Sprzedaż</p>
                 <p className="text-lg font-black text-slate-900">24</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-none shadow-sm bg-white hover:shadow-md transition-all rounded-2xl group cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-orange-50 flex items-center justify-center group-hover:bg-orange-600 transition-colors">
-                <Wrench className="h-5 w-5 text-orange-600 group-hover:text-white" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Serwisy</p>
-                <p className="text-lg font-black text-slate-900">8</p>
               </div>
             </CardContent>
           </Card>
@@ -150,7 +139,7 @@ export default function Home() {
           <div className="space-y-6">
             {[
               { label: "Sprzedaż: Etui iPhone 13", time: "14:30", user: "Jan Kowalski", price: "89 zł", icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-50" },
-              { label: "Serwis: Wymiana LCD S23", time: "12:15", user: "Anna Nowak", price: "450 zł", icon: Wrench, color: "text-orange-600", bg: "bg-orange-50" },
+              { label: "Sprzedaż: iPhone 15 Pro", time: "12:15", user: "Anna Nowak", price: "5 450 zł", icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-50" },
               { label: "Dostawa: Akcesoria", time: "09:45", user: "System", price: "1 200 zł", icon: ClipboardList, color: "text-emerald-600", bg: "bg-emerald-50" },
             ].map((action, i) => (
               <div key={i} className="flex items-center justify-between group cursor-pointer">

@@ -75,15 +75,13 @@ const salesData = {
 
 const categoryData = {
   all: [
-    { name: 'Akcesoria', value: 45, color: '#2563eb' },
-    { name: 'Telefony', value: 30, color: '#9333ea' },
-    { name: 'Serwis', value: 20, color: '#f59e0b' },
+    { name: 'Akcesoria', value: 55, color: '#2563eb' },
+    { name: 'Telefony', value: 40, color: '#9333ea' },
     { name: 'Części', value: 5, color: '#10b981' },
   ],
   'trzy-stawy': [
-    { name: 'Akcesoria', value: 60, color: '#2563eb' },
-    { name: 'Serwis', value: 30, color: '#f59e0b' },
-    { name: 'Telefony', value: 10, color: '#9333ea' },
+    { name: 'Akcesoria', value: 75, color: '#2563eb' },
+    { name: 'Telefony', value: 25, color: '#9333ea' },
   ],
   'galeria-katowicka': [
     { name: 'Telefony', value: 50, color: '#9333ea' },
@@ -91,9 +89,8 @@ const categoryData = {
     { name: 'Części', value: 10, color: '#10b981' },
   ],
   'silesia-city': [
-    { name: 'Akcesoria', value: 35, color: '#2563eb' },
-    { name: 'Telefony', value: 35, color: '#9333ea' },
-    { name: 'Serwis', value: 30, color: '#f59e0b' },
+    { name: 'Akcesoria', value: 45, color: '#2563eb' },
+    { name: 'Telefony', value: 55, color: '#9333ea' },
   ]
 };
 
@@ -155,17 +152,6 @@ export default function RaportyPage() {
       shop: 'Silesia City',
       items: [
         { name: 'Etui MagSafe', category: 'Akcesoria', price: 120 }
-      ]
-    },
-    { 
-      id: '4', 
-      date: '2024-05-20', 
-      time: '10:30', 
-      price: '250 zł', 
-      profit: '120 zł', 
-      shop: 'Silesia City',
-      items: [
-        { name: 'Wymiana baterii S21', category: 'Serwis', price: 250 }
       ]
     },
   ];
