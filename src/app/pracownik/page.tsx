@@ -1,5 +1,5 @@
 import { Navbar } from "@/components/navbar";
-import { ShoppingCart, Search, ClipboardList } from "lucide-react";
+import { ShoppingCart, Search, ClipboardList, Banknote, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,10 +18,30 @@ export default function PracownikDashboard() {
               <h1 className="text-2xl font-black">Jan Kowalski</h1>
             </div>
             
-            <div className="flex gap-4">
-              <div className="bg-white/10 rounded-2xl p-4 flex-1">
-                <p className="text-blue-100 text-[10px] font-bold uppercase tracking-widest">Twoja sprzedaż dziś</p>
-                <p className="text-3xl font-black mt-1">840 zł</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex flex-col justify-between">
+                <p className="text-blue-100 text-[10px] font-black uppercase tracking-[0.2em]">Suma Dnia</p>
+                <p className="text-3xl font-black mt-2 tracking-tighter">840 <span className="text-xs opacity-60">zł</span></p>
+              </div>
+              
+              <div className="bg-emerald-500/20 backdrop-blur-md rounded-2xl p-4 border border-emerald-400/20 flex items-center gap-3 group hover:bg-emerald-500/30 transition-all">
+                <div className="h-10 w-10 rounded-xl bg-emerald-400/20 flex items-center justify-center shrink-0">
+                  <Banknote className="h-5 w-5 text-emerald-300" />
+                </div>
+                <div>
+                  <p className="text-emerald-200 text-[9px] font-black uppercase tracking-widest">Gotówka</p>
+                  <p className="text-xl font-black">320 <span className="text-[10px] opacity-60">zł</span></p>
+                </div>
+              </div>
+
+              <div className="bg-blue-400/20 backdrop-blur-md rounded-2xl p-4 border border-blue-300/20 flex items-center gap-3 group hover:bg-blue-400/30 transition-all">
+                <div className="h-10 w-10 rounded-xl bg-blue-300/20 flex items-center justify-center shrink-0">
+                  <CreditCard className="h-5 w-5 text-blue-200" />
+                </div>
+                <div>
+                  <p className="text-blue-100 text-[9px] font-black uppercase tracking-widest">Karta</p>
+                  <p className="text-xl font-black">520 <span className="text-[10px] opacity-60">zł</span></p>
+                </div>
               </div>
             </div>
           </div>
@@ -50,7 +70,7 @@ export default function PracownikDashboard() {
                   <ClipboardList className="h-8 w-8" />
                 </div>
                 <div className="space-y-1">
-                  <p className="font-black text-slate-800 text-lg group-hover:text-emerald-600 transition-colors">Magazyn</p>
+                  <p className="font-black text-slate-800 text-lg group-hover:text-emerald-600 transition-colors">Akcesoria</p>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Sprawdź stany</p>
                 </div>
               </div>
@@ -74,18 +94,21 @@ export default function PracownikDashboard() {
         <section className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
           <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-4">Twoje ostatnie akcje</h2>
           <div className="space-y-4">
-            {[1, 2].map((i) => (
+            {[
+              { label: "Sprzedaż: Etui iPhone 13", time: "14:30", price: "89 zł", icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-50" },
+              { label: "Sprzedaż: iPhone 15 Pro", time: "12:15", price: "5 450 zł", icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-50" },
+            ].map((action, i) => (
               <div key={i} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center">
-                    <ShoppingCart className="h-4 w-4 text-blue-600" />
+                  <div className={`h-8 w-8 rounded-full ${action.bg} flex items-center justify-center`}>
+                    <action.icon className={`h-4 w-4 ${action.color}`} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-800">Sprzedaż: Etui iPhone 13</p>
-                    <p className="text-[10px] text-slate-400">14:30 • Trzy Stawy</p>
+                    <p className="text-sm font-bold text-slate-800">{action.label}</p>
+                    <p className="text-[10px] text-slate-400">{action.time} • Trzy Stawy</p>
                   </div>
                 </div>
-                <p className="text-sm font-black text-slate-900">89 zł</p>
+                <p className="text-sm font-black text-slate-900">{action.price}</p>
               </div>
             ))}
           </div>

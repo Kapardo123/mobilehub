@@ -9,9 +9,48 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Navbar } from "@/components/navbar";
+import { useState } from "react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { CreditCard, Banknote, FileText, ArrowRight } from "lucide-react";
 
 export default function Home() {
   const router = useRouter();
+  const [selectedShop, setSelectedShop] = useState("all");
+  const [isReportOpen, setIsReportOpen] = useState(false);
+
+  // Mock data for shops
+  const shopData = {
+    'all': { balance: "+3 650", cash: "1 700", card: "1 950", sales: [
+      { id: "1", time: "14:30", user: "Jan Kowalski", price: "89 zł", type: "Karta", item: "Etui iPhone 13", shop: "Trzy Stawy" },
+      { id: "2", time: "12:15", user: "Anna Nowak", price: "5 450 zł", type: "Karta", item: "iPhone 15 Pro", shop: "Galeria Katowicka" },
+    ]},
+    'trzy-stawy': { balance: "+2 090", cash: "1 250", card: "840", sales: [
+      { id: "1", time: "14:30", user: "Jan Kowalski", price: "89 zł", type: "Karta", item: "Etui iPhone 13", shop: "Trzy Stawy" },
+    ]},
+    'galeria-katowicka': { balance: "+1 560", cash: "900", card: "660", sales: [
+      { id: "2", time: "12:15", user: "Anna Nowak", price: "5 450 zł", type: "Karta", item: "iPhone 15 Pro", shop: "Galeria Katowicka" },
+    ]},
+    'silesia-city': { balance: "0", cash: "0", card: "0", sales: []},
+  };
+
+  const currentStats = shopData[selectedShop as keyof typeof shopData];
 
   useEffect(() => {
     // Sprawdzamy czy użytkownik jest zalogowany (wersja uproszczona - zawsze przekieruj na login jeśli wejdzie na /)
@@ -46,66 +85,67 @@ export default function Home() {
                   />
                 </div>
                 
-                <div className="w-full sm:w-auto flex-1 max-w-[180px]">
-                  <Select defaultValue="trzy-stawy">
-                    <SelectTrigger className="bg-white/5 border-white/5 h-9 text-white text-[11px] font-bold rounded-xl hover:bg-white/10 transition-colors">
+                <div className="w-full sm:w-auto flex-1 max-w-[200px]">
+                  <Select value={selectedShop} onValueChange={setSelectedShop}>
+                    <SelectTrigger className="bg-white/5 border-white/5 h-10 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-white/10 transition-colors px-4">
                       <div className="flex items-center gap-2">
                         <MapPin className="h-3.5 w-3.5 text-blue-400" />
-                        <SelectValue placeholder="Punkt" />
+                        <SelectValue placeholder="Punkt">
+                          {selectedShop === "all" ? "Wszystkie punkty" : selectedShop.replace('-', ' ').toUpperCase()}
+                        </SelectValue>
                       </div>
                     </SelectTrigger>
                     <SelectContent className="bg-[#1E293B] border-white/10 text-white rounded-xl">
-                      <SelectItem value="trzy-stawy">Trzy Stawy</SelectItem>
-                      <SelectItem value="galeria-katowicka">Galeria Katowicka</SelectItem>
-                      <SelectItem value="silesia-city">Silesia City Center</SelectItem>
+                      <SelectItem value="all" className="font-bold text-[10px] uppercase tracking-widest">Wszystkie punkty</SelectItem>
+                      <SelectItem value="trzy-stawy" className="font-bold text-[10px] uppercase tracking-widest">Trzy Stawy</SelectItem>
+                      <SelectItem value="galeria-katowicka" className="font-bold text-[10px] uppercase tracking-widest">Galeria Katowicka</SelectItem>
+                      <SelectItem value="silesia-city" className="font-bold text-[10px] uppercase tracking-widest">Silesia City Center</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               
               {/* Middle Row: Main Balance and Sub-stats */}
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-8 py-4">
                 <div className="space-y-1">
                   <p className="text-blue-400 text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Bilans Dnia</p>
                   <div className="flex items-baseline gap-2">
-                    <p className="text-4xl font-black text-emerald-400 tracking-tighter">
-                      +2 090
+                    <p className="text-5xl font-black text-emerald-400 tracking-tighter drop-shadow-[0_0_15px_rgba(52,211,153,0.3)]">
+                      {currentStats.balance}
                     </p>
                     <span className="text-sm font-bold text-emerald-400/60 uppercase">PLN</span>
                   </div>
                 </div>
 
-                <div className="flex gap-6 border-l sm:border-l-0 sm:border-t border-white/5 pt-0 sm:pt-0 pl-4 sm:pl-0">
-                  <div className="space-y-1">
-                    <p className="text-slate-500 text-[9px] font-bold uppercase tracking-wider">Gotówka</p>
-                    <p className="text-lg font-black text-white/90">1 250 <span className="text-[10px] text-slate-500">zł</span></p>
+                <div className="grid grid-cols-2 gap-4 flex-1 max-w-sm">
+                  <div className="bg-white/5 rounded-2xl p-4 border border-white/5 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
+                      <Banknote className="h-5 w-5 text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest">Gotówka</p>
+                      <p className="text-lg font-black text-white">{currentStats.cash} <span className="text-[10px] text-slate-500">zł</span></p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-slate-500 text-[9px] font-bold uppercase tracking-wider">Karta</p>
-                    <p className="text-lg font-black text-white/90">840 <span className="text-[10px] text-slate-500">zł</span></p>
+                  <div className="bg-white/5 rounded-2xl p-4 border border-white/5 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-blue-500/20 flex items-center justify-center shrink-0">
+                      <CreditCard className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest">Karta</p>
+                      <p className="text-lg font-black text-white">{currentStats.card} <span className="text-[10px] text-slate-500">zł</span></p>
+                    </div>
                   </div>
                 </div>
               </div>
+            </CardContent>
 
-              <Button className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black h-10 rounded-xl shadow-lg shadow-blue-900/20 transition-all text-[11px] uppercase tracking-widest">
-                Szczegółowy Raport
+            <Link href="/raport-dnia" className="block w-full">
+              <Button className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black h-14 rounded-none rounded-b-[2rem] shadow-none transition-all text-[11px] uppercase tracking-[0.2em] gap-3">
+                <FileText className="h-4 w-4" />
+                Szczegółowy Raport Dnia
               </Button>
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* Quick Stats Grid */}
-        <section>
-          <Card className="border-none shadow-sm bg-white hover:shadow-md transition-all rounded-2xl group cursor-pointer">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center group-hover:bg-blue-600 transition-colors">
-                <ShoppingCart className="h-5 w-5 text-blue-600 group-hover:text-white" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Sprzedaż</p>
-                <p className="text-lg font-black text-slate-900">24</p>
-              </div>
-            </CardContent>
+            </Link>
           </Card>
         </section>
 
@@ -117,7 +157,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-3">
             {[
               { href: "/sprzedaz", label: "Sprzedaż", icon: ShoppingCart, color: "bg-blue-600", shadow: "shadow-blue-100" },
-              { href: "/magazyn", label: "Magazyn", icon: ClipboardList, color: "bg-slate-800", shadow: "shadow-slate-100" },
+              { href: "/magazyn", label: "Akcesoria", icon: ClipboardList, color: "bg-slate-800", shadow: "shadow-slate-100" },
               { href: "/pracownicy", label: "Pracownicy", icon: Users, color: "bg-purple-600", shadow: "shadow-purple-100" },
               { href: "/raporty", label: "Raporty", icon: Search, color: "bg-emerald-600", shadow: "shadow-emerald-100" },
             ].map((item) => (
@@ -140,7 +180,6 @@ export default function Home() {
             {[
               { label: "Sprzedaż: Etui iPhone 13", time: "14:30", user: "Jan Kowalski", price: "89 zł", icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-50" },
               { label: "Sprzedaż: iPhone 15 Pro", time: "12:15", user: "Anna Nowak", price: "5 450 zł", icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-50" },
-              { label: "Dostawa: Akcesoria", time: "09:45", user: "System", price: "1 200 zł", icon: ClipboardList, color: "text-emerald-600", bg: "bg-emerald-50" },
             ].map((action, i) => (
               <div key={i} className="flex items-center justify-between group cursor-pointer">
                 <div className="flex items-center gap-4">

@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Settings, Bell, Search, BookOpen, Calculator, ShoppingCart, Users, LayoutDashboard, MapPin, User, ChevronDown, Store } from "lucide-react";
+import { LogOut, Settings, Bell, Search, BookOpen, Calculator, ShoppingCart, Users, LayoutDashboard, MapPin, User, ChevronDown, Store, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -75,14 +75,12 @@ export function Navbar() {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
-              {!isEmployee && (
-                <DropdownMenuItem className="cursor-pointer p-0">
-                  <Link href="/telefony" className="flex items-center w-full px-2 py-1.5">
-                    <Search className="mr-2 h-4 w-4" />
-                    <span>Telefony na stanie</span>
-                  </Link>
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem className="cursor-pointer p-0">
+                <Link href="/telefony" className="flex items-center w-full px-2 py-1.5">
+                  <Search className="mr-2 h-4 w-4" />
+                  <span>Telefony na stanie</span>
+                </Link>
+              </DropdownMenuItem>
 
               <DropdownMenuItem className="cursor-pointer p-0">
                 <Link href="/dokumenty" className="flex items-center w-full px-2 py-1.5">
@@ -95,6 +93,13 @@ export function Navbar() {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
+              <DropdownMenuItem className="cursor-pointer p-0">
+                <Link href="/magazyn" className="flex items-center w-full px-2 py-1.5">
+                  <ClipboardList className="mr-2 h-4 w-4" />
+                  <span>Akcesoria</span>
+                </Link>
+              </DropdownMenuItem>
+
               <DropdownMenuItem className="cursor-pointer p-0">
                 <Link href="/grafik" className="flex items-center w-full px-2 py-1.5">
                   <Settings className="mr-2 h-4 w-4" />
