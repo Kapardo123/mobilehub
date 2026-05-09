@@ -1,3 +1,7 @@
+"use client"
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Wrench, ShoppingCart, Users, Search, ClipboardList, Calendar as CalendarIcon, MapPin } from "lucide-react";
 import Link from "next/link";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,6 +11,18 @@ import { Input } from "@/components/ui/input";
 import { Navbar } from "@/components/navbar";
 
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Sprawdzamy czy użytkownik jest zalogowany (wersja uproszczona - zawsze przekieruj na login jeśli wejdzie na /)
+    // W przyszłości można tu dodać sprawdzanie sesji/localStorage
+    const isFirstVisit = !sessionStorage.getItem("visited");
+    if (isFirstVisit) {
+      sessionStorage.setItem("visited", "true");
+      router.push("/login");
+    }
+  }, [router]);
+
   return (
     <div className="flex flex-col min-h-screen bg-[#F8FAFC]">
       <Navbar />
