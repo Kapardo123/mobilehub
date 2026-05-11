@@ -415,7 +415,7 @@ export default function SprzedazPage() {
                 <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Kategoria</Label>
                 <UISelect 
                   value={newEntry.category} 
-                  onValueChange={(val) => setNewEntry({...newEntry, category: val})}
+                  onValueChange={(val) => setNewEntry({...newEntry, category: val || "akcesoria"})}
                 >
                   <UISelectTrigger className="bg-slate-50 border-none h-12 rounded-xl font-bold">
                     <UISelectValue placeholder="Wybierz..." />
