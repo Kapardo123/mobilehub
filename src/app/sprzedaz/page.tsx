@@ -559,7 +559,7 @@ export default function SprzedazPage() {
           <div className="space-y-2">
             <Label className="text-blue-400 text-xs font-black uppercase tracking-widest">punkt</Label>
             {userRole === "owner" ? (
-              <UISelect value={selectedShop} onValueChange={setSelectedShop}>
+              <UISelect value={selectedShop} onValueChange={(val) => setSelectedShop(val || "Trzy Stawy Katowice")}>
                 <UISelectTrigger className="bg-[#1a1f2e] border-slate-700 h-12 text-white font-bold">
                   <UISelectValue placeholder="Wybierz sklep" />
                 </UISelectTrigger>
