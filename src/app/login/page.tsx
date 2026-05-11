@@ -15,8 +15,12 @@ export default function LoginPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (login.toLowerCase() === "pracownik") {
+      sessionStorage.setItem("userRole", "employee");
+      sessionStorage.setItem("userName", "Jan Kowalski");
       router.push("/pracownik");
     } else if (login.toLowerCase() === "wlasciciel" || login.toLowerCase() === "właściciel") {
+      sessionStorage.setItem("userRole", "owner");
+      sessionStorage.setItem("userName", "Piotr Zakrzewski");
       router.push("/");
     } else {
       alert("Błędny login. Użyj 'pracownik' lub 'wlasciciel'.");
@@ -26,11 +30,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-4">
       <div className="w-full max-w-md space-y-8">
-        <div className="text-center space-y-2">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-xl shadow-blue-200 mb-4">
-            <Smartphone className="h-8 w-8" />
-          </div>
-          <h1 className="text-3xl font-black tracking-tighter text-slate-900">MOBILE<span className="text-blue-600 italic">HUB</span></h1>
+        <div className="text-center space-y-4">
+          <img src="/logo.png" alt="Mobile Hub" className="h-16 w-auto mx-auto object-contain" />
           <p className="text-slate-500 font-medium">Zaloguj się do systemu zarządzania</p>
         </div>
 

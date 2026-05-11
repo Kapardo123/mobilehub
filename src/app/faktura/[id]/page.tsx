@@ -44,10 +44,8 @@ function InvoiceContent() {
       <div className="max-w-4xl mx-auto bg-white p-12 sm:p-20 print:p-0 shadow-[0_0_50px_rgba(0,0,0,0.05)] print:shadow-none">
         {/* Top Header */}
         <div className="flex justify-between items-start mb-16">
-          <div className="space-y-4">
-            <div className="flex flex-col">
-              <span className="text-2xl font-black tracking-tighter text-slate-900 italic leading-none">MOBILE HUB</span>
-            </div>
+          <div className="space-y-6">
+            <img src="/logo.png" alt="Mobile Hub" className="h-16 w-auto object-contain" />
             <div className="space-y-0.5">
               <h1 className="text-4xl font-light text-slate-900 tracking-tight">Faktura <span className="font-black">VAT</span></h1>
               <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">NR {data.id}/{new Date().getFullYear()}</p>

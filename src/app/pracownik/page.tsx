@@ -1,10 +1,20 @@
+"use client"
+
 import { Navbar } from "@/components/navbar";
 import { ShoppingCart, Search, ClipboardList, Banknote, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 
 export default function PracownikDashboard() {
+  const [userName, setUserName] = useState("Jan Kowalski");
+
+  useEffect(() => {
+    const name = sessionStorage.getItem("userName");
+    if (name) setUserName(name);
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen bg-[#F8FAFC]">
       <Navbar />
@@ -15,7 +25,7 @@ export default function PracownikDashboard() {
           <div className="relative z-10 space-y-4">
             <div>
               <p className="text-blue-100 text-xs font-bold uppercase tracking-widest">Witaj ponownie,</p>
-              <h1 className="text-2xl font-black">Jan Kowalski</h1>
+              <h1 className="text-2xl font-black">{userName}</h1>
             </div>
             
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

@@ -13,18 +13,28 @@ import {
 import { LogOut, Settings, Bell, Search, BookOpen, Calculator, ShoppingCart, Users, LayoutDashboard, MapPin, User, ChevronDown, Store, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export function Navbar() {
   const pathname = usePathname();
-  const isEmployee = pathname === "/pracownik";
+  const [userName, setUserName] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const name = sessionStorage.getItem("userName");
+    const role = sessionStorage.getItem("userRole");
+    setUserName(name);
+    setUserRole(role);
+  }, []);
+
+  const isEmployee = userRole === "employee" || pathname === "/pracownik";
+  const displayName = userName || (isEmployee ? "Jan Kowalski" : "Piotr Zakrzewski");
+  const displayRole = userRole === "employee" ? "Pracownik" : (userRole === "owner" ? "Właściciel" : (isEmployee ? "Pracownik" : "Właściciel"));
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-white px-4 py-2 flex items-center justify-between">
       <Link href={isEmployee ? "/pracownik" : "/"} className="flex items-center gap-2">
-        <div className="flex flex-col items-center">
-          <span className="text-xl font-black tracking-tighter text-blue-600 italic">MOBILE</span>
-          <span className="text-[10px] font-bold tracking-[0.3em] text-slate-400 -mt-1 leading-none uppercase">HUB</span>
-        </div>
+        <img src="/logo.png" alt="Mobile Hub" className="h-10 w-auto object-contain" />
       </Link>
 
       <div className="flex items-center gap-4">
@@ -33,12 +43,12 @@ export function Navbar() {
             <div className="flex items-center gap-3 bg-slate-50 hover:bg-blue-50 px-4 py-2 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all shadow-sm">
               <div className="flex flex-col items-end text-right">
                 <span className="text-xs font-black text-slate-900 leading-none group-hover:text-blue-600 transition-colors uppercase tracking-tight">
-                  {isEmployee ? "Jan Kowalski" : "Piotr Zakrzewski"}
+                  {displayName}
                 </span>
                 <div className="flex items-center gap-1 mt-1">
                   <MapPin className="h-2.5 w-2.5 text-blue-600" />
                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                    {isEmployee ? "Trzy Stawy" : "Właściciel"}
+                    {displayRole === "Właściciel" ? "Właściciel" : "Trzy Stawy"}
                   </span>
                 </div>
               </div>
@@ -53,10 +63,10 @@ export function Navbar() {
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">
-                    {isEmployee ? "Jan Kowalski" : "Piotr Zakrzewski"}
+                    {displayName}
                   </p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    {isEmployee ? "Pracownik" : "Właściciel"}
+                    {displayRole}
                   </p>
                 </div>
               </DropdownMenuLabel>
