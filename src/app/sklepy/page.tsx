@@ -18,7 +18,8 @@ import {
   Users
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { 
   Dialog, 
   DialogContent, 
@@ -37,6 +38,17 @@ interface Shop {
 }
 
 export default function SklepyPage() {
+  const router = useRouter();
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const role = sessionStorage.getItem("userRole");
+    if (!role) {
+      router.push("/login");
+    }
+    setUserRole(role);
+  }, [router]);
+
   const [shops, setShops] = useState<Shop[]>([
     { id: "1", name: "Trzy Stawy", address: "ul. Pułaskiego 60, Katowice", phone: "123 456 789", employees: 4 },
     { id: "2", name: "Galeria Katowicka", address: "ul. 3 Maja 30, Katowice", phone: "987 654 321", employees: 3 },
@@ -87,74 +99,72 @@ export default function SklepyPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col min-h-screen bg-accent/20">
       <Navbar />
       
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full space-y-6 pb-24">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Link href="/">
-              <Button variant="ghost" size="icon" className="rounded-full">
+            <Link href={userRole === "employee" ? "/pracownik" : "/"}>
+              <Button variant="ghost" size="icon" className="rounded-full hover:bg-accent text-primary">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
             <div>
-              <h1 className="text-xl font-black text-slate-900">Zarządzanie Sklepami</h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Twoje punkty sprzedaży</p>
+              <h1 className="text-xl font-black text-foreground uppercase tracking-tight">Zarządzanie Sklepami</h1>
+              <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">Twoje punkty sprzedaży</p>
             </div>
           </div>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger 
-              render={
-                <Button className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black uppercase text-[10px] tracking-widest h-10 gap-2 shadow-lg shadow-blue-100">
-                  <Plus className="h-4 w-4" />
-                  Dodaj Sklep
-                </Button>
-              }
-            />
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90 text-white rounded-xl font-black uppercase text-[10px] tracking-widest h-10 gap-2 shadow-lg shadow-primary/10">
+                <Plus className="h-4 w-4" />
+                Dodaj Sklep
+              </Button>
+            </DialogTrigger>
             <DialogContent className="sm:max-w-[425px] rounded-3xl border-none p-0 overflow-hidden">
-              <DialogHeader className="p-8 bg-blue-600 text-white text-left">
+              <DialogHeader className="p-8 bg-primary text-white text-left">
                 <DialogTitle className="text-2xl font-black mb-1">Nowy Sklep</DialogTitle>
-                <p className="text-blue-100 text-xs font-bold uppercase tracking-widest">Dodaj nowy punkt sprzedaży do systemu</p>
+                <p className="text-white/70 text-xs font-bold uppercase tracking-widest">Dodaj nowy punkt sprzedaży do systemu</p>
               </DialogHeader>
 
               <div className="p-8 space-y-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                       <Store className="h-3 w-3" /> Nazwa Sklepu
                     </Label>
                     <Input 
                       value={newShop.name}
                       onChange={(e) => setNewShop({ ...newShop, name: e.target.value })}
                       placeholder="np. Galeria Katowicka"
-                      className="h-12 bg-slate-50 border-none rounded-xl font-bold"
+                      className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                       <MapPin className="h-3 w-3" /> Adres
                     </Label>
                     <Input 
                       value={newShop.address}
                       onChange={(e) => setNewShop({ ...newShop, address: e.target.value })}
                       placeholder="ul. Kolorowa 1, 00-000 Miasto"
-                      className="h-12 bg-slate-50 border-none rounded-xl font-bold"
+                      className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                       <Phone className="h-3 w-3" /> Telefon (opcjonalnie)
                     </Label>
                     <Input 
                       value={newShop.phone}
                       onChange={(e) => setNewShop({ ...newShop, phone: e.target.value })}
                       placeholder="123 456 789"
-                      className="h-12 bg-slate-50 border-none rounded-xl font-bold"
+                      className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
                     />
                   </div>
                 </div>
@@ -162,7 +172,7 @@ export default function SklepyPage() {
                 <div className="flex gap-3">
                   <Button 
                     variant="ghost"
-                    className="flex-1 h-12 rounded-xl font-bold text-slate-400"
+                    className="flex-1 h-12 rounded-xl font-bold text-muted-foreground hover:bg-accent"
                     onClick={() => setIsDialogOpen(false)}
                   >
                     Anuluj
@@ -170,7 +180,7 @@ export default function SklepyPage() {
                   <Button 
                     onClick={handleAddShop}
                     disabled={!newShop.name || !newShop.address}
-                    className="flex-[2] h-12 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-blue-100"
+                    className="flex-[2] h-12 bg-primary hover:bg-primary/90 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/10"
                   >
                     Dodaj Punkt
                   </Button>
@@ -182,46 +192,46 @@ export default function SklepyPage() {
           {/* Edit Shop Dialog */}
           <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
             <DialogContent className="sm:max-w-[425px] rounded-3xl border-none p-0 overflow-hidden">
-              <DialogHeader className="p-8 bg-amber-500 text-white text-left">
+              <DialogHeader className="p-8 bg-secondary text-white text-left">
                 <DialogTitle className="text-2xl font-black mb-1">Edytuj Sklep</DialogTitle>
-                <p className="text-amber-50 text-xs font-bold uppercase tracking-widest">Zmień dane punktu sprzedaży</p>
+                <p className="text-white/70 text-xs font-bold uppercase tracking-widest">Zmień dane punktu sprzedaży</p>
               </DialogHeader>
 
               <div className="p-8 space-y-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                       <Store className="h-3 w-3" /> Nazwa Sklepu
                     </Label>
                     <Input 
                       value={editingShop?.name || ""}
                       onChange={(e) => setEditingShop(prev => prev ? { ...prev, name: e.target.value } : null)}
                       placeholder="np. Galeria Katowicka"
-                      className="h-12 bg-slate-50 border-none rounded-xl font-bold"
+                      className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                       <MapPin className="h-3 w-3" /> Adres
                     </Label>
                     <Input 
                       value={editingShop?.address || ""}
                       onChange={(e) => setEditingShop(prev => prev ? { ...prev, address: e.target.value } : null)}
                       placeholder="ul. Kolorowa 1, 00-000 Miasto"
-                      className="h-12 bg-slate-50 border-none rounded-xl font-bold"
+                      className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                       <Phone className="h-3 w-3" /> Telefon (opcjonalnie)
                     </Label>
                     <Input 
                       value={editingShop?.phone || ""}
                       onChange={(e) => setEditingShop(prev => prev ? { ...prev, phone: e.target.value } : null)}
                       placeholder="123 456 789"
-                      className="h-12 bg-slate-50 border-none rounded-xl font-bold"
+                      className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
                     />
                   </div>
                 </div>
@@ -229,7 +239,7 @@ export default function SklepyPage() {
                 <div className="flex gap-3">
                   <Button 
                     variant="ghost"
-                    className="flex-1 h-12 rounded-xl font-bold text-slate-400"
+                    className="flex-1 h-12 rounded-xl font-bold text-muted-foreground hover:bg-accent"
                     onClick={() => setIsEditDialogOpen(false)}
                   >
                     Anuluj
@@ -237,7 +247,7 @@ export default function SklepyPage() {
                   <Button 
                     onClick={handleUpdateShop}
                     disabled={!editingShop?.name || !editingShop?.address}
-                    className="flex-[2] h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-amber-100"
+                    className="flex-[2] h-12 bg-secondary hover:bg-secondary/90 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-secondary/10"
                   >
                     Zapisz Zmiany
                   </Button>
@@ -248,53 +258,56 @@ export default function SklepyPage() {
         </div>
 
         {/* Shops List */}
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {shops.map((shop) => (
-            <Card key={shop.id} className="border-none shadow-sm bg-white overflow-hidden rounded-3xl group hover:shadow-md transition-all">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div className="flex gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-                      <Store className="h-6 w-6" />
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="font-black text-slate-900">{shop.name}</h3>
-                      <div className="flex items-center gap-2 text-slate-400">
-                        <MapPin className="h-3 w-3" />
-                        <span className="text-[11px] font-bold">{shop.address}</span>
+            <Card key={shop.id} className="border-none shadow-sm bg-white overflow-hidden rounded-3xl border border-primary/5 group hover:shadow-md transition-all">
+              <CardContent className="p-0">
+                <div className="flex">
+                  <div className="w-2 bg-primary group-hover:w-3 transition-all" />
+                  <div className="flex-1 p-6 flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <div className="h-16 w-16 rounded-2xl bg-accent flex items-center justify-center text-primary border border-primary/10 group-hover:bg-primary group-hover:text-white transition-all">
+                        <Building2 className="h-8 w-8" />
                       </div>
-                      <div className="flex items-center gap-4 pt-2">
-                        <div className="flex items-center gap-1.5">
-                          <Users className="h-3 w-3 text-blue-500" />
-                          <span className="text-[10px] font-black text-slate-500 uppercase">{shop.employees} Pracowników</span>
-                        </div>
-                        {shop.phone && (
-                          <div className="flex items-center gap-1.5">
-                            <Phone className="h-3 w-3 text-emerald-500" />
-                            <span className="text-[10px] font-black text-slate-500 uppercase">{shop.phone}</span>
+                      <div className="space-y-1">
+                        <h3 className="text-xl font-black text-foreground uppercase tracking-tight">{shop.name}</h3>
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <MapPin className="h-3 w-3 text-primary/50" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">{shop.address}</span>
                           </div>
-                        )}
+                          {shop.phone && (
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              <Phone className="h-3 w-3 text-primary/50" />
+                              <span className="text-[10px] font-bold uppercase tracking-widest">{shop.phone}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <Users className="h-3 w-3 text-primary/50" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">{shop.employees} Pracowników</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => handleEditClick(shop)}
-                      className="text-slate-200 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => handleDeleteShop(shop.id, shop.name)}
-                      className="text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-10 w-10 rounded-xl hover:bg-accent text-primary"
+                        onClick={() => handleEditClick(shop)}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-10 w-10 rounded-xl hover:bg-red-50 text-red-500"
+                        onClick={() => handleDeleteShop(shop.id, shop.name)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>

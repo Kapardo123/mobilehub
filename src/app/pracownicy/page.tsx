@@ -7,7 +7,9 @@ import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/toast";
 import { 
   Dialog, 
   DialogContent, 
@@ -37,6 +39,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function PracownicyPage() {
+  const router = useRouter();
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    const role = sessionStorage.getItem("userRole");
+    if (!role) {
+      router.push("/login");
+    }
+  }, [router]);
+
   const [selectedShop, setSelectedShop] = useState<string | null>(null);
   const [newEmployee, setNewEmployee] = useState({
     name: "",
@@ -51,6 +63,19 @@ export default function PracownicyPage() {
     { id: "2", name: "Jan Kowalski", role: "Pracownik", initials: "JK", shops: ["Trzy Stawy"], status: "W pracy", login: "jan.k", password: "PIN 654321" },
     { id: "3", name: "Anna Nowak", role: "Pracownik", initials: "AN", shops: ["Galeria Katowicka", "Silesia City Center"], status: "Offline", login: "anna.n", password: "PIN 112233" },
   ]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('pracownicy_employees');
+    if (saved) {
+      try {
+        setEmployees(JSON.parse(saved));
+      } catch { }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('pracownicy_employees', JSON.stringify(employees));
+  }, [employees]);
 
   const [showCredentialsFor, setShowCredentialsFor] = useState<any | null>(null);
 
@@ -86,13 +111,18 @@ export default function PracownicyPage() {
     };
 
     setEmployees([...employees, employee]);
+    window.dispatchEvent(new CustomEvent('pracownicy_updated'));
+    addToast(`Dodano pracownika ${employee.name}`, "success");
     setShowCredentialsFor(employee);
     setNewEmployee({ name: "", role: "pracownik", login: "", password: "" });
     setIsAddDialogOpen(false);
   };
 
   const removeEmployee = (id: string) => {
+    const emp = employees.find(e => e.id === id);
     setEmployees(employees.filter(emp => emp.id !== id));
+    window.dispatchEvent(new CustomEvent('pracownicy_updated'));
+    if (emp) addToast(`Usunięto pracownika ${emp.name}`, "info");
   };
 
   const shops = [
@@ -110,7 +140,7 @@ export default function PracownicyPage() {
     : [];
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col min-h-screen bg-accent/20">
       <Navbar />
       
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full space-y-6">
@@ -119,11 +149,12 @@ export default function PracownicyPage() {
             <Button 
               variant="ghost" 
               size="icon" 
+              className="rounded-xl hover:bg-accent text-primary"
               onClick={() => selectedShop ? setSelectedShop(null) : window.history.back()}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-bold">
+            <h1 className="text-xl font-black uppercase tracking-tight text-foreground">
               {selectedShop ? shops.find(s => s.id === selectedShop)?.label : "Wybierz Punkt"}
             </h1>
           </div>
@@ -131,37 +162,36 @@ export default function PracownicyPage() {
           {selectedShop && (
             <>
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger 
-                  render={
-                    <div className={cn(buttonVariants({ variant: "default", size: "default" }), "bg-blue-600 hover:bg-blue-500 rounded-xl font-bold shadow-lg shadow-blue-100 h-10 px-4 text-xs cursor-pointer text-white")}>
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Dodaj
-                    </div>
-                  }
-                />
-                <DialogContent className="sm:max-w-[425px] rounded-3xl border-none">
-                  <DialogHeader>
-                    <DialogTitle className="text-xl font-black text-slate-900">Nowy Pracownik</DialogTitle>
+                <DialogTrigger asChild>
+                  <Button className="bg-primary hover:bg-primary/90 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/10 h-10 px-4 text-white">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Dodaj
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px] rounded-3xl border-none p-0 overflow-hidden">
+                  <DialogHeader className="p-8 bg-primary text-white text-left">
+                    <DialogTitle className="text-xl font-black uppercase tracking-tight">Nowy Pracownik</DialogTitle>
+                    <p className="text-white/70 text-xs font-bold uppercase tracking-widest">Dodaj nowego pracownika do systemu</p>
                   </DialogHeader>
-                  <div className="grid gap-6 py-6">
+                  <div className="p-8 space-y-6">
                     <div className="grid gap-2">
-                      <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Imię i Nazwisko</Label>
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Imię i Nazwisko</Label>
                       <Input 
                         value={newEmployee.name}
                         onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
                         placeholder="np. Marek Nowak" 
-                        className="h-12 bg-slate-50 border-none rounded-xl font-bold" 
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase" 
                       />
                     </div>
 
-                    <div className="grid gap-4 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                    <div className="grid gap-4 p-4 bg-accent/50 rounded-2xl border border-primary/10">
                       <div className="flex items-center justify-between">
-                        <Label className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">Dane logowania</Label>
+                        <Label className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Dane logowania</Label>
                         <Button 
                           onClick={generateCredentials}
                           variant="ghost" 
                           size="sm" 
-                          className="h-7 text-[9px] font-black uppercase text-blue-600 hover:bg-blue-100 rounded-lg gap-2"
+                          className="h-7 text-[9px] font-black uppercase text-primary hover:bg-primary/10 rounded-lg gap-2"
                         >
                           <RefreshCw className="h-3 w-3" />
                           Generuj
@@ -170,19 +200,19 @@ export default function PracownicyPage() {
 
                       <div className="space-y-3">
                         <div className="relative">
-                          <Label className="text-[9px] font-bold text-slate-400 mb-1 ml-1 block">Login</Label>
+                          <Label className="text-[9px] font-bold text-muted-foreground mb-1 ml-1 block">Login</Label>
                           <div className="relative">
                             <Input 
                               value={newEmployee.login}
                               readOnly
                               className="h-10 bg-white border-none rounded-xl pr-10 font-mono text-xs" 
                             />
-                            <Key className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
+                            <Key className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary/30" />
                           </div>
                         </div>
 
                         <div className="relative">
-                          <Label className="text-[9px] font-bold text-slate-400 mb-1 ml-1 block">Hasło (PIN)</Label>
+                          <Label className="text-[9px] font-bold text-muted-foreground mb-1 ml-1 block">Hasło (PIN)</Label>
                           <div className="relative">
                             <Input 
                               type={showPassword ? "text" : "password"}
@@ -193,7 +223,7 @@ export default function PracownicyPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-slate-300 hover:text-slate-600"
+                              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-primary/30 hover:text-primary"
                               onClick={() => setShowPassword(!showPassword)}
                             >
                               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -204,12 +234,12 @@ export default function PracownicyPage() {
                     </div>
 
                     <div className="grid gap-2">
-                      <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Rola</Label>
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Rola</Label>
                       <UISelect 
                         value={newEmployee.role}
                         onValueChange={(val) => val && setNewEmployee({ ...newEmployee, role: val })}
                       >
-                        <UISelectTrigger className="h-12 bg-slate-50 border-none rounded-xl font-bold text-slate-700">
+                        <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase text-foreground">
                           <UISelectValue placeholder="Wybierz rolę" />
                         </UISelectTrigger>
                         <UISelectContent className="rounded-2xl">
@@ -219,45 +249,54 @@ export default function PracownicyPage() {
                         </UISelectContent>
                       </UISelect>
                     </div>
+
+                    <div className="flex gap-3">
+                      <Button 
+                        variant="ghost"
+                        className="flex-1 h-12 rounded-xl font-bold text-muted-foreground hover:bg-accent"
+                        onClick={() => setIsAddDialogOpen(false)}
+                      >
+                        Anuluj
+                      </Button>
+                      <Button 
+                        onClick={handleAddEmployee}
+                        disabled={!newEmployee.name || !newEmployee.login || !newEmployee.password}
+                        className="flex-[2] h-12 bg-primary hover:bg-primary/90 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/10"
+                      >
+                        Zapisz Pracownika
+                      </Button>
+                    </div>
                   </div>
-                  <DialogFooter>
-                    <Button 
-                      onClick={handleAddEmployee}
-                      className="w-full h-12 bg-blue-600 hover:bg-blue-500 rounded-xl font-black text-sm uppercase tracking-widest"
-                    >
-                      Zapisz Pracownika
-                    </Button>
-                  </DialogFooter>
                 </DialogContent>
               </Dialog>
 
               <Dialog open={!!showCredentialsFor} onOpenChange={(open) => !open && setShowCredentialsFor(null)}>
                 <DialogContent className="sm:max-w-[400px] rounded-3xl border-none p-0 overflow-hidden">
-                  <div className="bg-blue-600 p-8 text-white text-center">
+                  <div className="bg-primary p-8 text-white text-center">
                     <div className="h-16 w-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
                       <ShieldCheck className="h-8 w-8 text-white" />
                     </div>
-                    <h2 className="text-2xl font-black mb-1">Dane Logowania</h2>
-                    <p className="text-blue-100 text-sm font-medium">{showCredentialsFor?.name}</p>
+                    <h2 className="text-2xl font-black mb-1 uppercase tracking-tight">Dane Logowania</h2>
+                    <p className="text-white/70 text-sm font-medium">{showCredentialsFor?.name}</p>
                   </div>
                   
                   <div className="p-8 space-y-6">
                     <div className="space-y-4">
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Login do systemu</Label>
+                      <div className="bg-accent/30 p-4 rounded-2xl border border-primary/5">
+                        <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2">Login do systemu</Label>
                         <div className="flex items-center justify-between">
-                          <span className="font-mono font-bold text-lg text-slate-700">{showCredentialsFor?.login}</span>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-blue-600" onClick={() => navigator.clipboard.writeText(showCredentialsFor?.login)}>
+                          <span className="font-mono font-bold text-lg text-foreground">{showCredentialsFor?.login}</span>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary/30 hover:text-primary" onClick={() => navigator.clipboard.writeText(showCredentialsFor?.login)}>
                             <RefreshCw className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
 
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Hasło / PIN</Label>
+                      <div className="bg-accent/30 p-4 rounded-2xl border border-primary/5">
+                        <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mb-2">Hasło / PIN</Label>
                         <div className="flex items-center justify-between">
-                          <span className="font-mono font-bold text-lg text-slate-700">{showCredentialsFor?.password}</span>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-blue-600" onClick={() => navigator.clipboard.writeText(showCredentialsFor?.password)}>
+                          <span className="font-mono font-bold text-lg text-foreground tracking-widest">{showCredentialsFor?.password}</span>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary/30 hover:text-primary" onClick={() => navigator.clipboard.writeText(showCredentialsFor?.password)}>
                             <Lock className="h-4 w-4" />
                           </Button>
                         </div>
@@ -266,7 +305,7 @@ export default function PracownicyPage() {
 
                     <Button 
                       onClick={() => setShowCredentialsFor(null)}
-                      className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-sm uppercase tracking-widest"
+                      className="w-full h-12 bg-secondary hover:bg-secondary/90 text-white rounded-xl font-black text-sm uppercase tracking-widest"
                     >
                       Rozumiem
                     </Button>
@@ -283,22 +322,22 @@ export default function PracownicyPage() {
             {shops.map((shop) => (
               <Card 
                 key={shop.id} 
-                className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all cursor-pointer rounded-3xl"
+                className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all cursor-pointer rounded-3xl border border-primary/5"
                 onClick={() => setSelectedShop(shop.id)}
               >
                 <CardContent className="p-6 flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all">
+                    <div className="h-12 w-12 rounded-xl bg-accent text-primary flex items-center justify-center group-hover:scale-110 transition-all">
                       <MapPin className="h-6 w-6" />
                     </div>
                     <div>
-                      <p className="font-black text-slate-800 text-lg">{shop.label}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                      <p className="font-black text-foreground text-lg uppercase tracking-tight">{shop.label}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
                         {shop.count} Pracowników
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-blue-600 transition-colors" />
+                  <ChevronRight className="h-5 w-5 text-primary/30 group-hover:text-primary transition-colors" />
                 </CardContent>
               </Card>
             ))}
@@ -308,28 +347,28 @@ export default function PracownicyPage() {
           <div className="grid gap-4">
             {filteredEmployees.length > 0 ? (
               filteredEmployees.map((emp, idx) => (
-                <Card key={idx} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all rounded-3xl">
+                <Card key={idx} className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all rounded-3xl border border-primary/5">
                   <CardContent className="p-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="relative">
-                        <Avatar className="h-12 w-12 border-2 border-slate-100">
-                          <AvatarFallback className="bg-blue-50 text-blue-600 font-black text-sm">{emp.initials}</AvatarFallback>
+                        <Avatar className="h-12 w-12 border-2 border-accent group-hover:border-primary/20 transition-all">
+                          <AvatarFallback className="bg-accent text-primary font-black text-sm uppercase">{emp.initials}</AvatarFallback>
                         </Avatar>
                         <div className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
                           emp.status === 'W pracy' ? 'bg-emerald-500' : 
-                          emp.status === 'Online' ? 'bg-blue-500' : 'bg-slate-300'
+                          emp.status === 'Online' ? 'bg-primary' : 'bg-muted-foreground/30'
                         }`} />
                       </div>
                       <div>
-                        <p className="font-black text-slate-800">{emp.name}</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{emp.role}</p>
+                        <p className="font-black text-foreground uppercase tracking-tight">{emp.name}</p>
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{emp.role}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8 text-slate-400 hover:text-blue-600"
+                        className="h-8 w-8 text-primary/30 hover:text-primary hover:bg-accent rounded-xl transition-all"
                         onClick={(e) => {
                           e.stopPropagation();
                           setShowCredentialsFor(emp);
@@ -340,7 +379,7 @@ export default function PracownicyPage() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8 text-slate-400 hover:text-red-600"
+                        className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (confirm(`Czy na pewno chcesz usunąć pracownika ${emp.name}?`)) {
@@ -355,8 +394,8 @@ export default function PracownicyPage() {
                 </Card>
               ))
             ) : (
-              <div className="text-center py-12 bg-white rounded-3xl shadow-sm border border-dashed border-slate-200">
-                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Brak pracowników w tym punkcie</p>
+              <div className="text-center py-12 bg-white rounded-3xl shadow-sm border border-dashed border-primary/10">
+                <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">Brak pracowników w tym punkcie</p>
               </div>
             )}
           </div>
