@@ -224,7 +224,7 @@ export default function AkcjePage() {
                   <UISelect value={filterType || "all"} onValueChange={(val) => setFilterType(val === "all" ? null : val)}>
                     <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase">
                       <Clock className="h-4 w-4 mr-2 text-primary" />
-                      <SelectValue placeholder="Wszystkie typy" />
+                      <UISelectValue placeholder="Wszystkie typy" />
                     </UISelectTrigger>
                     <UISelectContent className="rounded-xl">
                       <UISelectItem value="all" className="font-bold text-xs uppercase">Wszystkie typy</UISelectItem>
