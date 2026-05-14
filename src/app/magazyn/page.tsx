@@ -14,7 +14,6 @@ import {
   ArrowLeft, 
   Plus, 
   Search, 
-  Filter, 
   ChevronRight, 
   Smartphone, 
   Package, 
@@ -23,13 +22,11 @@ import {
   ArrowUpDown, 
   Battery, 
   Hash, 
-  Palette, 
   Info,
   X,
   Trash2
 } from "lucide-react";
-import Link from "next/link";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -38,8 +35,7 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogTrigger,
-  DialogFooter
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { 
@@ -146,10 +142,10 @@ export default function MagazynPage() {
   const [inventory, setInventory] = useState(loadInitialInventory);
 
   const categories = useMemo(() => [
-    { id: "telefon", label: "Telefony", count: inventory.filter((i: typeof inventory[0]) => i.category === "telefon").length, icon: Smartphone, color: "text-primary", bg: "bg-accent/50" },
-    { id: "akcesoria", label: "Akcesoria", count: inventory.filter((i: typeof inventory[0]) => i.category === "akcesoria").length, icon: Package, color: "text-primary", bg: "bg-accent/50" },
-    { id: "usluga", label: "Usługa", count: inventory.filter((i: typeof inventory[0]) => i.category === "usluga").length, icon: Settings, color: "text-primary", bg: "bg-accent/50" },
-    { id: "serwis", label: "Serwis", count: inventory.filter((i: typeof inventory[0]) => i.category === "serwis").length, icon: Wrench, color: "text-primary", bg: "bg-accent/50" },
+    { id: "telefon", label: "Telefony", count: inventory.filter((i: typeof inventory[0]) => i.category === "telefon").length, icon: Smartphone, color: "text-primary", bg: "bg-accent/50", isLink: false, href: undefined },
+    { id: "akcesoria", label: "Akcesoria", count: inventory.filter((i: typeof inventory[0]) => i.category === "akcesoria").length, icon: Package, color: "text-primary", bg: "bg-accent/50", isLink: false, href: undefined },
+    { id: "usluga", label: "Usługa", count: inventory.filter((i: typeof inventory[0]) => i.category === "usluga").length, icon: Settings, color: "text-primary", bg: "bg-accent/50", isLink: false, href: undefined },
+    { id: "serwis", label: "Serwis", count: inventory.filter((i: typeof inventory[0]) => i.category === "serwis").length, icon: Wrench, color: "text-primary", bg: "bg-accent/50", isLink: false, href: undefined },
   ], [inventory]);
 
   useEffect(() => {
@@ -237,7 +233,7 @@ export default function MagazynPage() {
       (item.name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
-    result.sort((a, b) => {
+    result.sort((a: any, b: any) => {
       const getPrice = (priceStr: string) => {
         if (!priceStr) return 0;
         return parseFloat(priceStr.toString().replace(/[^\d.-]/g, '')) || 0;
@@ -416,7 +412,7 @@ export default function MagazynPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Stan</Label>
-                          <UISelect value={newItem.condition} onValueChange={(val) => setNewItem({...newItem, condition: val})}>
+                          <UISelect value={newItem.condition} onValueChange={(val) => setNewItem({...newItem, condition: val || newItem.condition})}>
                             <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase text-foreground w-full">
                               <UISelectValue placeholder="Wybierz stan" />
                             </UISelectTrigger>
@@ -491,7 +487,7 @@ export default function MagazynPage() {
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Typ Podatku</Label>
-                            <UISelect value={newItem.taxType} onValueChange={(val) => setNewItem({...newItem, taxType: val})}>
+                            <UISelect value={newItem.taxType} onValueChange={(val) => setNewItem({...newItem, taxType: val || newItem.taxType})}>
                               <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase text-foreground w-full">
                                 <UISelectValue placeholder="Wybierz typ" />
                               </UISelectTrigger>
@@ -815,7 +811,7 @@ export default function MagazynPage() {
               <div className="grid gap-4">
                 {/* Available Phones */}
                 {availablePhones.length > 0 ? (
-                  availablePhones.map((phone: any, idx) => (
+                  availablePhones.map((phone: any, idx: number) => (
                     <Card 
                       key={idx} 
                       className="border-none shadow-sm bg-white overflow-hidden group hover:shadow-md transition-all rounded-[2rem] border border-primary/5 cursor-pointer"
@@ -898,7 +894,7 @@ export default function MagazynPage() {
                       <h2 className="text-lg font-black uppercase text-muted-foreground tracking-tight">Sprzedane</h2>
                       <div className="h-px flex-1 bg-primary/10" />
                     </div>
-                    {soldPhones.map((phone: any, idx) => (
+                    {soldPhones.map((phone: any, idx: number) => (
                       <Card 
                         key={idx} 
                         className="border-none shadow-sm bg-white/50 overflow-hidden group hover:shadow-md transition-all rounded-[2rem] border border-red-100 cursor-pointer opacity-70"
@@ -984,7 +980,7 @@ export default function MagazynPage() {
                     </TableHeader>
                     <TableBody>
                       {filteredItems.length > 0 ? (
-                        filteredItems.map((item, idx) => {
+                        filteredItems.map((item: any, idx: number) => {
                           const originalIndex = inventory.indexOf(item);
                           return (
                           <TableRow key={idx} className="border-b border-primary/5 last:border-0 hover:bg-accent/30 transition-colors group">

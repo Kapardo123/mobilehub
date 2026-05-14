@@ -20,7 +20,6 @@ import {
   FileText, 
   Store, 
   Users,
-  ShoppingCart,
   Calendar,
   MapPin,
   Smartphone,
@@ -28,6 +27,24 @@ import {
   Wrench,
   Settings
 } from "lucide-react";
+
+interface SaleItem {
+  cat: string;
+  name: string;
+  price: number;
+  profit: number;
+  imei?: string;
+}
+
+interface Sale {
+  id: string;
+  ini: string;
+  payment: string;
+  date: string;
+  time: string;
+  items: SaleItem[];
+  shop: string;
+}
 import Link from "next/link";
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -67,7 +84,7 @@ export default function RaportyPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [isEmployeeDetailsOpen, setIsEmployeeDetailsOpen] = useState(false);
   const [employees, setEmployees] = useState<any[]>([]);
-  const [sales, setSales] = useState<any[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
 
   const months = [
     "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", 
@@ -148,8 +165,8 @@ export default function RaportyPage() {
         return saleDate.getDate() === day;
       });
       
-      const profit = daySales.reduce((sum, sale) => sum + sale.items.reduce((s, item) => s + item.profit, 0), 0);
-      const revenue = daySales.reduce((sum, sale) => sum + sale.items.reduce((s, item) => s + item.price, 0), 0);
+      const profit = daySales.reduce((sum: number, sale: Sale) => sum + sale.items.reduce((s: number, item: SaleItem) => s + item.profit, 0), 0);
+      const revenue = daySales.reduce((sum: number, sale: Sale) => sum + sale.items.reduce((s: number, item: SaleItem) => s + item.price, 0), 0);
       const costs = Math.random() > 0.7 ? -Math.floor(Math.random() * 2000) : 0;
       
       cumulativeSum += profit;
@@ -218,8 +235,8 @@ export default function RaportyPage() {
       const empData = employeeMap.get(employee.id);
       if (!empData) return;
       
-      const saleTotal = sale.items.reduce((sum, item) => sum + item.price, 0);
-      const saleProfit = sale.items.reduce((sum, item) => sum + item.profit, 0);
+      const saleTotal = sale.items.reduce((sum: number, item: SaleItem) => sum + item.price, 0);
+      const saleProfit = sale.items.reduce((sum: number, item: SaleItem) => sum + item.profit, 0);
       
       empData.salesTotal += saleTotal;
       empData.profitTotal += saleProfit;
@@ -234,7 +251,7 @@ export default function RaportyPage() {
       
       // Daily breakdown
       const saleDate = new Date(sale.date);
-      const existingDay = empData.dailyBreakdown.find(d => 
+      const existingDay = empData.dailyBreakdown.find((d: any) => 
         d.date === `${saleDate.getDate()}.${(saleDate.getMonth() + 1).toString().padStart(2, '0')}.${saleDate.getFullYear()}`
       );
       
@@ -312,7 +329,7 @@ export default function RaportyPage() {
 
             <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-primary/10">
               <MapPin className="h-4 w-4 text-primary ml-2" />
-              <Select value={selectedShop} onValueChange={(val) => setSelectedShop(val)}>
+              <Select value={selectedShop} onValueChange={(val) => setSelectedShop(val || selectedShop)}>
                 <SelectTrigger className="h-9 w-[180px] rounded-xl border-none shadow-none text-[10px] font-black uppercase">
                   <SelectValue placeholder="Wybierz sklep" />
                 </SelectTrigger>
@@ -559,7 +576,7 @@ export default function RaportyPage() {
                       <CardContent className="p-5">
                         <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-widest mb-4">Dzienna aktywność</h4>
                         <div className="space-y-2">
-                          {selectedEmployee.dailyBreakdown.map((day, i) => (
+                          {selectedEmployee.dailyBreakdown.map((day: any, i: number) => (
                             <div key={i} className="flex items-center justify-between py-2 px-3 hover:bg-accent/30 rounded-xl transition-colors">
                               <div className="flex items-center gap-3">
                                 <Calendar className="h-4 w-4 text-primary" />

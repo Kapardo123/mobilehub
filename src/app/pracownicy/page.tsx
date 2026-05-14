@@ -2,10 +2,8 @@
 
 import { Navbar } from "@/components/navbar";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, UserPlus, Settings, MapPin, ChevronRight, RefreshCw, Key, Eye, EyeOff, Trash2, ShieldCheck, Lock } from "lucide-react";
-import Link from "next/link";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { ArrowLeft, UserPlus, MapPin, ChevronRight, RefreshCw, Key, Eye, EyeOff, Trash2, ShieldCheck, Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -15,8 +13,7 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogTrigger,
-  DialogFooter
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,16 +24,6 @@ import {
   SelectTrigger as UISelectTrigger, 
   SelectValue as UISelectValue 
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-  DropdownMenuGroup
-} from "@/components/ui/dropdown-menu";
 
 export default function PracownicyPage() {
   const router = useRouter();
@@ -110,7 +97,7 @@ export default function PracownicyPage() {
     const shopLabel = shops.find(s => s.id === selectedShop)?.label || "";
     
     const employee = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       name: newEmployee.name,
       role: newEmployee.role.charAt(0).toUpperCase() + newEmployee.role.slice(1),
       initials: newEmployee.name.split(" ").map(n => n[0]).join("").toUpperCase(),
@@ -172,12 +159,10 @@ export default function PracownicyPage() {
           {selectedShop && (
             <>
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-primary hover:bg-primary/90 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/10 h-10 px-4 text-white">
+                <DialogTrigger render={<Button className="bg-primary hover:bg-primary/90 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/10 h-10 px-4 text-white">
                     <UserPlus className="h-4 w-4 mr-2" />
                     Dodaj
-                  </Button>
-                </DialogTrigger>
+                  </Button>}></DialogTrigger>
                 <DialogContent className="sm:max-w-[425px] rounded-3xl border-none p-0 overflow-hidden">
                   <DialogHeader className="p-8 bg-primary text-white text-left">
                     <DialogTitle className="text-xl font-black uppercase tracking-tight">Nowy Pracownik</DialogTitle>
