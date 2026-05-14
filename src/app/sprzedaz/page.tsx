@@ -475,7 +475,7 @@ export default function SprzedazPage() {
             }
           : sale
       ));
-      addToast("Sprzedaż zaktualizowana", "success");
+      addToast({ message: "Sprzedaż zaktualizowana", variant: "success" });
     } else {
       // Nowa sprzedaż
       const newSale: SaleGroup = {
@@ -488,7 +488,7 @@ export default function SprzedazPage() {
       };
       
       setSales(prev => [newSale, ...prev]);
-      addToast(`Sprzedaż dodana (${newSale.items.length} pozycji)`, "success");
+      addToast({ message: `Sprzedaż dodana (${newSale.items.length} pozycji)`, variant: "success" });
     }
     
     setCartItems([]);
@@ -525,7 +525,7 @@ export default function SprzedazPage() {
   const removePosition = (id: string) => {
     const sale = sales.find(s => s.id === id);
     setSales(prev => prev.filter(s => s.id !== id));
-    if (sale) addToast(`Usunięto sprzedaż (${sale.items.length} pozycji)`, "info");
+    if (sale) addToast({ message: `Usunięto sprzedaż (${sale.items.length} pozycji)`, variant: "info" });
   };
 
   const generateCSV = (data: typeof flattenedSales) => {

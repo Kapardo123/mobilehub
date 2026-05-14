@@ -213,7 +213,7 @@ export default function MagazynPage() {
     };
 
     setInventory([item, ...inventory]);
-    addToast(`Dodano ${item.name} do magazynu`, "success");
+    addToast({ message: `Dodano ${item.name} do magazynu`, variant: "success" });
     setNewItem({ 
       name: "", category: "akcesoria", stock: "", purchasePrice: "", sellingPrice: "",
       brand: "", model: "", memory: "", batteryHealth: "", condition: "używany",
@@ -227,7 +227,7 @@ export default function MagazynPage() {
   const handleDeleteItem = (index: number, itemName: string) => {
     if (confirm(`Czy na pewno chcesz usunąć "${itemName}" z magazynu?`)) {
       setInventory(inventory.filter((_: any, i: number) => i !== index));
-      addToast(`Usunięto ${itemName} z magazynu`, "success");
+      addToast({ message: `Usunięto ${itemName} z magazynu`, variant: "success" });
     }
   };
 
@@ -672,7 +672,7 @@ export default function MagazynPage() {
                   <Button 
                     onClick={() => {
                       if (!newItem.name || !newItem.sellingPrice) {
-                        addToast("Wypełnij nazwę i cenę sprzedaży", "error");
+                        addToast({ message: "Wypełnij nazwę i cenę sprzedaży", variant: "error" });
                         return;
                       }
                       const item = {
@@ -683,7 +683,7 @@ export default function MagazynPage() {
                         alert: false,
                       };
                       setInventory([item, ...inventory]);
-                      addToast(`Dodano ${item.name} do magazynu`, "success");
+                      addToast({ message: `Dodano ${item.name} do magazynu`, variant: "success" });
                       setNewItem({...newItem, name: "", stock: "1", purchasePrice: "", sellingPrice: ""});
                       setIsAddUslugaDialogOpen(false);
                     }}
@@ -751,7 +751,7 @@ export default function MagazynPage() {
                   <Button 
                     onClick={() => {
                       if (!newItem.name || !newItem.sellingPrice) {
-                        addToast("Wypełnij nazwę i cenę sprzedaży", "error");
+                        addToast({ message: "Wypełnij nazwę i cenę sprzedaży", variant: "error" });
                         return;
                       }
                       const item = {
@@ -762,7 +762,7 @@ export default function MagazynPage() {
                         alert: false,
                       };
                       setInventory([item, ...inventory]);
-                      addToast(`Dodano ${item.name} do magazynu`, "success");
+                      addToast({ message: `Dodano ${item.name} do magazynu`, variant: "success" });
                       setNewItem({...newItem, name: "", stock: "1", purchasePrice: "", sellingPrice: ""});
                       setIsAddSerwisDialogOpen(false);
                     }}
@@ -1226,7 +1226,7 @@ export default function MagazynPage() {
                     if (confirm(`Czy na pewno chcesz usunąć "${selectedPhone.name}" z magazynu?`)) {
                       const idx = inventory.indexOf(selectedPhone);
                       setInventory(inventory.filter((_: any, i: number) => i !== idx));
-                      addToast(`Usunięto ${selectedPhone.name} z magazynu`, "success");
+                      addToast({ message: `Usunięto ${selectedPhone.name} z magazynu`, variant: "success" });
                       setSelectedPhone(null);
                     }
                   }}

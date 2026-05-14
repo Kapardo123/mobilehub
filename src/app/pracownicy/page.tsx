@@ -122,7 +122,7 @@ export default function PracownicyPage() {
 
     setEmployees([...employees, employee]);
     window.dispatchEvent(new CustomEvent('pracownicy_updated'));
-    addToast(`Dodano pracownika ${employee.name}`, "success");
+    addToast({ message: `Dodano pracownika ${employee.name}`, variant: "success" });
     setShowCredentialsFor(employee);
     setNewEmployee({ name: "", role: "pracownik", login: "", password: "" });
     setIsAddDialogOpen(false);
@@ -132,7 +132,7 @@ export default function PracownicyPage() {
     const emp = employees.find(e => e.id === id);
     setEmployees(employees.filter(emp => emp.id !== id));
     window.dispatchEvent(new CustomEvent('pracownicy_updated'));
-    if (emp) addToast(`Usunięto pracownika ${emp.name}`, "info");
+    if (emp) addToast({ message: `Usunięto pracownika ${emp.name}`, variant: "info" });
   };
 
   const shops = [
