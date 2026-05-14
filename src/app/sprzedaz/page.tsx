@@ -215,7 +215,13 @@ export default function SprzedazPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isPhoneSelectOpen, setIsPhoneSelectOpen] = useState(false);
   const [warehousePhones, setWarehousePhones] = useState<any[]>([]);
+  const [warehouseUslugi, setWarehouseUslugi] = useState<any[]>([]);
+  const [warehouseSerwisy, setWarehouseSerwisy] = useState<any[]>([]);
+  const [isUslugaSelectOpen, setIsUslugaSelectOpen] = useState(false);
+  const [isSerwisSelectOpen, setIsSerwisSelectOpen] = useState(false);
   const [phoneSearchQuery, setPhoneSearchQuery] = useState("");
+  const [uslugaSearchQuery, setUslugaSearchQuery] = useState("");
+  const [serwisSearchQuery, setSerwisSearchQuery] = useState("");
   const [purchasePriceFromWarehouse, setPurchasePriceFromWarehouse] = useState<number>(0);
   
   // New entry state
@@ -233,6 +239,15 @@ export default function SprzedazPage() {
   const [cartItems, setCartItems] = useState<SaleItem[]>([]);
   const [selectedSale, setSelectedSale] = useState<SaleGroup | null>(null);
   const [selectedSaleForEdit, setSelectedSaleForEdit] = useState<SaleGroup | null>(null);
+  const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
+  const [invoiceCustomer, setInvoiceCustomer] = useState({
+    name: "",
+    nip: "",
+    address: "",
+    email: ""
+  });
+  const [savedCustomers, setSavedCustomers] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
 
   useEffect(() => {
     const role = sessionStorage.getItem("userRole");
@@ -259,17 +274,34 @@ export default function SprzedazPage() {
   }, [router]);
 
   useEffect(() => {
+    const saved = localStorage.getItem('pracownicy_employees');
+    if (saved) {
+      setEmployees(JSON.parse(saved));
+    }
+  }, []);
+
+  useEffect(() => {
     const loadWarehousePhones = () => {
       const saved = localStorage.getItem('magazyn_inventory');
       if (saved) {
         try {
           const inventory = JSON.parse(saved);
           const availablePhones = inventory.filter((item: any) => 
-            item.category === "telefon" && !item.statusSprzedany
+            item.category === "telefon" && !item.statusSold
+          );
+          const availableUslugi = inventory.filter((item: any) => 
+            item.category === "usluga"
+          );
+          const availableSerwisy = inventory.filter((item: any) => 
+            item.category === "serwis"
           );
           setWarehousePhones(availablePhones);
+          setWarehouseUslugi(availableUslugi);
+          setWarehouseSerwisy(availableSerwisy);
         } catch {
           setWarehousePhones([]);
+          setWarehouseUslugi([]);
+          setWarehouseSerwisy([]);
         }
       }
     };
@@ -277,6 +309,20 @@ export default function SprzedazPage() {
     loadWarehousePhones();
     window.addEventListener('magazyn_updated', loadWarehousePhones);
     return () => window.removeEventListener('magazyn_updated', loadWarehousePhones);
+  }, []);
+
+  useEffect(() => {
+    const loadSavedCustomers = () => {
+      const saved = localStorage.getItem('saved_customers');
+      if (saved) {
+        try {
+          setSavedCustomers(JSON.parse(saved));
+        } catch {
+          setSavedCustomers([]);
+        }
+      }
+    };
+    loadSavedCustomers();
   }, []);
 
   useEffect(() => {
@@ -326,9 +372,8 @@ export default function SprzedazPage() {
 
   // Get unique employees from sales
   const uniqueEmployees = useMemo(() => {
-    const employees = sales.flatMap(s => s.ini);
-    return [...new Set(employees)];
-  }, [sales]);
+    return employees;
+  }, [employees]);
 
   // Flatten sales for filtering
   const flattenedSales = useMemo(() => {
@@ -701,7 +746,9 @@ export default function SprzedazPage() {
                   <UISelectContent className="rounded-xl">
                     <UISelectItem value="all" className="font-bold text-xs">Wszyscy</UISelectItem>
                     {uniqueEmployees.map(emp => (
-                      <UISelectItem key={emp} value={emp} className="font-bold text-xs">{emp}</UISelectItem>
+                      <UISelectItem key={emp.id} value={emp.initials} className="font-bold text-xs">
+                        {emp.name}
+                      </UISelectItem>
                     ))}
                   </UISelectContent>
                 </UISelect>
@@ -938,6 +985,167 @@ export default function SprzedazPage() {
                 <p className="text-xl font-black text-emerald-500">+{selectedSale?.items.reduce((s, i) => s + i.profit, 0)} zł</p>
               </div>
             </div>
+
+            <Button
+              className="w-full bg-primary hover:bg-primary/90 text-white rounded-xl font-black text-xs uppercase tracking-widest h-12"
+              onClick={() => setIsInvoiceDialogOpen(true)}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Generuj fakturę
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invoice Customer Details Dialog */}
+      <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] rounded-3xl border-none p-0 overflow-hidden">
+          <DialogHeader className="p-6 bg-primary text-white">
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">Dane klienta</DialogTitle>
+            <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Wprowadź dane do faktury</p>
+          </DialogHeader>
+          <div className="p-6 space-y-4">
+            {savedCustomers.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Zapisani klienci</Label>
+                <UISelect
+                  onValueChange={(val) => {
+                    const customer = savedCustomers.find((c: any) => c.id === val);
+                    if (customer) {
+                      setInvoiceCustomer({
+                        name: customer.name,
+                        nip: customer.nip,
+                        address: customer.address,
+                        email: customer.email
+                      });
+                    }
+                  }}
+                >
+                  <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase">
+                    <UISelectValue placeholder="Wybierz zapisanego klienta..." />
+                  </UISelectTrigger>
+                  <UISelectContent className="rounded-xl">
+                    {savedCustomers.map((customer: any) => (
+                      <UISelectItem key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </UISelectItem>
+                    ))}
+                  </UISelectContent>
+                </UISelect>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Nazwa</Label>
+              <Input
+                value={invoiceCustomer.name}
+                onChange={(e) => setInvoiceCustomer({ ...invoiceCustomer, name: e.target.value })}
+                placeholder="np. Jan Kowalski"
+                className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">NIP</Label>
+              <Input
+                value={invoiceCustomer.nip}
+                onChange={(e) => setInvoiceCustomer({ ...invoiceCustomer, nip: e.target.value })}
+                placeholder="np. 123-456-78-90"
+                className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Adres</Label>
+              <Input
+                value={invoiceCustomer.address}
+                onChange={(e) => setInvoiceCustomer({ ...invoiceCustomer, address: e.target.value })}
+                placeholder="np. ul. Marszałkowska 1, 00-001 Warszawa"
+                className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Email</Label>
+              <Input
+                type="email"
+                value={invoiceCustomer.email}
+                onChange={(e) => setInvoiceCustomer({ ...invoiceCustomer, email: e.target.value })}
+                placeholder="np. jan.kowalski@example.com"
+                className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                className="bg-secondary hover:bg-secondary/90 text-white rounded-xl font-black text-xs uppercase tracking-widest h-12"
+                onClick={() => {
+                  if (!invoiceCustomer.name) return;
+                  const newCustomer = {
+                    id: Date.now().toString(),
+                    name: invoiceCustomer.name,
+                    nip: invoiceCustomer.nip,
+                    address: invoiceCustomer.address,
+                    email: invoiceCustomer.email
+                  };
+                  const updatedCustomers = [...savedCustomers, newCustomer];
+                  localStorage.setItem('saved_customers', JSON.stringify(updatedCustomers));
+                  setSavedCustomers(updatedCustomers);
+                  addToast({
+                    title: "Klient zapisany",
+                    description: "Dane klienta zostały zapisane",
+                    variant: "success"
+                  });
+                }}
+              >
+                <User className="h-4 w-4 mr-2" />
+                Zapisz klienta
+              </Button>
+              <Button
+                className="bg-primary hover:bg-primary/90 text-white rounded-xl font-black text-xs uppercase tracking-widest h-12"
+                onClick={() => {
+                  if (!selectedSale) return;
+                  const totalPrice = selectedSale.items.reduce((s, i) => s + i.price, 0);
+                  const invoiceItems = selectedSale.items.map(item => ({
+                    name: item.name,
+                    category: allCategories.find(c => c.id === item.cat)?.label || item.cat,
+                    price: item.price
+                  }));
+
+                  // Save invoice to localStorage
+                  const newInvoice = {
+                    id: selectedSale.id,
+                    customerName: invoiceCustomer.name,
+                    customerNip: invoiceCustomer.nip,
+                    customerAddress: invoiceCustomer.address,
+                    customerEmail: invoiceCustomer.email,
+                    date: selectedSale.date,
+                    time: selectedSale.time,
+                    totalPrice: totalPrice,
+                    items: invoiceItems,
+                    createdAt: new Date().toISOString()
+                  };
+                  const savedInvoices = JSON.parse(localStorage.getItem('invoices') || '[]');
+                  const updatedInvoices = [...savedInvoices, newInvoice];
+                  localStorage.setItem('invoices', JSON.stringify(updatedInvoices));
+
+                  const queryParams = new URLSearchParams({
+                    id: selectedSale.id,
+                    name: invoiceCustomer.name,
+                    nip: invoiceCustomer.nip,
+                    address: invoiceCustomer.address,
+                    email: invoiceCustomer.email,
+                    date: selectedSale.date,
+                    time: selectedSale.time,
+                    price: totalPrice.toString(),
+                    items: JSON.stringify(invoiceItems)
+                  });
+
+                  window.open(`/faktura/${selectedSale.id}?${queryParams.toString()}`, "_blank");
+                  setIsInvoiceDialogOpen(false);
+                  setSelectedSale(null);
+                  setInvoiceCustomer({ name: "", nip: "", address: "", email: "" });
+                }}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Otwórz fakturę
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -960,8 +1168,8 @@ export default function SprzedazPage() {
 
       {/* Add Sale Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) { setEditingId(null); setPurchasePriceFromWarehouse(0); } setIsDialogOpen(open); }}>
-        <DialogContent className="sm:max-w-[500px] rounded-3xl border-none p-0 overflow-hidden">
-          <DialogHeader className="p-8 bg-primary text-white relative">
+        <DialogContent className="sm:max-w-[500px] rounded-3xl border-none p-0 overflow-hidden max-h-[80vh] flex flex-col">
+          <DialogHeader className="p-8 bg-primary text-white relative shrink-0">
             <div className="space-y-1">
               <DialogTitle className="text-2xl font-black uppercase tracking-tight">{editingId ? "Edytuj Sprzedaż" : "Nowa Sprzedaż"}</DialogTitle>
               <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">{editingId ? "Wprowadź zmiany w pozycji" : "Dodaj nową pozycję do zeszytu"}</p>
@@ -971,7 +1179,7 @@ export default function SprzedazPage() {
             </div>
           </DialogHeader>
 
-          <div className="p-8 space-y-6 bg-white">
+          <div className="p-8 space-y-6 bg-white overflow-y-auto flex-1">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Kategoria</Label>
@@ -1047,6 +1255,78 @@ export default function SprzedazPage() {
                   >
                     <Smartphone className="h-4 w-4 mr-2" />
                     Wybierz telefon z magazynu
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {newEntry.category === "usluga" && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Usługa z magazynu</Label>
+                {newEntry.name ? (
+                  <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-black text-sm text-emerald-700 uppercase">{newEntry.name}</p>
+                        <p className="text-[10px] text-emerald-600 font-bold mt-1">Cena: {newEntry.price} zł | Zysk: {newEntry.profit} zł</p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => {
+                          setNewEntry({...newEntry, name: "", price: "", profit: ""});
+                        }}
+                        className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg"
+                      >
+                        Zmień
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsUslugaSelectOpen(true)}
+                    className="w-full h-12 border-primary/20 border-2 border-dashed rounded-xl font-bold text-xs uppercase hover:bg-accent/50 hover:border-primary/30"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Wybierz usługę z magazynu
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {newEntry.category === "serwis" && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Serwis z magazynu</Label>
+                {newEntry.name ? (
+                  <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-black text-sm text-emerald-700 uppercase">{newEntry.name}</p>
+                        <p className="text-[10px] text-emerald-600 font-bold mt-1">Cena: {newEntry.price} zł | Zysk: {newEntry.profit} zł</p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => {
+                          setNewEntry({...newEntry, name: "", price: "", profit: ""});
+                        }}
+                        className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg"
+                      >
+                        Zmień
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsSerwisSelectOpen(true)}
+                    className="w-full h-12 border-primary/20 border-2 border-dashed rounded-xl font-bold text-xs uppercase hover:bg-accent/50 hover:border-primary/30"
+                  >
+                    <Wrench className="h-4 w-4 mr-2" />
+                    Wybierz serwis z magazynu
                   </Button>
                 )}
               </div>
@@ -1236,6 +1516,8 @@ export default function SprzedazPage() {
                         ...newEntry,
                         name: phone.name,
                         imei: phone.imei,
+                        price: phone.price || "",
+                        profit: phone.profit || "",
                         warehousePhoneId: idx
                       });
                       setIsPhoneSelectOpen(false);
@@ -1266,6 +1548,158 @@ export default function SprzedazPage() {
                       <div className="text-right">
                         <p className="text-lg font-black text-primary">{phone.price}</p>
                         <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Cena sprzedaży</p>
+                      </div>
+                    </div>
+                  </button>
+                ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Usługa Selection Dialog */}
+      <Dialog open={isUslugaSelectOpen} onOpenChange={setIsUslugaSelectOpen}>
+        <DialogContent className="sm:max-w-[600px] rounded-3xl border-none p-0 overflow-hidden max-h-[80vh] flex flex-col">
+          <DialogHeader className="p-6 bg-primary text-white relative shrink-0">
+            <div className="space-y-1">
+              <DialogTitle className="text-xl font-black uppercase tracking-tight">Wybierz usługę</DialogTitle>
+              <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Z magazynu</p>
+            </div>
+            <div className="absolute right-6 top-6 flex items-center gap-2">
+              <div className="bg-white/10 px-3 py-1 rounded-lg">
+                <p className="text-white/80 text-[10px] font-bold uppercase">Dostępne: {warehouseUslugi.length}</p>
+              </div>
+            </div>
+          </DialogHeader>
+          
+          <div className="p-4 border-b border-primary/10 shrink-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Szukaj usługi..." 
+                className="pl-10 bg-accent/30 border-none h-11 rounded-xl"
+                value={uslugaSearchQuery}
+                onChange={(e) => setUslugaSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {warehouseUslugi.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="h-12 w-12 text-primary/20 mx-auto mb-3" />
+                <p className="text-muted-foreground font-bold text-sm">Brak dostępnych usług</p>
+                <p className="text-muted-foreground/60 text-xs mt-1">Dodaj usługi w zakładce Magazyn</p>
+              </div>
+            ) : (
+              warehouseUslugi
+                .filter(usluga => 
+                  usluga.name.toLowerCase().includes(uslugaSearchQuery.toLowerCase())
+                )
+                .map((usluga, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setNewEntry({
+                        ...newEntry,
+                        name: usluga.name,
+                        price: usluga.price || "",
+                        profit: usluga.profit || ""
+                      });
+                      setIsUslugaSelectOpen(false);
+                      setUslugaSearchQuery("");
+                    }}
+                    className="w-full p-4 bg-accent/30 rounded-2xl border border-primary/5 hover:border-primary/20 hover:bg-accent/50 transition-all text-left group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary">
+                          <FileText className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <p className="font-black text-sm text-foreground uppercase tracking-tight">{usluga.name}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-black text-primary">{usluga.price}</p>
+                        <p className="text-[9px] text-emerald-600 font-bold uppercase mt-1">+{usluga.profit} zł zysku</p>
+                      </div>
+                    </div>
+                  </button>
+                ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Serwis Selection Dialog */}
+      <Dialog open={isSerwisSelectOpen} onOpenChange={setIsSerwisSelectOpen}>
+        <DialogContent className="sm:max-w-[600px] rounded-3xl border-none p-0 overflow-hidden max-h-[80vh] flex flex-col">
+          <DialogHeader className="p-6 bg-primary text-white relative shrink-0">
+            <div className="space-y-1">
+              <DialogTitle className="text-xl font-black uppercase tracking-tight">Wybierz serwis</DialogTitle>
+              <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Z magazynu</p>
+            </div>
+            <div className="absolute right-6 top-6 flex items-center gap-2">
+              <div className="bg-white/10 px-3 py-1 rounded-lg">
+                <p className="text-white/80 text-[10px] font-bold uppercase">Dostępne: {warehouseSerwisy.length}</p>
+              </div>
+            </div>
+          </DialogHeader>
+          
+          <div className="p-4 border-b border-primary/10 shrink-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Szukaj serwisu..." 
+                className="pl-10 bg-accent/30 border-none h-11 rounded-xl"
+                value={serwisSearchQuery}
+                onChange={(e) => setSerwisSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {warehouseSerwisy.length === 0 ? (
+              <div className="text-center py-12">
+                <Wrench className="h-12 w-12 text-primary/20 mx-auto mb-3" />
+                <p className="text-muted-foreground font-bold text-sm">Brak dostępnych serwisów</p>
+                <p className="text-muted-foreground/60 text-xs mt-1">Dodaj serwisy w zakładce Magazyn</p>
+              </div>
+            ) : (
+              warehouseSerwisy
+                .filter(serwis => 
+                  serwis.name.toLowerCase().includes(serwisSearchQuery.toLowerCase())
+                )
+                .map((serwis, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setNewEntry({
+                        ...newEntry,
+                        name: serwis.name,
+                        price: serwis.price || "",
+                        profit: serwis.profit || ""
+                      });
+                      setIsSerwisSelectOpen(false);
+                      setSerwisSearchQuery("");
+                    }}
+                    className="w-full p-4 bg-accent/30 rounded-2xl border border-primary/5 hover:border-primary/20 hover:bg-accent/50 transition-all text-left group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary">
+                          <Wrench className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <p className="font-black text-sm text-foreground uppercase tracking-tight">{serwis.name}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-black text-primary">{serwis.price}</p>
+                        <p className="text-[9px] text-emerald-600 font-bold uppercase mt-1">+{serwis.profit} zł zysku</p>
                       </div>
                     </div>
                   </button>

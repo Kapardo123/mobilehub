@@ -60,8 +60,18 @@ export default function PracownicyPage() {
 
   const [employees, setEmployees] = useState([
     { id: "1", name: "Piotr Zakrzewski", role: "Właściciel", initials: "PZ", shops: ["Trzy Stawy", "Galeria Katowicka", "Silesia City Center"], status: "Online", login: "piotr.z", password: "PIN 123456" },
+    // Trzy Stawy
     { id: "2", name: "Jan Kowalski", role: "Pracownik", initials: "JK", shops: ["Trzy Stawy"], status: "W pracy", login: "jan.k", password: "PIN 654321" },
-    { id: "3", name: "Anna Nowak", role: "Pracownik", initials: "AN", shops: ["Galeria Katowicka", "Silesia City Center"], status: "Offline", login: "anna.n", password: "PIN 112233" },
+    { id: "3", name: "Maria Wójcik", role: "Pracownik", initials: "MW", shops: ["Trzy Stawy"], status: "Offline", login: "maria.w", password: "PIN 223344" },
+    { id: "4", name: "Krzysztof Nowak", role: "Pracownik", initials: "KN", shops: ["Trzy Stawy"], status: "Offline", login: "krzysztof.n", password: "PIN 556677" },
+    // Galeria Katowicka
+    { id: "5", name: "Anna Nowak", role: "Pracownik", initials: "AN", shops: ["Galeria Katowicka"], status: "W pracy", login: "anna.n", password: "PIN 112233" },
+    { id: "6", name: "Marek Krawczyk", role: "Pracownik", initials: "MK", shops: ["Galeria Katowicka"], status: "Offline", login: "marek.k", password: "PIN 334455" },
+    { id: "7", name: "Karolina Zielińska", role: "Pracownik", initials: "KZ", shops: ["Galeria Katowicka"], status: "Offline", login: "karolina.z", password: "PIN 778899" },
+    // Silesia City Center
+    { id: "8", name: "Tomasz Szymański", role: "Pracownik", initials: "TS", shops: ["Silesia City Center"], status: "W pracy", login: "tomasz.s", password: "PIN 445566" },
+    { id: "9", name: "Barbara Dąbrowska", role: "Pracownik", initials: "BD", shops: ["Silesia City Center"], status: "Offline", login: "barbara.d", password: "PIN 889900" },
+    { id: "10", name: "Łukasz Kamiński", role: "Pracownik", initials: "ŁK", shops: ["Silesia City Center"], status: "Offline", login: "lukasz.k", password: "PIN 990011" },
   ]);
 
   useEffect(() => {

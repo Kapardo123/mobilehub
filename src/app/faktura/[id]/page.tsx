@@ -4,11 +4,15 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Printer, ArrowLeft, Download } from "lucide-react";
-import { Suspense, useEffect } from "react";
+import { Suspense, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 
 function InvoiceContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const invoiceRef = useRef<HTMLDivElement>(null);
   
   const data = {
     id: searchParams.get("id"),
@@ -30,20 +34,60 @@ function InvoiceContent() {
     account: "12 3456 7890 0000 0000 1234 5678"
   };
 
+  const downloadAsPDF = async () => {
+    if (!invoiceRef.current) return;
+    
+    const canvas = await html2canvas(invoiceRef.current, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff"
+    });
+    
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4"
+    });
+    
+    const imgWidth = 210;
+    const pageHeight = 297;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft >= 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
+    pdf.save(`faktura-${data.id}.pdf`);
+  };
+
   return (
     <div className="min-h-screen bg-accent/30 p-4 sm:p-12 print:bg-white print:p-0">
       {/* Controls - Hidden on print */}
       <div className="max-w-4xl mx-auto mb-6 flex justify-between items-center print:hidden">
         <Button variant="ghost" onClick={() => window.close()} className="gap-2 text-muted-foreground hover:text-primary hover:bg-white rounded-xl transition-all">
-          <ArrowLeft className="h-4 w-4" /> Powrót
+          <ArrowLeft className="h-4 w-4" /> Zamknij
         </Button>
-        <Button onClick={() => window.print()} className="bg-primary hover:bg-primary/90 text-white gap-2 px-8 h-12 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/10 transition-all active:scale-95">
-          <Printer className="h-4 w-4" /> Drukuj Fakturę
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={downloadAsPDF} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 px-6 h-12 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-emerald-600/10 transition-all active:scale-95">
+            <Download className="h-4 w-4" /> Pobierz PDF
+          </Button>
+          <Button onClick={() => window.print()} className="bg-primary hover:bg-primary/90 text-white gap-2 px-6 h-12 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/10 transition-all active:scale-95">
+            <Printer className="h-4 w-4" /> Drukuj Fakturę
+          </Button>
+        </div>
       </div>
 
       {/* Invoice Page */}
-      <div className="max-w-4xl mx-auto bg-white p-12 sm:p-20 print:p-0 shadow-[0_0_80px_rgba(0,0,0,0.03)] print:shadow-none rounded-[2rem] print:rounded-none">
+      <div ref={invoiceRef} className="max-w-4xl mx-auto bg-white p-12 sm:p-20 print:p-0 shadow-[0_0_80px_rgba(0,0,0,0.03)] print:shadow-none rounded-[2rem] print:rounded-none">
         {/* Top Header */}
         <div className="flex justify-between items-start mb-20">
           <div className="space-y-8">

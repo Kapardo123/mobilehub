@@ -25,7 +25,8 @@ import {
   Hash, 
   Palette, 
   Info,
-  X 
+  X,
+  Trash2
 } from "lucide-react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -57,9 +58,12 @@ export default function MagazynPage() {
   const { addToast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isAddUslugaDialogOpen, setIsAddUslugaDialogOpen] = useState(false);
+  const [isAddSerwisDialogOpen, setIsAddSerwisDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"alfanum-asc" | "alfanum-desc" | "cena-asc" | "cena-desc" | "stan-asc" | "stan-desc">("alfanum-asc");
   const [selectedPhone, setSelectedPhone] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({
     name: "",
     category: "akcesoria",
@@ -154,6 +158,7 @@ export default function MagazynPage() {
       router.push("/login");
       return;
     }
+    setUserRole(userRole);
   }, [router]);
 
   useEffect(() => {
@@ -217,6 +222,13 @@ export default function MagazynPage() {
       statusSprzedany: false, dataSprzedazy: ""
     });
     setIsAddDialogOpen(false);
+  };
+
+  const handleDeleteItem = (index: number, itemName: string) => {
+    if (confirm(`Czy na pewno chcesz usunąć "${itemName}" z magazynu?`)) {
+      setInventory(inventory.filter((_: any, i: number) => i !== index));
+      addToast(`Usunięto ${itemName} z magazynu`, "success");
+    }
   };
 
   const filteredItems = useMemo(() => {
@@ -283,42 +295,68 @@ export default function MagazynPage() {
           </div>
           
           <div className="flex gap-2">
+            {userRole === "owner" && selectedCategory === "usluga" && (
+              <Button 
+                onClick={() => {
+                  setNewItem({...newItem, category: "usluga", name: "", stock: "1", purchasePrice: "", sellingPrice: ""});
+                  setIsAddUslugaDialogOpen(true);
+                }}
+                className="bg-emerald-500 hover:bg-emerald-600 rounded-xl font-black text-xs uppercase tracking-widest h-10 px-4 text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Dodaj usługę
+              </Button>
+            )}
+            
+            {userRole === "owner" && selectedCategory === "serwis" && (
+              <Button 
+                onClick={() => {
+                  setNewItem({...newItem, category: "serwis", name: "", stock: "1", purchasePrice: "", sellingPrice: ""});
+                  setIsAddSerwisDialogOpen(true);
+                }}
+                className="bg-amber-500 hover:bg-amber-600 rounded-xl font-black text-xs uppercase tracking-widest h-10 px-4 text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Dodaj serwis
+              </Button>
+            )}
+            
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger render={<Button className="bg-primary hover:bg-primary/90 rounded-xl font-black text-xs uppercase tracking-widest h-10 px-4 text-white">
                   <Plus className="h-4 w-4 mr-2" />
                   Przyjmij towar
                 </Button>} />
 
-              <DialogContent className="sm:max-w-xl h-[95vh] flex flex-col rounded-[2rem] border-none p-0 overflow-hidden">
-                <div className="p-6 bg-primary text-white shadow-md">
-                  <DialogHeader>
-                    <DialogTitle className="text-xl font-black uppercase tracking-tight">Przyjęcie na Stan</DialogTitle>
-                    <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Wprowadź dane towaru lub urządzenia</p>
-                  </DialogHeader>
-                </div>
+                <DialogContent className="sm:max-w-xl h-[95vh] flex flex-col rounded-[2rem] border-none p-0 overflow-hidden">
+                  <div className="p-6 bg-primary text-white shadow-md">
+                    <DialogHeader>
+                      <DialogTitle className="text-xl font-black uppercase tracking-tight">Przyjęcie na Stan</DialogTitle>
+                      <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Wprowadź dane towaru lub urządzenia</p>
+                    </DialogHeader>
+                  </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-accent/30">
-                  <div className="space-y-4">
-                    <h3 className="text-[10px] font-black text-primary uppercase tracking-[0.2em] px-1">Podstawowe</h3>
-                    <div className="grid gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Kategoria</Label>
-                        <UISelect 
-                          value={newItem.category}
-                          onValueChange={(val) => val && setNewItem({ ...newItem, category: val })}
-                        >
-                          <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase text-foreground w-full">
-                            <UISelectValue placeholder="Wybierz" />
-                          </UISelectTrigger>
-                          <UISelectContent className="rounded-2xl">
-                            {categories.map(cat => (
-                              <UISelectItem key={cat.id} value={cat.id}>{cat.label}</UISelectItem>
-                            ))}
-                          </UISelectContent>
-                        </UISelect>
+                  <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-accent/30">
+                    <div className="space-y-4">
+                      <h3 className="text-[10px] font-black text-primary uppercase tracking-[0.2em] px-1">Podstawowe</h3>
+                      <div className="grid gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Kategoria</Label>
+                          <UISelect 
+                            value={newItem.category}
+                            onValueChange={(val) => val && setNewItem({ ...newItem, category: val })}
+                          >
+                            <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase text-foreground w-full">
+                              <UISelectValue placeholder="Wybierz" />
+                            </UISelectTrigger>
+                            <UISelectContent className="rounded-2xl">
+                              {categories.filter(cat => cat.id === "telefon" || cat.id === "akcesoria").map(cat => (
+                                <UISelectItem key={cat.id} value={cat.id}>{cat.label}</UISelectItem>
+                              ))}
+                            </UISelectContent>
+                          </UISelect>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
                   {newItem.category === "telefon" ? (
                   /* PHONE SPECIFIC FORM */
@@ -577,9 +615,167 @@ export default function MagazynPage() {
                 </div>
               </DialogContent>
             </Dialog>
+            
+            {/* Dialog dla usługi */}
+            <Dialog open={isAddUslugaDialogOpen} onOpenChange={setIsAddUslugaDialogOpen}>
+              <DialogContent className="sm:max-w-md h-[70vh] flex flex-col rounded-[2rem] border-none p-0 overflow-hidden">
+                <div className="p-6 bg-emerald-500 text-white shadow-md">
+                  <DialogHeader>
+                    <DialogTitle className="text-xl font-black uppercase tracking-tight">Dodaj Usługę</DialogTitle>
+                    <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Wprowadź dane usługi</p>
+                  </DialogHeader>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Nazwa Usługi</Label>
+                    <Input 
+                      value={newItem.name}
+                      onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                      placeholder="np. Wymiana ekranu" 
+                      className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Cena Zakupu</Label>
+                      <Input 
+                        type="number"
+                        value={newItem.purchasePrice}
+                        onChange={(e) => setNewItem({...newItem, purchasePrice: e.target.value})}
+                        placeholder="0.00" 
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Cena Sprzedaży</Label>
+                      <Input 
+                        type="number"
+                        value={newItem.sellingPrice}
+                        onChange={(e) => setNewItem({...newItem, sellingPrice: e.target.value})}
+                        placeholder="0.00" 
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase" 
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Ilość (szt)</Label>
+                    <Input 
+                      type="number"
+                      value={newItem.stock}
+                      onChange={(e) => setNewItem({...newItem, stock: e.target.value})}
+                      placeholder="1" 
+                      className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase" 
+                    />
+                  </div>
+                </div>
+                <div className="p-6 bg-accent/10 border-t border-primary/5 sticky bottom-0 z-20">
+                  <Button 
+                    onClick={() => {
+                      if (!newItem.name || !newItem.sellingPrice) {
+                        addToast("Wypełnij nazwę i cenę sprzedaży", "error");
+                        return;
+                      }
+                      const item = {
+                        name: newItem.name,
+                        category: "usluga",
+                        stock: parseInt(newItem.stock) || 1,
+                        price: `${newItem.sellingPrice} zł`,
+                        alert: false,
+                      };
+                      setInventory([item, ...inventory]);
+                      addToast(`Dodano ${item.name} do magazynu`, "success");
+                      setNewItem({...newItem, name: "", stock: "1", purchasePrice: "", sellingPrice: ""});
+                      setIsAddUslugaDialogOpen(false);
+                    }}
+                    className="w-full h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-sm uppercase tracking-widest shadow-lg transition-all active:scale-95"
+                  >
+                    Dodaj do Magazynu
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            
+            {/* Dialog dla serwisu */}
+            <Dialog open={isAddSerwisDialogOpen} onOpenChange={setIsAddSerwisDialogOpen}>
+              <DialogContent className="sm:max-w-md h-[70vh] flex flex-col rounded-[2rem] border-none p-0 overflow-hidden">
+                <div className="p-6 bg-amber-500 text-white shadow-md">
+                  <DialogHeader>
+                    <DialogTitle className="text-xl font-black uppercase tracking-tight">Dodaj Serwis</DialogTitle>
+                    <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Wprowadź dane serwisu</p>
+                  </DialogHeader>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Nazwa Serwisu</Label>
+                    <Input 
+                      value={newItem.name}
+                      onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                      placeholder="np. Naprawa głośnika" 
+                      className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase" 
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Cena Zakupu</Label>
+                      <Input 
+                        type="number"
+                        value={newItem.purchasePrice}
+                        onChange={(e) => setNewItem({...newItem, purchasePrice: e.target.value})}
+                        placeholder="0.00" 
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Cena Sprzedaży</Label>
+                      <Input 
+                        type="number"
+                        value={newItem.sellingPrice}
+                        onChange={(e) => setNewItem({...newItem, sellingPrice: e.target.value})}
+                        placeholder="0.00" 
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase" 
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Ilość (szt)</Label>
+                    <Input 
+                      type="number"
+                      value={newItem.stock}
+                      onChange={(e) => setNewItem({...newItem, stock: e.target.value})}
+                      placeholder="1" 
+                      className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase" 
+                    />
+                  </div>
+                </div>
+                <div className="p-6 bg-accent/10 border-t border-primary/5 sticky bottom-0 z-20">
+                  <Button 
+                    onClick={() => {
+                      if (!newItem.name || !newItem.sellingPrice) {
+                        addToast("Wypełnij nazwę i cenę sprzedaży", "error");
+                        return;
+                      }
+                      const item = {
+                        name: newItem.name,
+                        category: "serwis",
+                        stock: parseInt(newItem.stock) || 1,
+                        price: `${newItem.sellingPrice} zł`,
+                        alert: false,
+                      };
+                      setInventory([item, ...inventory]);
+                      addToast(`Dodano ${item.name} do magazynu`, "success");
+                      setNewItem({...newItem, name: "", stock: "1", purchasePrice: "", sellingPrice: ""});
+                      setIsAddSerwisDialogOpen(false);
+                    }}
+                    className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-sm uppercase tracking-widest shadow-lg transition-all active:scale-95"
+                  >
+                    Dodaj do Magazynu
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
-
+        
         {/* Search and Sort - Visible in Category View or when Category is selected */}
         {(selectedCategory || !selectedCategory) && (
           <div className="flex flex-col sm:flex-row gap-3">
@@ -783,11 +979,14 @@ export default function MagazynPage() {
                         <TableHead className="text-[10px] font-black uppercase text-white pl-6 h-12">Produkt</TableHead>
                         <TableHead className="text-[10px] font-black uppercase text-white text-center">Stan</TableHead>
                         <TableHead className="text-[10px] font-black uppercase text-white text-right pr-6">Cena</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase text-white text-center w-20">Akcja</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredItems.length > 0 ? (
-                        filteredItems.map((item, idx) => (
+                        filteredItems.map((item, idx) => {
+                          const originalIndex = inventory.indexOf(item);
+                          return (
                           <TableRow key={idx} className="border-b border-primary/5 last:border-0 hover:bg-accent/30 transition-colors group">
                             <TableCell className="py-4 pl-6">
                               <p className="font-black text-sm text-foreground uppercase tracking-tight">{item.name}</p>
@@ -806,11 +1005,21 @@ export default function MagazynPage() {
                             <TableCell className="text-right py-4 pr-6">
                               <p className="text-sm font-black text-primary">{item.price}</p>
                             </TableCell>
+                            <TableCell className="text-center py-4">
+                              {!(item.category === "usluga" || item.category === "serwis") || userRole === "owner" ? (
+                                <button
+                                  onClick={() => handleDeleteItem(originalIndex, item.name)}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-red-50 rounded-lg"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </button>
+                              ) : null}
+                            </TableCell>
                           </TableRow>
-                        ))
+                        )})
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={3} className="py-12 text-center">
+                          <TableCell colSpan={4} className="py-12 text-center">
                             <div className="space-y-4">
                               <Package className="h-12 w-12 text-primary/20 mx-auto" />
                               <div>
@@ -1011,10 +1220,24 @@ export default function MagazynPage() {
                 </div>
               </div>
 
-              <div className="p-6 bg-accent/10 border-t border-primary/5 sticky bottom-0 z-20">
+              <div className="p-6 bg-accent/10 border-t border-primary/5 sticky bottom-0 z-20 flex gap-3">
+                <Button 
+                  onClick={() => {
+                    if (confirm(`Czy na pewno chcesz usunąć "${selectedPhone.name}" z magazynu?`)) {
+                      const idx = inventory.indexOf(selectedPhone);
+                      setInventory(inventory.filter((_: any, i: number) => i !== idx));
+                      addToast(`Usunięto ${selectedPhone.name} z magazynu`, "success");
+                      setSelectedPhone(null);
+                    }
+                  }}
+                  className="flex-1 h-14 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-sm uppercase tracking-widest shadow-lg transition-all active:scale-95"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Usuń
+                </Button>
                 <Button 
                   onClick={() => setSelectedPhone(null)}
-                  className="w-full h-14 bg-primary hover:bg-primary/90 text-white rounded-xl font-black text-sm uppercase tracking-widest shadow-lg shadow-primary/10 transition-all active:scale-95"
+                  className="flex-1 h-14 bg-primary hover:bg-primary/90 text-white rounded-xl font-black text-sm uppercase tracking-widest shadow-lg shadow-primary/10 transition-all active:scale-95"
                 >
                   Zamknij
                 </Button>

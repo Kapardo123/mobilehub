@@ -28,12 +28,24 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { CreditCard, Banknote, FileText, ArrowRight, DollarSign } from "lucide-react";
+import { CreditCard, Banknote, ArrowRight, DollarSign, Package, Wrench, Settings, User, Clock } from "lucide-react";
+import { addAction, getActions, Action } from "./akcje/page";
 
 export default function Home() {
   const router = useRouter();
   const [selectedShop, setSelectedShop] = useState("all");
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [recentActions, setRecentActions] = useState<Action[]>([]);
+  const [actionFilterShop, setActionFilterShop] = useState<string>("all");
+  const [actionFilterEmployee, setActionFilterEmployee] = useState<string>("all");
+  const [employees, setEmployees] = useState<any[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('pracownicy_employees');
+    if (saved) {
+      setEmployees(JSON.parse(saved));
+    }
+  }, []);
 
   // Mock data for shops
   const shopData = {
@@ -58,6 +70,28 @@ export default function Home() {
       router.push("/login");
     }
   }, [router]);
+
+  useEffect(() => {
+    const allActions = getActions();
+    let filtered = allActions;
+    
+    if (actionFilterShop !== "all") {
+      filtered = filtered.filter(a => a.shopId === actionFilterShop);
+    }
+    if (actionFilterEmployee !== "all") {
+      filtered = filtered.filter(a => a.employeeId === actionFilterEmployee);
+    }
+    
+    setRecentActions(filtered.slice(0, 5));
+  }, [actionFilterShop, actionFilterEmployee]);
+
+  useEffect(() => {
+    const handleActionAdded = (e: CustomEvent<Action>) => {
+      setRecentActions(prev => [e.detail, ...prev].slice(0, 5));
+    };
+    window.addEventListener('action_added', handleActionAdded as EventListener);
+    return () => window.removeEventListener('action_added', handleActionAdded as EventListener);
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-accent/20">
@@ -139,13 +173,6 @@ export default function Home() {
                 </div>
               </div>
             </CardContent>
-
-            <Link href="/raport-dnia" className="block w-full">
-              <Button className="w-full bg-primary hover:bg-primary/90 text-white font-black h-14 rounded-none rounded-b-[2rem] shadow-none transition-all text-[11px] uppercase tracking-[0.2em] gap-3">
-                <FileText className="h-4 w-4" />
-                Szczegółowy Raport Dnia
-              </Button>
-            </Link>
           </Card>
         </section>
 
@@ -159,7 +186,7 @@ export default function Home() {
               { href: "/sprzedaz", label: "Sprzedaż", icon: ShoppingCart, color: "bg-primary", shadow: "shadow-primary/10" },
               { href: "/magazyn", label: "Magazyn", icon: ClipboardList, color: "bg-secondary", shadow: "shadow-secondary/10" },
               { href: "/pracownicy", label: "Pracownicy", icon: Users, color: "bg-secondary/80", shadow: "shadow-secondary/10" },
-              { href: "/raporty", label: "Raporty", icon: Search, color: "bg-primary/80", shadow: "shadow-primary/10" },
+              { href: "/raporty", label: "Raporty", icon: Search, color: "bg-secondary/80", shadow: "shadow-secondary/10" },
             ].map((item) => (
               <Link key={item.href} href={item.href} className="group">
                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-primary/5 group-hover:border-primary/20 group-hover:shadow-md transition-all flex items-center gap-3">
@@ -177,25 +204,80 @@ export default function Home() {
 
         {/* Quick Access List - More Refined */}
         <section className="bg-white rounded-[2rem] p-6 shadow-sm border border-primary/5">
-          <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-6 px-1">Ostatnie Akcje</h2>
-          <div className="space-y-6">
-            {[
-              { label: "Sprzedaż: Etui iPhone 13", time: "14:30", user: "Jan Kowalski", price: "89 zł", icon: ShoppingCart, color: "text-primary", bg: "bg-accent/50" },
-              { label: "Sprzedaż: iPhone 15 Pro", time: "12:15", user: "Anna Nowak", price: "5 450 zł", icon: ShoppingCart, color: "text-primary", bg: "bg-accent/50" },
-            ].map((action, i) => (
-              <div key={i} className="flex items-center justify-between group cursor-pointer">
-                <div className="flex items-center gap-4">
-                  <div className={`h-10 w-10 rounded-xl ${action.bg} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                    <action.icon className={`h-5 w-5 ${action.color}`} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{action.label}</p>
-                    <p className="text-[10px] text-muted-foreground font-medium">{action.time} • {action.user}</p>
-                  </div>
+          <div className="flex items-center justify-between mb-6 px-1">
+            <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Ostatnie Akcje</h2>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-2 mb-6">
+            <Select value={actionFilterShop} onValueChange={(val) => setActionFilterShop(val || "all")}>
+              <SelectTrigger className="bg-accent/30 border-none h-10 text-[10px] font-bold uppercase rounded-xl flex-1">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-3 w-3 text-primary" />
+                  <span className="truncate">
+                    {actionFilterShop === "all" ? "Wszystkie sklepy" : 
+                     actionFilterShop === "1" ? "Trzy Stawy" :
+                     actionFilterShop === "2" ? "Galeria Katowicka" :
+                     actionFilterShop === "3" ? "Silesia City Center" : actionFilterShop}
+                  </span>
                 </div>
-                <p className="text-sm font-black text-foreground">{action.price}</p>
-              </div>
-            ))}
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all" className="font-bold text-[10px] uppercase">Wszystkie sklepy</SelectItem>
+                <SelectItem value="1" className="font-bold text-[10px] uppercase">Trzy Stawy</SelectItem>
+                <SelectItem value="2" className="font-bold text-[10px] uppercase">Galeria Katowicka</SelectItem>
+                <SelectItem value="3" className="font-bold text-[10px] uppercase">Silesia City Center</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select value={actionFilterEmployee} onValueChange={(val) => setActionFilterEmployee(val || "all")}>
+              <SelectTrigger className="bg-accent/30 border-none h-10 text-[10px] font-bold uppercase rounded-xl flex-1">
+                <div className="flex items-center gap-2">
+                  <Users className="h-3 w-3 text-primary" />
+                  <span className="truncate">
+                    {actionFilterEmployee === "all" ? "Wszyscy pracownicy" : 
+                     employees.find(e => e.id === actionFilterEmployee)?.name || actionFilterEmployee}
+                  </span>
+                </div>
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all" className="font-bold text-[10px] uppercase">Wszyscy pracownicy</SelectItem>
+                {employees.map((emp) => (
+                  <SelectItem key={emp.id} value={emp.id} className="font-bold text-[10px] uppercase">
+                    {emp.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-6">
+            {recentActions.length > 0 ? recentActions.map((action) => {
+              const actionIcons: Record<string, any> = {
+                sprzedaz: ShoppingCart,
+                przyjecie: Package,
+                serwis: Wrench,
+                edycja: Settings,
+                logowanie: User,
+                inna: Clock,
+              };
+              const Icon = actionIcons[action.type] || Clock;
+              return (
+                <div key={action.id} className="flex items-center justify-between group cursor-pointer">
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-xl bg-accent/50 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{action.description}</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">{action.employeeName} • {action.shopName}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs font-black text-muted-foreground">{action.timestamp.split(" ")[1]}</p>
+                </div>
+              );
+            }) : (
+              <p className="text-sm text-muted-foreground text-center py-4">Brak ostatnich akcji</p>
+            )}
           </div>
         </section>
       </main>
