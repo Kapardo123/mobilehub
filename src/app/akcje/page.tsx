@@ -15,6 +15,7 @@ import {
   SelectTrigger as UISelectTrigger, 
   SelectValue as UISelectValue 
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
 export interface Action {
@@ -192,7 +193,7 @@ export default function AkcjePage() {
                   <UISelect value={filterShop || "all"} onValueChange={(val) => setFilterShop(val === "all" ? null : val)}>
                     <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase">
                       <Store className="h-4 w-4 mr-2 text-primary" />
-                      <SelectValue placeholder="Wszystkie sklepy" />
+                      <UISelectValue placeholder="Wszystkie sklepy" />
                     </UISelectTrigger>
                     <UISelectContent className="rounded-xl">
                       <UISelectItem value="all" className="font-bold text-xs uppercase">Wszystkie sklepy</UISelectItem>
@@ -208,7 +209,7 @@ export default function AkcjePage() {
                   <UISelect value={filterEmployee || "all"} onValueChange={(val) => setFilterEmployee(val === "all" ? null : val)}>
                     <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase">
                       <User className="h-4 w-4 mr-2 text-primary" />
-                      <SelectValue placeholder="Wszyscy pracownicy" />
+                      <UISelectValue placeholder="Wszyscy pracownicy" />
                     </UISelectTrigger>
                     <UISelectContent className="rounded-xl">
                       <UISelectItem value="all" className="font-bold text-xs uppercase">Wszyscy pracownicy</UISelectItem>
