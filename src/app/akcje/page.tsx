@@ -16,6 +16,7 @@ import {
   SelectValue as UISelectValue 
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export interface Action {
   id: string;
@@ -312,11 +313,5 @@ export default function AkcjePage() {
         </div>
       </main>
     </div>
-  );
-}
-
-function Label({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <label className={className}>{children}</label>
   );
 }
