@@ -767,27 +767,15 @@ export default function MagazynPage() {
                     )}
 
                     {editItem.category === "telefon" && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Ilość</Label>
-                          <Input 
-                            placeholder="1" 
-                            type="number"
-                            value={editItem.stock}
-                            onChange={(e) => setEditItem({...editItem, stock: e.target.value})}
-                            className="h-12 bg-accent/30 border-none rounded-xl"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cena sprzedaży</Label>
-                          <Input 
-                            placeholder="1999" 
-                            type="number"
-                            value={editItem.sellingPrice}
-                            onChange={(e) => setEditItem({...editItem, sellingPrice: e.target.value})}
-                            className="h-12 bg-accent/30 border-none rounded-xl"
-                          />
-                        </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cena sprzedaży</Label>
+                        <Input 
+                          placeholder="1999" 
+                          type="number"
+                          value={editItem.sellingPrice}
+                          onChange={(e) => setEditItem({...editItem, sellingPrice: e.target.value})}
+                          className="h-12 bg-accent/30 border-none rounded-xl"
+                        />
                       </div>
                     )}
                   </div>
