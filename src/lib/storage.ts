@@ -45,7 +45,12 @@ export function getLocalStorageSafe<T>(key: string, defaultValue: T) {
   if (typeof window === "undefined") return defaultValue;
   try {
     const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : defaultValue;
+    if (!stored) return defaultValue;
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return stored as any;
+    }
   } catch {
     return defaultValue;
   }
@@ -56,7 +61,12 @@ export function getSessionStorageSafe<T>(key: string, defaultValue: T) {
   if (typeof window === "undefined") return defaultValue;
   try {
     const stored = sessionStorage.getItem(key);
-    return stored ? JSON.parse(stored) : defaultValue;
+    if (!stored) return defaultValue;
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return stored as any;
+    }
   } catch {
     return defaultValue;
   }
