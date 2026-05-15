@@ -374,6 +374,11 @@ export default function GrafikPage() {
             value={selectedShop} 
             onValueChange={(val) => isOwner && val && setSelectedShop(val)}
             disabled={!isOwner}
+            items={[
+              { value: "trzy-stawy", label: "Trzy Stawy" },
+              { value: "galeria-katowicka", label: "Galeria Katowicka" },
+              { value: "silesia-city", label: "Silesia City Center" }
+            ]}
           >
             <SelectTrigger className="border-none bg-transparent h-12 focus:ring-0 font-bold text-foreground">
               <div className="flex items-center gap-2 pl-2">

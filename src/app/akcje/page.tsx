@@ -2,7 +2,7 @@
 
 import { Navbar } from "@/components/navbar";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Search, Filter, User, Store, Clock, ShoppingCart, Package, Wrench, Settings, ChevronDown } from "lucide-react";
+import { ArrowLeft, Search, Filter, User, Store, Clock, ShoppingCart, Package, Wrench, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -40,15 +40,7 @@ const actionTypes = {
   inna: { label: "Inna", icon: Clock, color: "bg-primary/10 text-primary", bgColor: "bg-primary/5" },
 };
 
-const defaultActions: Action[] = [
-  { id: "1", type: "sprzedaz", description: "Sprzedaż iPhone 15 Pro", employeeName: "Jan Kowalski", employeeId: "2", shopName: "Trzy Stawy", shopId: "1", timestamp: "2024-05-13 14:32:00", details: "Cena: 4500 zł" },
-  { id: "2", type: "przyjecie", description: "Przyjęcie na stan: Samsung S23", employeeName: "Anna Nowak", employeeId: "3", shopName: "Galeria Katowicka", shopId: "2", timestamp: "2024-05-13 13:15:00", details: "IMEI: 354455667788990" },
-  { id: "3", type: "serwis", description: "Wymiana baterii - Xiaomi 13", employeeName: "Jan Kowalski", employeeId: "2", shopName: "Trzy Stawy", shopId: "1", timestamp: "2024-05-13 11:45:00", details: "Klient: Jan Nowak" },
-  { id: "5", type: "sprzedaz", description: "Sprzedaż etui MagSafe + ładowarka", employeeName: "Anna Nowak", employeeId: "3", shopName: "Silesia City Center", shopId: "3", timestamp: "2024-05-13 09:30:00", details: "Cena: 228 zł" },
-  { id: "6", type: "logowanie", description: "Logowanie do systemu", employeeName: "Jan Kowalski", employeeId: "2", shopName: "Trzy Stawy", shopId: "1", timestamp: "2024-05-13 08:00:00" },
-  { id: "7", type: "przyjecie", description: "Przyjęcie na stan: iPhone 14 Pro Max", employeeName: "Piotr Zakrzewski", employeeId: "1", shopName: "Silesia City Center", shopId: "3", timestamp: "2024-05-12 16:45:00", details: "IMEI: 356789012345678" },
-  { id: "8", type: "sprzedaz", description: "Sprzedaż Samsung S22 + szkło hartowane", employeeName: "Anna Nowak", employeeId: "3", shopName: "Galeria Katowicka", shopId: "2", timestamp: "2024-05-12 15:20:00", details: "Cena: 1939 zł" },
-];
+const defaultActions: Action[] = [];
 
 export function addAction(action: Omit<Action, "id" | "timestamp">) {
   const newAction: Action = {
@@ -75,7 +67,6 @@ export function getActions(): Action[] {
 
 export default function AkcjePage() {
   const router = useRouter();
-  const [userRole, setUserRole] = useState<string | null>(null);
   const [actions, setActions] = useState<Action[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterShop, setFilterShop] = useState<string | null>(null);
@@ -107,17 +98,25 @@ export default function AkcjePage() {
     return () => window.removeEventListener('action_added', handleActionAdded as EventListener);
   }, []);
 
-  const shops = useMemo(() => [
-    { id: "1", name: "Trzy Stawy" },
-    { id: "2", name: "Galeria Katowicka" },
-    { id: "3", name: "Silesia City Center" },
-  ], []);
+  const shops = useMemo(() => {
+    if (typeof window === "undefined") return [];
+    const savedShops = getLocalStorageSafe('shops', []);
+    return savedShops.length > 0 ? savedShops : [
+      { id: "1", name: "Trzy Stawy" },
+      { id: "2", name: "Galeria Katowicka" },
+      { id: "3", name: "Silesia City Center" },
+    ];
+  }, [actions]);
 
-  const employees = useMemo(() => [
-    { id: "1", name: "Piotr Zakrzewski" },
-    { id: "2", name: "Jan Kowalski" },
-    { id: "3", name: "Anna Nowak" },
-  ], []);
+  const employees = useMemo(() => {
+    if (typeof window === "undefined") return [];
+    const savedEmployees = getLocalStorageSafe('employees', []);
+    return savedEmployees.length > 0 ? savedEmployees : [
+      { id: "1", name: "Piotr Zakrzewski" },
+      { id: "2", name: "Jan Kowalski" },
+      { id: "3", name: "Anna Nowak" },
+    ];
+  }, [actions]);
 
   const filteredActions = useMemo(() => {
     return actions.filter(action => {
@@ -193,14 +192,14 @@ export default function AkcjePage() {
               <div className="grid grid-cols-1 gap-3">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Sklep</Label>
-                  <UISelect value={filterShop || "all"} onValueChange={(val) => setFilterShop(val === "all" ? null : val)}>
+                  <UISelect value={filterShop || "all"} onValueChange={(val) => setFilterShop(val === "all" ? null : val)} items={[{ value: "all", label: "Wszystkie sklepy" }, ...shops.map((shop: { id: string; name: string }) => ({ value: shop.id, label: shop.name }))]}>
                     <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase">
                       <Store className="h-4 w-4 mr-2 text-primary" />
                       <UISelectValue placeholder="Wszystkie sklepy" />
                     </UISelectTrigger>
                     <UISelectContent className="rounded-xl">
                       <UISelectItem value="all" className="font-bold text-xs uppercase">Wszystkie sklepy</UISelectItem>
-                      {shops.map(shop => (
+                      {shops.map((shop: { id: string; name: string }) => (
                         <UISelectItem key={shop.id} value={shop.id} className="font-bold text-xs uppercase">{shop.name}</UISelectItem>
                       ))}
                     </UISelectContent>
@@ -209,14 +208,14 @@ export default function AkcjePage() {
 
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Pracownik</Label>
-                  <UISelect value={filterEmployee || "all"} onValueChange={(val) => setFilterEmployee(val === "all" ? null : val)}>
+                  <UISelect value={filterEmployee || "all"} onValueChange={(val) => setFilterEmployee(val === "all" ? null : val)} items={[{ value: "all", label: "Wszyscy pracownicy" }, ...employees.map((emp: { id: string; name: string }) => ({ value: emp.id, label: emp.name }))]}>
                     <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase">
                       <User className="h-4 w-4 mr-2 text-primary" />
                       <UISelectValue placeholder="Wszyscy pracownicy" />
                     </UISelectTrigger>
                     <UISelectContent className="rounded-xl">
                       <UISelectItem value="all" className="font-bold text-xs uppercase">Wszyscy pracownicy</UISelectItem>
-                      {employees.map(emp => (
+                      {employees.map((emp: { id: string; name: string }) => (
                         <UISelectItem key={emp.id} value={emp.id} className="font-bold text-xs uppercase">{emp.name}</UISelectItem>
                       ))}
                     </UISelectContent>
@@ -225,7 +224,7 @@ export default function AkcjePage() {
 
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Typ akcji</Label>
-                  <UISelect value={filterType || "all"} onValueChange={(val) => setFilterType(val === "all" ? null : val)}>
+                  <UISelect value={filterType || "all"} onValueChange={(val) => setFilterType(val === "all" ? null : val)} items={[{ value: "all", label: "Wszystkie typy" }, ...Object.entries(actionTypes).map(([key, val]) => ({ value: key, label: val.label }))]}>
                     <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase">
                       <Clock className="h-4 w-4 mr-2 text-primary" />
                       <UISelectValue placeholder="Wszystkie typy" />

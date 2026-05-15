@@ -62,6 +62,7 @@ import { DollarSign, Package, RefreshCcw, Send, Wallet, Smartphone, Headphones, 
 import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/components/ui/toast";
 import { getLocalStorageSafe, useLocalStorage, getSessionStorageSafe, useSessionStorage } from "@/lib/storage";
+import { addAction } from "@/app/akcje/page";
 
 export default function SprzedazPage() {
   const router = useRouter();
@@ -84,6 +85,8 @@ export default function SprzedazPage() {
     price: number;
     profit: number;
     imei?: string;
+    taxType?: string;
+    comment?: string;
   }
   
   interface SaleGroup {
@@ -218,11 +221,14 @@ export default function SprzedazPage() {
   const [warehousePhones, setWarehousePhones] = useState<any[]>([]);
   const [warehouseUslugi, setWarehouseUslugi] = useState<any[]>([]);
   const [warehouseSerwisy, setWarehouseSerwisy] = useState<any[]>([]);
+  const [warehouseAkcesoria, setWarehouseAkcesoria] = useState<any[]>([]);
   const [isUslugaSelectOpen, setIsUslugaSelectOpen] = useState(false);
   const [isSerwisSelectOpen, setIsSerwisSelectOpen] = useState(false);
+  const [isAkcesoriaSelectOpen, setIsAkcesoriaSelectOpen] = useState(false);
   const [phoneSearchQuery, setPhoneSearchQuery] = useState("");
   const [uslugaSearchQuery, setUslugaSearchQuery] = useState("");
   const [serwisSearchQuery, setSerwisSearchQuery] = useState("");
+  const [akcesoriaSearchQuery, setAkcesoriaSearchQuery] = useState("");
   const [purchasePriceFromWarehouse, setPurchasePriceFromWarehouse] = useState<number>(0);
   
   // New entry state
@@ -234,7 +240,9 @@ export default function SprzedazPage() {
     payment: "gotówka",
     ini: "",
     imei: "",
-    warehousePhoneId: null as number | null
+    warehousePhoneId: null as number | null,
+    taxType: "marża" as "VAT" | "marża",
+    comment: ""
   });
   
   const [cartItems, setCartItems] = useState<SaleItem[]>([]);
@@ -268,7 +276,7 @@ export default function SprzedazPage() {
     
     const initials = userName
       .split(" ")
-      .map((n) => n[0])
+      .map((n: string) => n[0])
       .join("")
       .toUpperCase();
     
@@ -287,7 +295,7 @@ export default function SprzedazPage() {
       const inventory = getLocalStorageSafe('magazyn_inventory', []);
       try {
         const availablePhones = inventory.filter((item: any) => 
-          item.category === "telefon" && !item.statusSold
+          item.category === "telefon" && !item.statusSprzedany
         );
         const availableUslugi = inventory.filter((item: any) => 
           item.category === "usluga"
@@ -295,13 +303,18 @@ export default function SprzedazPage() {
         const availableSerwisy = inventory.filter((item: any) => 
           item.category === "serwis"
         );
+        const availableAkcesoria = inventory.filter((item: any) => 
+          item.category === "akcesoria"
+        );
         setWarehousePhones(availablePhones);
         setWarehouseUslugi(availableUslugi);
         setWarehouseSerwisy(availableSerwisy);
+        setWarehouseAkcesoria(availableAkcesoria);
       } catch {
         setWarehousePhones([]);
         setWarehouseUslugi([]);
         setWarehouseSerwisy([]);
+        setWarehouseAkcesoria([]);
       }
     };
     
@@ -334,7 +347,9 @@ export default function SprzedazPage() {
         payment: selectedSaleForEdit.payment,
         ini: selectedSaleForEdit.ini,
         imei: "",
-        warehousePhoneId: null
+        warehousePhoneId: null,
+        taxType: "marża",
+        comment: ""
       });
     }
   }, [editingId, selectedSaleForEdit]);
@@ -353,14 +368,6 @@ export default function SprzedazPage() {
         { id: "telefon", label: "Telefon", icon: Smartphone, color: "text-primary" },
         { id: "usluga", label: "Usługa", icon: FileText, color: "text-primary" },
         { id: "serwis", label: "Serwis", icon: Wrench, color: "text-primary" },
-      ]
-    },
-    {
-      label: "Pozostałe",
-      items: [
-        { id: "paczka", label: "Paczka", icon: Package, color: "text-slate-500" },
-        { id: "zwrot", label: "Zwrot", icon: RefreshCcw, color: "text-red-500" },
-        { id: "skup", label: "Skup", icon: Smartphone, color: "text-amber-500" },
       ]
     }
   ];
@@ -423,16 +430,17 @@ export default function SprzedazPage() {
   const addPosition = () => {
     if (!newEntry.name || !newEntry.price) return;
 
-    const isSkup = newEntry.category === "skup";
     const priceVal = parseFloat(newEntry.price);
     const profitVal = parseFloat(newEntry.profit || "0");
 
     const newItem: SaleItem = {
       cat: newEntry.category,
       name: newEntry.name,
-      price: isSkup ? -Math.abs(priceVal) : priceVal,
-      profit: isSkup ? -Math.abs(profitVal) : profitVal,
-      imei: newEntry.imei
+      price: priceVal,
+      profit: profitVal,
+      imei: newEntry.imei,
+      taxType: newEntry.category === "telefon" ? newEntry.taxType : undefined,
+      comment: newEntry.comment
     };
 
     setCartItems(prev => [...prev, newItem]);
@@ -454,7 +462,9 @@ export default function SprzedazPage() {
       payment: newEntry.payment,
       ini: newEntry.ini,
       imei: "",
-      warehousePhoneId: null
+      warehousePhoneId: null,
+      taxType: "marża",
+      comment: ""
     });
   };
 
@@ -467,7 +477,7 @@ export default function SprzedazPage() {
         sale.id === editingId 
           ? { 
               ...sale, 
-              ini: cartItems[0].cat === "skup" ? "SKUP" : (newEntry.ini || sale.ini),
+              ini: newEntry.ini || sale.ini,
               payment: newEntry.payment,
               items: cartItems
             }
@@ -478,7 +488,7 @@ export default function SprzedazPage() {
       // Nowa sprzedaż
       const newSale: SaleGroup = {
         id: Math.random().toString(36).substr(2, 9),
-        ini: cartItems[0].cat === "skup" ? "SKUP" : (newEntry.ini || "PZ"),
+        ini: newEntry.ini || "PZ",
         payment: newEntry.payment,
         date: new Date().toISOString().split('T')[0],
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -487,6 +497,21 @@ export default function SprzedazPage() {
       
       setSales(prev => [newSale, ...prev]);
       addToast({ message: `Sprzedaż dodana (${newSale.items.length} pozycji)`, variant: "success" });
+      
+      const employeeName = getSessionStorageSafe("userName", "Pracownik");
+      const employeeId = getSessionStorageSafe("userId", "unknown");
+      const shopName = getSessionStorageSafe("shopName", "Sklep");
+      const shopId = getSessionStorageSafe("shopId", "unknown");
+      
+      addAction({
+        type: "sprzedaz",
+        description: `Sprzedaż: ${cartItems.map(item => item.name).join(", ")}`,
+        employeeName,
+        employeeId,
+        shopName,
+        shopId,
+        details: `${cartItems.length} pozycji | ${newEntry.payment} | Suma: ${newSale.items.reduce((sum, item) => sum + item.price, 0).toFixed(2)} zł`
+      });
     }
     
     setCartItems([]);
@@ -498,7 +523,9 @@ export default function SprzedazPage() {
       payment: "gotówka",
       ini: "",
       imei: "",
-      warehousePhoneId: null
+      warehousePhoneId: null,
+      taxType: "marża",
+      comment: ""
     });
     setEditingId(null);
     setSelectedSaleForEdit(null);
@@ -682,7 +709,7 @@ export default function SprzedazPage() {
                 <div className="h-12 w-px bg-primary/10 hidden md:block" />
 
                 <div className="w-[200px]">
-                  <UISelect value="Trzy Stawy Katowice" onValueChange={(val) => setSelectedShop(val || "Trzy Stawy Katowice")}>
+                  <UISelect value="Trzy Stawy Katowice" onValueChange={(val) => setSelectedShop(val || "Trzy Stawy Katowice")} items={shops.map(shop => ({ value: shop, label: shop }))}>
                     <UISelectTrigger className="h-12 rounded-2xl bg-white border-primary/10 font-bold text-xs">
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-primary" />
@@ -718,7 +745,7 @@ export default function SprzedazPage() {
               </div>
               
               <div className="w-[150px]">
-                <UISelect value={filterCategory || "all"} onValueChange={(val) => setFilterCategory(val === "all" ? null : val)}>
+                <UISelect value={filterCategory || "all"} onValueChange={(val) => setFilterCategory(val === "all" ? null : val)} items={[{ value: "all", label: "Wszystkie" }, ...allCategories.map(cat => ({ value: cat.id, label: cat.label }))]}>
                   <UISelectTrigger className="h-10 rounded-xl bg-white border-primary/10 font-bold text-xs">
                     <UISelectValue placeholder="Kategoria" />
                   </UISelectTrigger>
@@ -737,7 +764,7 @@ export default function SprzedazPage() {
               </div>
 
               <div className="w-[120px]">
-                <UISelect value={filterEmployee || "all"} onValueChange={(val) => setFilterEmployee(val === "all" ? null : val)}>
+                <UISelect value={filterEmployee || "all"} onValueChange={(val) => setFilterEmployee(val === "all" ? null : val)} items={[{ value: "all", label: "Wszyscy" }, ...uniqueEmployees.map(emp => ({ value: emp.initials, label: emp.name }))]}>
                   <UISelectTrigger className="h-10 rounded-xl bg-white border-primary/10 font-bold text-xs">
                     <UISelectValue placeholder="Pracownik" />
                   </UISelectTrigger>
@@ -753,7 +780,12 @@ export default function SprzedazPage() {
               </div>
 
               <div className="w-[140px]">
-                <UISelect value={dateRange} onValueChange={(val: any) => setDateRange(val)}>
+                <UISelect value={dateRange} onValueChange={(val: any) => setDateRange(val)} items={[
+                  { value: "today", label: "Dzisiaj" },
+                  { value: "week", label: "Ostatni tydzień" },
+                  { value: "month", label: "Ostatni miesiąc" },
+                  { value: "custom", label: "Własny zakres" }
+                ]}>
                   <UISelectTrigger className="h-10 rounded-xl bg-white border-primary/10 font-bold text-xs">
                     <UISelectValue placeholder="Okres" />
                   </UISelectTrigger>
@@ -960,9 +992,12 @@ export default function SprzedazPage() {
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {selectedSale?.items.map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 bg-accent/30 rounded-xl">
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm font-bold">{item.name}</p>
                       <p className="text-[10px] text-muted-foreground">{allCategories.find(c => c.id === item.cat)?.label || item.cat}</p>
+                      {item.comment && (
+                        <p className="text-[9px] text-orange-600 font-medium mt-0.5 italic">{item.comment}</p>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-black">{item.price} zł</p>
@@ -1226,40 +1261,74 @@ export default function SprzedazPage() {
             </div>
 
             {newEntry.category === "telefon" && (
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Telefon z magazynu</Label>
-                {newEntry.imei ? (
-                  <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-black text-sm text-emerald-700 uppercase">{newEntry.name}</p>
-                        <p className="text-[10px] text-emerald-600 font-bold mt-1">IMEI: {newEntry.imei}</p>
+              <>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Telefon z magazynu</Label>
+                  {newEntry.imei ? (
+                    <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-black text-sm text-emerald-700 uppercase">{newEntry.name}</p>
+                          <p className="text-[10px] text-emerald-600 font-bold mt-1">IMEI: {newEntry.imei}</p>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => {
+                            setNewEntry({...newEntry, name: "", imei: "", warehousePhoneId: null, price: "", profit: "", taxType: "marża"});
+                            setPurchasePriceFromWarehouse(0);
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg"
+                        >
+                          Zmień
+                        </Button>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => {
-                          setNewEntry({...newEntry, name: "", imei: "", warehousePhoneId: null, price: "", profit: ""});
-                          setPurchasePriceFromWarehouse(0);
-                        }}
-                        className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg"
-                      >
-                        Zmień
-                      </Button>
                     </div>
+                  ) : (
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsPhoneSelectOpen(true)}
+                      className="w-full h-12 border-primary/20 border-2 border-dashed rounded-xl font-bold text-xs uppercase hover:bg-accent/50 hover:border-primary/30"
+                    >
+                      <Smartphone className="h-4 w-4 mr-2" />
+                      Wybierz telefon z magazynu
+                    </Button>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Typ Podatku</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setNewEntry({...newEntry, taxType: "VAT"})}
+                      className={cn(
+                        "h-14 rounded-2xl border-2 transition-all flex items-center justify-center gap-2 font-black text-xs uppercase tracking-widest",
+                        newEntry.taxType === "VAT" 
+                          ? "border-primary bg-primary/5 text-primary shadow-sm" 
+                          : "border-accent/30 bg-accent/30 text-muted-foreground hover:bg-accent/50"
+                      )}
+                    >
+                      <FileText className="h-5 w-5" />
+                      VAT
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewEntry({...newEntry, taxType: "marża"})}
+                      className={cn(
+                        "h-14 rounded-2xl border-2 transition-all flex items-center justify-center gap-2 font-black text-xs uppercase tracking-widest",
+                        newEntry.taxType === "marża" 
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-600 shadow-sm" 
+                          : "border-accent/30 bg-accent/30 text-muted-foreground hover:bg-accent/50"
+                      )}
+                    >
+                      <Banknote className="h-5 w-5" />
+                      Marża
+                    </button>
                   </div>
-                ) : (
-                  <Button 
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsPhoneSelectOpen(true)}
-                    className="w-full h-12 border-primary/20 border-2 border-dashed rounded-xl font-bold text-xs uppercase hover:bg-accent/50 hover:border-primary/30"
-                  >
-                    <Smartphone className="h-4 w-4 mr-2" />
-                    Wybierz telefon z magazynu
-                  </Button>
-                )}
-              </div>
+                </div>
+              </>
             )}
 
             {newEntry.category === "usluga" && (
@@ -1276,7 +1345,7 @@ export default function SprzedazPage() {
                         variant="ghost" 
                         size="sm" 
                         onClick={() => {
-                          setNewEntry({...newEntry, name: "", price: "", profit: ""});
+                          setNewEntry({...newEntry, name: "", price: "", profit: "", taxType: "marża"});
                         }}
                         className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg"
                       >
@@ -1312,7 +1381,7 @@ export default function SprzedazPage() {
                         variant="ghost" 
                         size="sm" 
                         onClick={() => {
-                          setNewEntry({...newEntry, name: "", price: "", profit: ""});
+                          setNewEntry({...newEntry, name: "", price: "", profit: "", taxType: "marża"});
                         }}
                         className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg"
                       >
@@ -1334,6 +1403,43 @@ export default function SprzedazPage() {
               </div>
             )}
 
+            {newEntry.category === "akcesoria" && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Akcesorium z magazynu</Label>
+                {newEntry.name ? (
+                  <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-black text-sm text-emerald-700 uppercase">{newEntry.name}</p>
+                        <p className="text-[10px] text-emerald-600 font-bold mt-1">Cena: {newEntry.price} zł | Zysk: {newEntry.profit} zł</p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => {
+                          setNewEntry({...newEntry, name: "", price: "", profit: "", taxType: "marża"});
+                        }}
+                        className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg"
+                      >
+                        Zmień
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsAkcesoriaSelectOpen(true)}
+                    className="w-full h-12 border-primary/20 border-2 border-dashed rounded-xl font-bold text-xs uppercase hover:bg-accent/50 hover:border-primary/30"
+                  >
+                    <Package className="h-4 w-4 mr-2" />
+                    Wybierz akcesorium z magazynu
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {newEntry.category !== "telefon" && newEntry.category !== "akcesoria" && newEntry.category !== "usluga" && newEntry.category !== "serwis" && (
             <div className="space-y-2">
               <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Nazwa pozycji</Label>
               <Input 
@@ -1344,6 +1450,7 @@ export default function SprzedazPage() {
                 onChange={(e) => setNewEntry({...newEntry, name: e.target.value})}
               />
             </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1376,6 +1483,16 @@ export default function SprzedazPage() {
                   onChange={(e) => setNewEntry({...newEntry, profit: e.target.value})}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Komentarz</Label>
+              <Input 
+                placeholder="Dodaj dodatkowe informacje..." 
+                className="bg-accent/30 border-none h-12 rounded-xl font-medium"
+                value={newEntry.comment}
+                onChange={(e) => setNewEntry({...newEntry, comment: e.target.value})}
+              />
             </div>
 
             <div className="space-y-3">
@@ -1419,9 +1536,12 @@ export default function SprzedazPage() {
                 <div className="space-y-2 max-h-40 overflow-y-auto">
                   {cartItems.map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between bg-white p-2 rounded-xl">
-                      <div>
+                      <div className="flex-1">
                         <p className="text-xs font-bold">{item.name}</p>
                         <p className="text-[10px] text-muted-foreground">{item.price} zł</p>
+                        {item.comment && (
+                          <p className="text-[9px] text-orange-600 font-medium mt-0.5 italic">{item.comment}</p>
+                        )}
                       </div>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeFromCart(idx)}>
                         <X className="h-3 w-3" />
@@ -1514,13 +1634,22 @@ export default function SprzedazPage() {
                       const purchasePrice = parseFloat(phone.purchasePrice) || 0;
                       setPurchasePriceFromWarehouse(purchasePrice);
                       
+                      // Extract number from price string (remove " zł" suffix)
+                      const priceStr = phone.price || "";
+                      const priceNum = priceStr.replace(/ zł/g, "");
+                      
+                      // Calculate profit if not available
+                      const priceVal = parseFloat(priceNum) || 0;
+                      const profitVal = purchasePrice > 0 ? priceVal - purchasePrice : Math.floor(priceVal * 0.3);
+                      
                       setNewEntry({
                         ...newEntry,
                         name: phone.name,
                         imei: phone.imei,
-                        price: phone.price || "",
-                        profit: phone.profit || "",
-                        warehousePhoneId: idx
+                        price: priceNum,
+                        profit: profitVal.toString(),
+                        warehousePhoneId: idx,
+                        taxType: phone.taxType || "marża"
                       });
                       setIsPhoneSelectOpen(false);
                       setPhoneSearchQuery("");
@@ -1550,6 +1679,9 @@ export default function SprzedazPage() {
                       <div className="text-right">
                         <p className="text-lg font-black text-primary">{phone.price}</p>
                         <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Cena sprzedaży</p>
+                        {phone.taxType && (
+                          <p className="text-[9px] text-emerald-600 font-bold uppercase mt-1">{phone.taxType}</p>
+                        )}
                       </div>
                     </div>
                   </button>
@@ -1603,11 +1735,20 @@ export default function SprzedazPage() {
                     key={idx}
                     type="button"
                     onClick={() => {
+                      // Extract number from price string (remove " zł" suffix)
+                      const priceStr = usluga.price || "";
+                      const priceNum = priceStr.replace(/ zł/g, "");
+                      
+                      // Calculate profit (50% of price if not available)
+                      const priceVal = parseFloat(priceNum) || 0;
+                      const profitVal = Math.floor(priceVal * 0.5);
+                      
                       setNewEntry({
                         ...newEntry,
                         name: usluga.name,
-                        price: usluga.price || "",
-                        profit: usluga.profit || ""
+                        price: priceNum,
+                        profit: profitVal.toString(),
+                        taxType: "marża"
                       });
                       setIsUslugaSelectOpen(false);
                       setUslugaSearchQuery("");
@@ -1679,11 +1820,20 @@ export default function SprzedazPage() {
                     key={idx}
                     type="button"
                     onClick={() => {
+                      // Extract number from price string (remove " zł" suffix)
+                      const priceStr = serwis.price || "";
+                      const priceNum = priceStr.replace(/ zł/g, "");
+                      
+                      // Calculate profit (50% of price if not available)
+                      const priceVal = parseFloat(priceNum) || 0;
+                      const profitVal = Math.floor(priceVal * 0.5);
+                      
                       setNewEntry({
                         ...newEntry,
                         name: serwis.name,
-                        price: serwis.price || "",
-                        profit: serwis.profit || ""
+                        price: priceNum,
+                        profit: profitVal.toString(),
+                        taxType: "marża"
                       });
                       setIsSerwisSelectOpen(false);
                       setSerwisSearchQuery("");
@@ -1703,6 +1853,81 @@ export default function SprzedazPage() {
                         <p className="text-lg font-black text-primary">{serwis.price}</p>
                         <p className="text-[9px] text-emerald-600 font-bold uppercase mt-1">+{serwis.profit} zł zysku</p>
                       </div>
+                    </div>
+                  </button>
+                ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Akcesoria Selection Dialog */}
+      <Dialog open={isAkcesoriaSelectOpen} onOpenChange={setIsAkcesoriaSelectOpen}>
+        <DialogContent className="sm:max-w-[600px] rounded-3xl border-none p-0 overflow-hidden max-h-[80vh] flex flex-col">
+          <DialogHeader className="p-6 bg-primary text-white relative shrink-0">
+            <div className="space-y-1">
+              <DialogTitle className="text-xl font-black uppercase tracking-tight">Wybierz akcesorium</DialogTitle>
+              <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Z magazynu</p>
+            </div>
+            <div className="absolute right-6 top-6 flex items-center gap-2">
+              <div className="bg-white/10 px-3 py-1 rounded-lg">
+                <p className="text-white/80 text-[10px] font-bold uppercase">Dostępne: {warehouseAkcesoria.length}</p>
+              </div>
+            </div>
+          </DialogHeader>
+          
+          <div className="p-4 border-b border-primary/10 shrink-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Szukaj akcesorium..." 
+                className="pl-10 bg-accent/30 border-none h-11 rounded-xl"
+                value={akcesoriaSearchQuery}
+                onChange={(e) => setAkcesoriaSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {warehouseAkcesoria.length === 0 ? (
+              <div className="text-center py-12">
+                <Package className="h-12 w-12 text-primary/20 mx-auto mb-3" />
+                <p className="text-muted-foreground font-bold text-sm">Brak dostępnych akcesoriów</p>
+                <p className="text-muted-foreground/60 text-xs mt-1">Dodaj akcesoria w zakładce Magazyn</p>
+              </div>
+            ) : (
+              warehouseAkcesoria
+                .filter(akcesorium => 
+                  akcesorium.name.toLowerCase().includes(akcesoriaSearchQuery.toLowerCase())
+                )
+                .map((akcesorium, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      const priceVal = 0;
+                      setNewEntry({
+                        ...newEntry,
+                        name: akcesorium.name,
+                        price: "",
+                        profit: "",
+                        taxType: "marża"
+                      });
+                      setIsAkcesoriaSelectOpen(false);
+                      setAkcesoriaSearchQuery("");
+                    }}
+                    className="w-full p-4 bg-accent/30 rounded-2xl border border-primary/5 hover:border-primary/20 hover:bg-accent/50 transition-all text-left group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary">
+                          <Package className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <p className="font-black text-sm text-foreground uppercase tracking-tight">{akcesorium.name}</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-primary/40 group-hover:text-primary transition-colors" />
                     </div>
                   </button>
                 ))
@@ -1738,7 +1963,7 @@ export default function SprzedazPage() {
           <div className="space-y-2">
             <Label className="text-primary text-xs font-black uppercase tracking-widest">punkt</Label>
             {userRole === "owner" ? (
-              <UISelect value={selectedShop} onValueChange={(val) => setSelectedShop(val || "Trzy Stawy Katowice")}>
+              <UISelect value={selectedShop} onValueChange={(val) => setSelectedShop(val || "Trzy Stawy Katowice")} items={shops.map(shop => ({ value: shop, label: shop }))}>
                 <UISelectTrigger className="bg-white/5 border-white/10 h-12 text-white font-bold rounded-xl focus:ring-primary">
                   <span>{selectedShop}</span>
                 </UISelectTrigger>

@@ -237,6 +237,11 @@ export default function PracownicyPage() {
                       <UISelect 
                         value={newEmployee.role}
                         onValueChange={(val) => val && setNewEmployee({ ...newEmployee, role: val })}
+                        items={[
+                          { value: "pracownik", label: "Pracownik" },
+                          { value: "kierownik", label: "Kierownik" },
+                          { value: "wlasciciel", label: "Właściciel" }
+                        ]}
                       >
                         <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase text-foreground">
                           <UISelectValue placeholder="Wybierz rolę" />

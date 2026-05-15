@@ -330,7 +330,7 @@ export default function RaportyPage() {
 
             <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-primary/10">
               <MapPin className="h-4 w-4 text-primary ml-2" />
-              <Select value={selectedShop} onValueChange={(val) => setSelectedShop(val || selectedShop)}>
+              <Select value={selectedShop} onValueChange={(val) => setSelectedShop(val || selectedShop)} items={shops.map(shop => ({ value: shop.id, label: shop.label }))}>
                 <SelectTrigger className="h-9 w-[180px] rounded-xl border-none shadow-none text-[10px] font-black uppercase">
                   <SelectValue placeholder="Wybierz sklep" />
                 </SelectTrigger>

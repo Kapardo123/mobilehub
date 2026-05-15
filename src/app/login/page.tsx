@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Smartphone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { addAction } from "@/app/akcje/page";
 
 export default function LoginPage() {
   const [login, setLogin] = useState("");
@@ -15,12 +16,38 @@ export default function LoginPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (login.toLowerCase() === "pracownik") {
-      sessionStorage.setItem("userRole", "employee");
-      sessionStorage.setItem("userName", "Jan Kowalski");
+      sessionStorage.setItem("userRole", JSON.stringify("employee"));
+      sessionStorage.setItem("userName", JSON.stringify("Jan Kowalski"));
+      sessionStorage.setItem("userId", JSON.stringify("2"));
+      sessionStorage.setItem("shopName", JSON.stringify("Trzy Stawy"));
+      sessionStorage.setItem("shopId", JSON.stringify("1"));
+      
+      addAction({
+        type: "logowanie",
+        description: "Logowanie do systemu",
+        employeeName: "Jan Kowalski",
+        employeeId: "2",
+        shopName: "Trzy Stawy",
+        shopId: "1"
+      });
+      
       router.push("/pracownik");
     } else if (login.toLowerCase() === "wlasciciel" || login.toLowerCase() === "właściciel") {
-      sessionStorage.setItem("userRole", "owner");
-      sessionStorage.setItem("userName", "Piotr Zakrzewski");
+      sessionStorage.setItem("userRole", JSON.stringify("owner"));
+      sessionStorage.setItem("userName", JSON.stringify("Piotr Zakrzewski"));
+      sessionStorage.setItem("userId", JSON.stringify("1"));
+      sessionStorage.setItem("shopName", JSON.stringify("Silesia City Center"));
+      sessionStorage.setItem("shopId", JSON.stringify("3"));
+      
+      addAction({
+        type: "logowanie",
+        description: "Logowanie do systemu",
+        employeeName: "Piotr Zakrzewski",
+        employeeId: "1",
+        shopName: "Silesia City Center",
+        shopId: "3"
+      });
+      
       router.push("/");
     } else {
       alert("Błędny login. Użyj 'pracownik' lub 'wlasciciel'.");
