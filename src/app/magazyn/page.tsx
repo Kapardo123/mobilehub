@@ -201,7 +201,7 @@ export default function MagazynPage() {
       item => !existingNonPhoneNames.includes(item.name)
     );
     if (missingItems.length > 0) {
-      setInventory([...inventory, ...missingItems]);
+      setInventory([...inventory, ...missingItems] as InventoryItem[]);
     }
   }, [isMounted]);
 

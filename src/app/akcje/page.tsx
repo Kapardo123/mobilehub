@@ -81,7 +81,6 @@ export default function AkcjePage() {
       router.push("/login");
       return;
     }
-    setUserRole(role);
   }, [router]);
 
   useEffect(() => {
