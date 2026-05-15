@@ -190,14 +190,38 @@ export default function MagazynPage() {
 
   const handleAddItem = () => {
     if (!newItem.name || !newItem.category) return;
-    
-    const item = {
-      ...newItem,
+
+    const baseItem = {
+      name: newItem.name,
+      category: newItem.category,
       price: newItem.sellingPrice ? `${newItem.sellingPrice} zł` : "0 zł",
       alert: false,
+      stock: newItem.stock ? parseInt(newItem.stock) : 0,
+      purchasePrice: newItem.purchasePrice || "",
+      sellingDate: newItem.sellingDate || "",
+      statusSprzedany: false,
+      dataSprzedazy: "",
     };
-    
-    setInventory([...inventory, item]);
+
+    const item = newItem.category === "telefon"
+      ? {
+          ...baseItem,
+          brand: newItem.brand,
+          model: newItem.model,
+          memory: newItem.memory,
+          battery: newItem.batteryHealth ? `${newItem.batteryHealth}%` : "",
+          color: newItem.color,
+          condition: newItem.condition,
+          imei: newItem.imei,
+          taxType: newItem.taxType,
+          purchaseDate: newItem.purchaseDate,
+          warranty: newItem.warranty,
+          setIncludes: newItem.setIncludes,
+          notes: newItem.notes,
+        }
+      : baseItem;
+
+    setInventory([...inventory, item as any]);
     setNewItem({
       name: "",
       category: "akcesoria",
