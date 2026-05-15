@@ -20,6 +20,7 @@ import {
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getSessionStorageSafe } from "@/lib/storage";
 import { 
   Dialog, 
   DialogContent, 
@@ -42,7 +43,8 @@ export default function SklepyPage() {
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("userRole");
+    if (typeof window === "undefined") return;
+    const role = getSessionStorageSafe("userRole", "");
     if (!role) {
       router.push("/login");
     }

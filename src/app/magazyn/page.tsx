@@ -48,6 +48,7 @@ import {
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
+import { getLocalStorageSafe, useLocalStorage, getSessionStorageSafe, useSessionStorage } from "@/lib/storage";
 
 export default function MagazynPage() {
   const router = useRouter();
@@ -83,18 +84,6 @@ export default function MagazynPage() {
     statusSprzedany: false,
     dataSprzedazy: "",
   });
-
-  const loadInitialInventory = () => {
-    const saved = localStorage.getItem('magazyn_inventory');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return getDefaultInventory();
-      }
-    }
-    return getDefaultInventory();
-  };
 
   const getDefaultInventory = () => [
     // Telefony
@@ -139,7 +128,7 @@ export default function MagazynPage() {
     { name: "Konsultacja", category: "usluga", stock: 1, price: "60 zł", alert: false },
   ];
 
-  const [inventory, setInventory] = useState(loadInitialInventory);
+  const [inventory, setInventory] = useLocalStorage('magazyn_inventory', getDefaultInventory());
 
   const categories = useMemo(() => [
     { id: "telefon", label: "Telefony", count: inventory.filter((i: typeof inventory[0]) => i.category === "telefon").length, icon: Smartphone, color: "text-primary", bg: "bg-accent/50", isLink: false, href: undefined },
@@ -148,17 +137,17 @@ export default function MagazynPage() {
     { id: "serwis", label: "Serwis", count: inventory.filter((i: typeof inventory[0]) => i.category === "serwis").length, icon: Wrench, color: "text-primary", bg: "bg-accent/50", isLink: false, href: undefined },
   ], [inventory]);
 
-  useEffect(() => {
-    const userRole = sessionStorage.getItem("userRole");
-    if (!userRole) {
-      router.push("/login");
-      return;
-    }
-    setUserRole(userRole);
-  }, [router]);
+  const [userRole, setUserRole] = useSessionStorage<string | null>("userRole", null);
 
   useEffect(() => {
-    localStorage.setItem('magazyn_inventory', JSON.stringify(inventory));
+    if (typeof window === "undefined") return;
+    if (!userRole) {
+      router.push("/login");
+    }
+  }, [userRole, router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     window.dispatchEvent(new CustomEvent('magazyn_updated', { detail: inventory }));
   }, [inventory]);
 

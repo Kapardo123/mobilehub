@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
 import { 
   Select as UISelect, 
   SelectContent as UISelectContent, 
@@ -56,12 +57,10 @@ export function addAction(action: Omit<Action, "id" | "timestamp">) {
     timestamp: new Date().toISOString().replace("T", " ").substr(0, 19),
   };
   
-  const saved = localStorage.getItem('system_actions');
-  const actions = saved ? JSON.parse(saved) : defaultActions;
-  actions.unshift(newAction);
-  localStorage.setItem('system_actions', JSON.stringify(actions));
-  
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
+    const actions = getLocalStorageSafe('system_actions', defaultActions);
+    actions.unshift(newAction);
+    localStorage.setItem('system_actions', JSON.stringify(actions));
     window.dispatchEvent(new CustomEvent('action_added', { detail: newAction }));
   }
   
@@ -69,6 +68,7 @@ export function addAction(action: Omit<Action, "id" | "timestamp">) {
 }
 
 export function getActions(): Action[] {
+  if (typeof window === "undefined") return defaultActions;
   const saved = localStorage.getItem('system_actions');
   return saved ? JSON.parse(saved) : defaultActions;
 }
@@ -84,7 +84,8 @@ export default function AkcjePage() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("userRole");
+    if (typeof window === "undefined") return;
+    const role = getSessionStorageSafe("userRole", "");
     if (!role) {
       router.push("/login");
       return;
@@ -93,10 +94,12 @@ export default function AkcjePage() {
   }, [router]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     setActions(getActions());
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const handleActionAdded = (e: CustomEvent<Action>) => {
       setActions(prev => [e.detail, ...prev]);
     };

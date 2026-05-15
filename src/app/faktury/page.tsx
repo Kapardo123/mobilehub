@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/navbar";
+import { getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Calendar, ArrowLeft, Download, User, Building2, Edit, Trash2, X, Save } from "lucide-react";
@@ -44,17 +45,20 @@ export default function InvoicesHistoryPage() {
   const { addToast } = useToast();
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const savedInvoices = localStorage.getItem("invoices");
     if (savedInvoices) {
       setInvoices(JSON.parse(savedInvoices));
     }
-    const role = sessionStorage.getItem("userRole");
+    const role = getSessionStorageSafe("userRole", null);
     setUserRole(role);
   }, []);
 
   const saveInvoicesToStorage = (updatedInvoices: Invoice[]) => {
     setInvoices(updatedInvoices);
-    localStorage.setItem("invoices", JSON.stringify(updatedInvoices));
+    if (typeof window !== "undefined") {
+      localStorage.setItem("invoices", JSON.stringify(updatedInvoices));
+    }
   };
 
   const openInvoice = (invoice: Invoice) => {

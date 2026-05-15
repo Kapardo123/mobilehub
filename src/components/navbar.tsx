@@ -14,6 +14,7 @@ import { LogOut, Settings, Bell, Search, BookOpen, Calculator, ShoppingCart, Use
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { getSessionStorageSafe } from "@/lib/storage";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -21,8 +22,9 @@ export function Navbar() {
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    const name = sessionStorage.getItem("userName");
-    const role = sessionStorage.getItem("userRole");
+    if (typeof window === "undefined") return;
+    const name = getSessionStorageSafe("userName", null);
+    const role = getSessionStorageSafe("userRole", null);
     setUserName(name);
     setUserRole(role);
   }, []);
@@ -129,9 +131,11 @@ export function Navbar() {
             <DropdownMenuGroup>
               <DropdownMenuItem variant="destructive" className="p-0">
                 <Link href="/login" className="flex items-center w-full px-2 py-2 font-bold text-xs uppercase tracking-tight hover:bg-red-50 rounded-xl transition-colors" onClick={() => {
-                  sessionStorage.removeItem("userRole");
-                  sessionStorage.removeItem("userName");
-                  sessionStorage.removeItem("userShop");
+                  if (typeof window !== "undefined") {
+                    sessionStorage.removeItem("userRole");
+                    sessionStorage.removeItem("userName");
+                    sessionStorage.removeItem("userShop");
+                  }
                 }}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Wyloguj System</span>

@@ -61,6 +61,7 @@ import {
 import { DollarSign, Package, RefreshCcw, Send, Wallet, Smartphone, Headphones, Wrench } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/components/ui/toast";
+import { getLocalStorageSafe, useLocalStorage, getSessionStorageSafe, useSessionStorage } from "@/lib/storage";
 
 export default function SprzedazPage() {
   const router = useRouter();
@@ -250,12 +251,13 @@ export default function SprzedazPage() {
   const [employees, setEmployees] = useState<any[]>([]);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("userRole");
+    if (typeof window === "undefined") return;
+    const role = getSessionStorageSafe("userRole", "");
     if (!role) {
       router.push("/login");
       return;
     }
-    const userName = sessionStorage.getItem("userName") || "Piotr Zakrzewski";
+    const userName = getSessionStorageSafe("userName", "Piotr Zakrzewski");
     setUserRole(role);
     
     if (role === "employee") {
@@ -274,53 +276,49 @@ export default function SprzedazPage() {
   }, [router]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('pracownicy_employees');
-    if (saved) {
-      setEmployees(JSON.parse(saved));
-    }
+    if (typeof window === "undefined") return;
+    const saved = getLocalStorageSafe('pracownicy_employees', []);
+    setEmployees(saved);
   }, []);
 
   useEffect(() => {
     const loadWarehousePhones = () => {
-      const saved = localStorage.getItem('magazyn_inventory');
-      if (saved) {
-        try {
-          const inventory = JSON.parse(saved);
-          const availablePhones = inventory.filter((item: any) => 
-            item.category === "telefon" && !item.statusSold
-          );
-          const availableUslugi = inventory.filter((item: any) => 
-            item.category === "usluga"
-          );
-          const availableSerwisy = inventory.filter((item: any) => 
-            item.category === "serwis"
-          );
-          setWarehousePhones(availablePhones);
-          setWarehouseUslugi(availableUslugi);
-          setWarehouseSerwisy(availableSerwisy);
-        } catch {
-          setWarehousePhones([]);
-          setWarehouseUslugi([]);
-          setWarehouseSerwisy([]);
-        }
+      if (typeof window === "undefined") return;
+      const inventory = getLocalStorageSafe('magazyn_inventory', []);
+      try {
+        const availablePhones = inventory.filter((item: any) => 
+          item.category === "telefon" && !item.statusSold
+        );
+        const availableUslugi = inventory.filter((item: any) => 
+          item.category === "usluga"
+        );
+        const availableSerwisy = inventory.filter((item: any) => 
+          item.category === "serwis"
+        );
+        setWarehousePhones(availablePhones);
+        setWarehouseUslugi(availableUslugi);
+        setWarehouseSerwisy(availableSerwisy);
+      } catch {
+        setWarehousePhones([]);
+        setWarehouseUslugi([]);
+        setWarehouseSerwisy([]);
       }
     };
     
-    loadWarehousePhones();
-    window.addEventListener('magazyn_updated', loadWarehousePhones);
-    return () => window.removeEventListener('magazyn_updated', loadWarehousePhones);
+    if (typeof window !== "undefined") {
+      loadWarehousePhones();
+      window.addEventListener('magazyn_updated', loadWarehousePhones);
+    }
+    return () => {
+      if (typeof window !== "undefined") window.removeEventListener('magazyn_updated', loadWarehousePhones);
+    }
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const loadSavedCustomers = () => {
-      const saved = localStorage.getItem('saved_customers');
-      if (saved) {
-        try {
-          setSavedCustomers(JSON.parse(saved));
-        } catch {
-          setSavedCustomers([]);
-        }
-      }
+      const saved = getLocalStorageSafe('saved_customers', []);
+      setSavedCustomers(saved);
     };
     loadSavedCustomers();
   }, []);
@@ -1084,7 +1082,9 @@ export default function SprzedazPage() {
                     email: invoiceCustomer.email
                   };
                   const updatedCustomers = [...savedCustomers, newCustomer];
-                  localStorage.setItem('saved_customers', JSON.stringify(updatedCustomers));
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem('saved_customers', JSON.stringify(updatedCustomers));
+                  }
                   setSavedCustomers(updatedCustomers);
                   addToast({
                     title: "Klient zapisany",
@@ -1120,9 +1120,11 @@ export default function SprzedazPage() {
                     items: invoiceItems,
                     createdAt: new Date().toISOString()
                   };
-                  const savedInvoices = JSON.parse(localStorage.getItem('invoices') || '[]');
+                  const savedInvoices = typeof window !== "undefined" ? JSON.parse(localStorage.getItem('invoices') || '[]') : [];
                   const updatedInvoices = [...savedInvoices, newInvoice];
-                  localStorage.setItem('invoices', JSON.stringify(updatedInvoices));
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem('invoices', JSON.stringify(updatedInvoices));
+                  }
 
                   const queryParams = new URLSearchParams({
                     id: selectedSale.id,

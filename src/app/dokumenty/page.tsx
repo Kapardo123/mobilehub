@@ -8,13 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getSessionStorageSafe } from "@/lib/storage";
 
 export default function DokumentyPage() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("userRole");
+    if (typeof window === "undefined") return;
+    const role = getSessionStorageSafe("userRole", "");
     if (!role) {
       router.push("/login");
     }

@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
+import { getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
 import { 
   Dialog, 
   DialogContent, 
@@ -30,7 +31,8 @@ export default function PracownicyPage() {
   const { addToast } = useToast();
 
   useEffect(() => {
-    const role = sessionStorage.getItem("userRole");
+    if (typeof window === "undefined") return;
+    const role = getSessionStorageSafe("userRole", "");
     if (!role) {
       router.push("/login");
     }
@@ -62,6 +64,7 @@ export default function PracownicyPage() {
   ]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const saved = localStorage.getItem('pracownicy_employees');
     if (saved) {
       try {
@@ -71,6 +74,7 @@ export default function PracownicyPage() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     localStorage.setItem('pracownicy_employees', JSON.stringify(employees));
   }, [employees]);
 

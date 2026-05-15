@@ -7,18 +7,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getSessionStorageSafe } from "@/lib/storage";
 
 export default function PracownikDashboard() {
   const router = useRouter();
   const [userName, setUserName] = useState("Jan Kowalski");
 
   useEffect(() => {
-    const userRole = sessionStorage.getItem("userRole");
+    if (typeof window === "undefined") return;
+    const userRole = getSessionStorageSafe("userRole", "");
     if (!userRole) {
       router.push("/login");
       return;
     }
-    const name = sessionStorage.getItem("userName");
+    const name = getSessionStorageSafe("userName", "Jan Kowalski");
     if (name) setUserName(name);
   }, [router]);
 

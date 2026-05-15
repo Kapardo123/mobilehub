@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
 import { CreditCard, Banknote, ArrowRight, DollarSign, Package, Wrench, Settings, User, Clock } from "lucide-react";
 import { addAction, getActions, Action } from "./akcje/page";
 
@@ -41,10 +42,9 @@ export default function Home() {
   const [employees, setEmployees] = useState<any[]>([]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('pracownicy_employees');
-    if (saved) {
-      setEmployees(JSON.parse(saved));
-    }
+    if (typeof window === "undefined") return;
+    const saved = getLocalStorageSafe('pracownicy_employees', []);
+    setEmployees(saved);
   }, []);
 
   // Mock data for shops
@@ -65,13 +65,15 @@ export default function Home() {
   const currentStats = shopData[selectedShop as keyof typeof shopData];
 
   useEffect(() => {
-    const userRole = sessionStorage.getItem("userRole");
+    if (typeof window === "undefined") return;
+    const userRole = getSessionStorageSafe("userRole", "");
     if (!userRole) {
       router.push("/login");
     }
   }, [router]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const allActions = getActions();
     let filtered = allActions;
     
@@ -86,6 +88,7 @@ export default function Home() {
   }, [actionFilterShop, actionFilterEmployee]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const handleActionAdded = (e: CustomEvent<Action>) => {
       setRecentActions(prev => [e.detail, ...prev].slice(0, 5));
     };

@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
 
 // Employee colors for visual distinction
 const employeeColors = [
@@ -42,13 +43,14 @@ export default function GrafikPage() {
   const [userShop, setUserShop] = useState("trzy-stawy");
 
   useEffect(() => {
-    const role = sessionStorage.getItem("userRole");
+    if (typeof window === "undefined") return;
+    const role = getSessionStorageSafe("userRole", "");
     if (!role) {
       router.push("/login");
       return;
     }
     setUserRole(role === "owner" ? "Właściciel" : "Pracownik");
-    const shop = sessionStorage.getItem("userShop") || "trzy-stawy";
+    const shop = getSessionStorageSafe("userShop", "trzy-stawy");
     setUserShop(shop);
   }, [router]);
 
@@ -131,6 +133,7 @@ export default function GrafikPage() {
   const [employees, setEmployees] = useState<any[]>([]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const saved = localStorage.getItem('pracownicy_employees');
     if (saved) {
       try {
@@ -158,6 +161,7 @@ export default function GrafikPage() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const handler = () => {
       const saved = localStorage.getItem('pracownicy_employees');
       if (saved) {
@@ -184,6 +188,7 @@ export default function GrafikPage() {
   ]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const savedShifts = localStorage.getItem('grafik_shifts');
     if (savedShifts) {
       try {
@@ -193,6 +198,7 @@ export default function GrafikPage() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     localStorage.setItem('grafik_shifts', JSON.stringify(shifts));
   }, [shifts]);
 

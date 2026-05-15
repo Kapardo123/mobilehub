@@ -49,6 +49,7 @@ import Link from "next/link";
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
 import { 
   Dialog, 
   DialogContent, 
@@ -70,7 +71,8 @@ export default function RaportyPage() {
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("userRole");
+    if (typeof window === "undefined") return;
+    const role = getSessionStorageSafe("userRole", "");
     if (!role) {
       router.push("/login");
     }
@@ -101,10 +103,9 @@ export default function RaportyPage() {
   ];
 
   useEffect(() => {
-    const savedEmployees = localStorage.getItem('pracownicy_employees');
-    if (savedEmployees) {
-      setEmployees(JSON.parse(savedEmployees));
-    }
+    if (typeof window === "undefined") return;
+    const savedEmployees = getLocalStorageSafe('pracownicy_employees', []);
+    setEmployees(savedEmployees);
     
     const savedSales = localStorage.getItem('sales');
     if (savedSales) {
