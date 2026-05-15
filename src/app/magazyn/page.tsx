@@ -302,12 +302,10 @@ export default function MagazynPage() {
             </Button>
             {userRole === "owner" && (
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="h-9 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-black uppercase tracking-tight">
+                <DialogTrigger render={<Button size="sm" className="h-9 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-black uppercase tracking-tight">
                     <Plus className="h-4 w-4 mr-1" />
                     Dodaj
-                  </Button>
-                </DialogTrigger>
+                  </Button>} />
                 <DialogContent className="sm:max-w-[500px] rounded-3xl border-none p-0 overflow-hidden max-h-[80vh] flex flex-col">
                   <DialogHeader className="p-8 bg-primary text-white relative shrink-0">
                     <div className="space-y-1">
