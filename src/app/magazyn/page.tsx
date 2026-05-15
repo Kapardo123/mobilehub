@@ -259,7 +259,7 @@ export default function MagazynPage() {
     addToast({
       title: "Usunięto przedmiot",
       description: `${itemName} został usunięty z magazynu`,
-      variant: "destructive"
+      variant: "error"
     });
   };
 
