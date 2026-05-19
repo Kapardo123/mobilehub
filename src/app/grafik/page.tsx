@@ -40,7 +40,7 @@ const employeeColors = [
 export default function GrafikPage() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [userShop, setUserShop] = useState("trzy-stawy");
+  const [userShop, setUserShop] = useState("kaufland-wloclawek");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -50,17 +50,17 @@ export default function GrafikPage() {
       return;
     }
     setUserRole(role === "owner" ? "Właściciel" : "Pracownik");
-    const shop = getSessionStorageSafe("userShop", "trzy-stawy");
+    const shop = getSessionStorageSafe("userShop", "kaufland-wloclawek");
     setUserShop(shop);
   }, [router]);
 
   const isOwner = userRole === "Właściciel";
-  const [selectedShop, setSelectedShop] = useState("trzy-stawy");
+  const [selectedShop, setSelectedShop] = useState("kaufland-wloclawek");
 
   const shopLabels: Record<string, string> = {
-    "trzy-stawy": "Trzy Stawy",
-    "galeria-katowicka": "Galeria Katowicka",
-    "silesia-city": "Silesia City Center"
+    "kaufland-wloclawek": "Kaufland Włocławek",
+    "riviera-gdynia": "Riviera Gdynia",
+    "dominikanska-wroclaw": "Dominikańska Wrocław"
   };
 
   useEffect(() => {
@@ -181,10 +181,10 @@ export default function GrafikPage() {
   }, []);
 
   const [shifts, setShifts] = useState([
-    { name: "Jan Kowalski", initials: "JK", shift: "09:00 - 17:00", start: 9, end: 17, shop: "trzy-stawy", status: "W pracy", date: 12 },
-    { name: "Anna Nowak", initials: "AN", shift: "10:00 - 18:00", start: 10, end: 18, shop: "trzy-stawy", status: "Zaplanowane", date: 12 },
-    { name: "Piotr Zakrzewski", initials: "PZ", shift: "12:00 - 20:00", start: 12, end: 20, shop: "galeria-katowicka", status: "Zaplanowane", date: 12 },
-    { name: "Jan Kowalski", initials: "JK", shift: "09:00 - 17:00", start: 9, end: 17, shop: "trzy-stawy", status: "Zaplanowane", date: 15 },
+    { name: "Tomasz Lewandowski", initials: "TL", shift: "09:00 - 17:00", start: 9, end: 17, shop: "kaufland-wloclawek", status: "W pracy", date: 12 },
+    { name: "Marta Kowalczyk", initials: "MK", shift: "10:00 - 18:00", start: 10, end: 18, shop: "riviera-gdynia", status: "Zaplanowane", date: 12 },
+    { name: "Piotr Zakrzewski", initials: "PZ", shift: "12:00 - 20:00", start: 12, end: 20, shop: "dominikanska-wroclaw", status: "Zaplanowane", date: 12 },
+    { name: "Kamil Nowicki", initials: "KN", shift: "09:00 - 17:00", start: 9, end: 17, shop: "kaufland-wloclawek", status: "Zaplanowane", date: 15 },
   ]);
 
   useEffect(() => {
@@ -375,9 +375,9 @@ export default function GrafikPage() {
             onValueChange={(val) => isOwner && val && setSelectedShop(val)}
             disabled={!isOwner}
             items={[
-              { value: "trzy-stawy", label: "Trzy Stawy" },
-              { value: "galeria-katowicka", label: "Galeria Katowicka" },
-              { value: "silesia-city", label: "Silesia City Center" }
+              { value: "kaufland-wloclawek", label: "Kaufland Włocławek" },
+              { value: "riviera-gdynia", label: "Riviera Gdynia" },
+              { value: "dominikanska-wroclaw", label: "Dominikańska Wrocław" }
             ]}
           >
             <SelectTrigger className="border-none bg-transparent h-12 focus:ring-0 font-bold text-foreground">
@@ -387,9 +387,9 @@ export default function GrafikPage() {
               </div>
             </SelectTrigger>
             <SelectContent className="rounded-2xl border-primary/5">
-              <SelectItem value="trzy-stawy">Trzy Stawy</SelectItem>
-              <SelectItem value="galeria-katowicka">Galeria Katowicka</SelectItem>
-              <SelectItem value="silesia-city">Silesia City Center</SelectItem>
+              <SelectItem value="kaufland-wloclawek">Kaufland Włocławek</SelectItem>
+              <SelectItem value="riviera-gdynia">Riviera Gdynia</SelectItem>
+              <SelectItem value="dominikanska-wroclaw">Dominikańska Wrocław</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -183,7 +183,7 @@ function InvoiceContent() {
               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Do zapłaty</span>
               <div className="text-right">
                 <span className="text-4xl font-black text-foreground tracking-tighter">{data.price}</span>
-                <span className="text-xs font-black text-foreground ml-2 uppercase">pln</span>
+                <span className="text-xs font-black text-foreground ml-2 uppercase">zł</span>
               </div>
             </div>
           </div>

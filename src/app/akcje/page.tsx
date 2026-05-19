@@ -101,9 +101,9 @@ export default function AkcjePage() {
     if (typeof window === "undefined") return [];
     const savedShops = getLocalStorageSafe('shops', []);
     return savedShops.length > 0 ? savedShops : [
-      { id: "1", name: "Trzy Stawy" },
-      { id: "2", name: "Galeria Katowicka" },
-      { id: "3", name: "Silesia City Center" },
+      { id: "1", name: "Kaufland Włocławek" },
+      { id: "2", name: "Riviera Gdynia" },
+      { id: "3", name: "Dominikańska Wrocław" },
     ];
   }, [actions]);
 

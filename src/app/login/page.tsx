@@ -20,7 +20,7 @@ export default function LoginPage() {
       sessionStorage.setItem("userRole", JSON.stringify("employee"));
       sessionStorage.setItem("userName", JSON.stringify("Jan Kowalski"));
       sessionStorage.setItem("userId", JSON.stringify("2"));
-      sessionStorage.setItem("shopName", JSON.stringify("Trzy Stawy"));
+      sessionStorage.setItem("shopName", JSON.stringify("Kaufland Włocławek"));
       sessionStorage.setItem("shopId", JSON.stringify("1"));
       
       addAction({
@@ -28,7 +28,7 @@ export default function LoginPage() {
         description: "Logowanie do systemu",
         employeeName: "Jan Kowalski",
         employeeId: "2",
-        shopName: "Trzy Stawy",
+        shopName: "Kaufland Włocławek",
         shopId: "1"
       });
       
@@ -37,7 +37,7 @@ export default function LoginPage() {
       sessionStorage.setItem("userRole", JSON.stringify("owner"));
       sessionStorage.setItem("userName", JSON.stringify("Piotr Zakrzewski"));
       sessionStorage.setItem("userId", JSON.stringify("1"));
-      sessionStorage.setItem("shopName", JSON.stringify("Silesia City Center"));
+      sessionStorage.setItem("shopName", JSON.stringify("Dominikańska Wrocław"));
       sessionStorage.setItem("shopId", JSON.stringify("3"));
       
       addAction({
@@ -45,7 +45,7 @@ export default function LoginPage() {
         description: "Logowanie do systemu",
         employeeName: "Piotr Zakrzewski",
         employeeId: "1",
-        shopName: "Silesia City Center",
+        shopName: "Dominikańska Wrocław",
         shopId: "3"
       });
       

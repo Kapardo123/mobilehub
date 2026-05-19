@@ -48,19 +48,13 @@ export default function PracownicyPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   const [employees, setEmployees] = useState([
-    { id: "1", name: "Piotr Zakrzewski", role: "Właściciel", initials: "PZ", shops: ["Trzy Stawy", "Galeria Katowicka", "Silesia City Center"], status: "Online", login: "piotr.z", password: "PIN 123456" },
-    // Trzy Stawy
-    { id: "2", name: "Jan Kowalski", role: "Pracownik", initials: "JK", shops: ["Trzy Stawy"], status: "W pracy", login: "jan.k", password: "PIN 654321" },
-    { id: "3", name: "Maria Wójcik", role: "Pracownik", initials: "MW", shops: ["Trzy Stawy"], status: "Offline", login: "maria.w", password: "PIN 223344" },
-    { id: "4", name: "Krzysztof Nowak", role: "Pracownik", initials: "KN", shops: ["Trzy Stawy"], status: "Offline", login: "krzysztof.n", password: "PIN 556677" },
-    // Galeria Katowicka
-    { id: "5", name: "Anna Nowak", role: "Pracownik", initials: "AN", shops: ["Galeria Katowicka"], status: "W pracy", login: "anna.n", password: "PIN 112233" },
-    { id: "6", name: "Marek Krawczyk", role: "Pracownik", initials: "MK", shops: ["Galeria Katowicka"], status: "Offline", login: "marek.k", password: "PIN 334455" },
-    { id: "7", name: "Karolina Zielińska", role: "Pracownik", initials: "KZ", shops: ["Galeria Katowicka"], status: "Offline", login: "karolina.z", password: "PIN 778899" },
-    // Silesia City Center
-    { id: "8", name: "Tomasz Szymański", role: "Pracownik", initials: "TS", shops: ["Silesia City Center"], status: "W pracy", login: "tomasz.s", password: "PIN 445566" },
-    { id: "9", name: "Barbara Dąbrowska", role: "Pracownik", initials: "BD", shops: ["Silesia City Center"], status: "Offline", login: "barbara.d", password: "PIN 889900" },
-    { id: "10", name: "Łukasz Kamiński", role: "Pracownik", initials: "ŁK", shops: ["Silesia City Center"], status: "Offline", login: "lukasz.k", password: "PIN 990011" },
+    { id: "1", name: "Piotr Zakrzewski", role: "Właściciel", initials: "PZ", shops: ["Kaufland Włocławek", "Riviera Gdynia", "Dominikańska Wrocław"], status: "Online", login: "piotr.z", password: "PIN 123456" },
+    // Kaufland Włocławek
+    { id: "2", name: "Tomasz Lewandowski", role: "Pracownik", initials: "TL", shops: ["Kaufland Włocławek"], status: "W pracy", login: "tomasz.l", password: "PIN 654321" },
+    // Riviera Gdynia
+    { id: "3", name: "Marta Kowalczyk", role: "Pracownik", initials: "MK", shops: ["Riviera Gdynia"], status: "W pracy", login: "marta.k", password: "PIN 223344" },
+    // Dominikańska Wrocław
+    { id: "4", name: "Kamil Nowicki", role: "Pracownik", initials: "KN", shops: ["Dominikańska Wrocław"], status: "Offline", login: "kamil.n", password: "PIN 556677" },
   ]);
 
   useEffect(() => {
@@ -127,9 +121,9 @@ export default function PracownicyPage() {
   };
 
   const shops = [
-    { id: "trzy-stawy", label: "Trzy Stawy", count: employees.filter(e => e.shops.includes("Trzy Stawy")).length },
-    { id: "galeria-katowicka", label: "Galeria Katowicka", count: employees.filter(e => e.shops.includes("Galeria Katowicka")).length },
-    { id: "silesia-city", label: "Silesia City Center", count: employees.filter(e => e.shops.includes("Silesia City Center")).length },
+    { id: "kaufland-wloclawek", label: "Kaufland Włocławek", count: employees.filter(e => e.shops.includes("Kaufland Włocławek")).length },
+    { id: "riviera-gdynia", label: "Riviera Gdynia", count: employees.filter(e => e.shops.includes("Riviera Gdynia")).length },
+    { id: "dominikanska-wroclaw", label: "Dominikańska Wrocław", count: employees.filter(e => e.shops.includes("Dominikańska Wrocław")).length },
   ];
 
   const filteredEmployees = selectedShop 

@@ -9,7 +9,6 @@ import {
   Plus, 
   MapPin, 
   Store, 
-  Phone, 
   Mail, 
   Trash2, 
   Edit2,
@@ -34,7 +33,6 @@ interface Shop {
   id: string;
   name: string;
   address: string;
-  phone: string;
   employees: number;
 }
 
@@ -52,15 +50,14 @@ export default function SklepyPage() {
   }, [router]);
 
   const [shops, setShops] = useState<Shop[]>([
-    { id: "1", name: "Trzy Stawy", address: "ul. Pułaskiego 60, Katowice", phone: "123 456 789", employees: 4 },
-    { id: "2", name: "Galeria Katowicka", address: "ul. 3 Maja 30, Katowice", phone: "987 654 321", employees: 3 },
-    { id: "3", name: "Silesia City Center", address: "ul. Chorzowska 107, Katowice", phone: "555 666 777", employees: 5 },
+    { id: "1", name: "Kaufland Włocławek", address: "ul. Bauera 1, 87-800 Włocławek", employees: 1 },
+    { id: "2", name: "Riviera Gdynia", address: "ul. Kazimierza Górskiego 2, 81-304 Gdynia", employees: 1 },
+    { id: "3", name: "Dominikańska Wrocław", address: "pl. Dominikański 3, 50-159 Wrocław", employees: 1 },
   ]);
 
   const [newShop, setNewShop] = useState({
     name: "",
-    address: "",
-    phone: ""
+    address: ""
   });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -77,7 +74,7 @@ export default function SklepyPage() {
     };
 
     setShops([...shops, shop]);
-    setNewShop({ name: "", address: "", phone: "" });
+    setNewShop({ name: "", address: "" });
     setIsDialogOpen(false);
   };
 
@@ -141,7 +138,7 @@ export default function SklepyPage() {
                     <Input 
                       value={newShop.name}
                       onChange={(e) => setNewShop({ ...newShop, name: e.target.value })}
-                      placeholder="np. Galeria Katowicka"
+                      placeholder="np. Kaufland Włocławek"
                       className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
                     />
                   </div>
@@ -154,18 +151,6 @@ export default function SklepyPage() {
                       value={newShop.address}
                       onChange={(e) => setNewShop({ ...newShop, address: e.target.value })}
                       placeholder="ul. Kolorowa 1, 00-000 Miasto"
-                      className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                      <Phone className="h-3 w-3" /> Telefon (opcjonalnie)
-                    </Label>
-                    <Input 
-                      value={newShop.phone}
-                      onChange={(e) => setNewShop({ ...newShop, phone: e.target.value })}
-                      placeholder="123 456 789"
                       className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
                     />
                   </div>
@@ -208,7 +193,7 @@ export default function SklepyPage() {
                     <Input 
                       value={editingShop?.name || ""}
                       onChange={(e) => setEditingShop(prev => prev ? { ...prev, name: e.target.value } : null)}
-                      placeholder="np. Galeria Katowicka"
+                      placeholder="np. Kaufland Włocławek"
                       className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
                     />
                   </div>
@@ -225,17 +210,6 @@ export default function SklepyPage() {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                      <Phone className="h-3 w-3" /> Telefon (opcjonalnie)
-                    </Label>
-                    <Input 
-                      value={editingShop?.phone || ""}
-                      onChange={(e) => setEditingShop(prev => prev ? { ...prev, phone: e.target.value } : null)}
-                      placeholder="123 456 789"
-                      className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
-                    />
-                  </div>
                 </div>
 
                 <div className="flex gap-3">
@@ -278,12 +252,6 @@ export default function SklepyPage() {
                             <MapPin className="h-3 w-3 text-primary/50" />
                             <span className="text-[10px] font-bold uppercase tracking-widest">{shop.address}</span>
                           </div>
-                          {shop.phone && (
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <Phone className="h-3 w-3 text-primary/50" />
-                              <span className="text-[10px] font-bold uppercase tracking-widest">{shop.phone}</span>
-                            </div>
-                          )}
                           <div className="flex items-center gap-1.5 text-muted-foreground">
                             <Users className="h-3 w-3 text-primary/50" />
                             <span className="text-[10px] font-bold uppercase tracking-widest">{shop.employees} Pracowników</span>

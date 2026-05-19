@@ -49,7 +49,7 @@ export function Navbar() {
               <div className="flex items-center gap-1 mt-1">
                 <MapPin className="h-2.5 w-2.5 text-primary" />
                 <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">
-                  {displayRole === "Właściciel" ? "Właściciel" : "Trzy Stawy"}
+                  {displayRole === "Właściciel" ? "Właściciel" : "Kaufland Włocławek"}
                 </span>
               </div>
             </div>

@@ -69,8 +69,8 @@ export default function SprzedazPage() {
   const { addToast } = useToast();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [userShop, setUserShop] = useState("Trzy Stawy");
-  const [selectedShop, setSelectedShop] = useState("Trzy Stawy Katowice");
+  const [userShop, setUserShop] = useState("Kaufland Włocławek");
+  const [selectedShop, setSelectedShop] = useState("Kaufland Włocławek");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
@@ -96,6 +96,19 @@ export default function SprzedazPage() {
     date: string;
     time: string;
     items: SaleItem[];
+  }
+  
+  interface Cost {
+    id: string;
+    date: string;
+    time: string;
+    category: 'skup' | 'zaliczka' | 'paczki' | 'gotowka';
+    amount: number;
+    description: string;
+    shop: string;
+    employeeId: string;
+    employeeName: string;
+    paymentMethod: 'gotowka' | 'przelew';
   }
   
   const [sales, setSales] = useState<SaleGroup[]>([
@@ -215,6 +228,18 @@ export default function SprzedazPage() {
     },
   ]);
   
+  const [costs, setCosts] = useState<Cost[]>([]);
+  const [activeTab, setActiveTab] = useState<'sprzedaz' | 'koszty'>('sprzedaz');
+  const [isCostDialogOpen, setIsCostDialogOpen] = useState(false);
+  const [costFilterCategory, setCostFilterCategory] = useState<string>('all');
+  
+  const [newCost, setNewCost] = useState({
+    category: 'zaliczka' as Cost['category'],
+    amount: '',
+    description: '',
+    paymentMethod: 'gotowka' as Cost['paymentMethod']
+  });
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isPhoneSelectOpen, setIsPhoneSelectOpen] = useState(false);
@@ -269,9 +294,9 @@ export default function SprzedazPage() {
     setUserRole(role);
     
     if (role === "employee") {
-      setSelectedShop("Trzy Stawy Katowice");
+      setSelectedShop("Kaufland Włocławek");
     } else {
-      setSelectedShop("Trzy Stawy Katowice");
+      setSelectedShop("Dominikańska Wrocław");
     }
     
     const initials = userName
@@ -287,6 +312,12 @@ export default function SprzedazPage() {
     if (typeof window === "undefined") return;
     const saved = getLocalStorageSafe('pracownicy_employees', []);
     setEmployees(saved);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedCosts = getLocalStorageSafe('sprzedaz_costs', []);
+    setCosts(savedCosts);
   }, []);
 
   useEffect(() => {
@@ -355,9 +386,9 @@ export default function SprzedazPage() {
   }, [editingId, selectedSaleForEdit]);
 
   const shops = [
-    "Trzy Stawy Katowice",
-    "Galeria Katowicka",
-    "Silesia City Center"
+    "Kaufland Włocławek",
+    "Riviera Gdynia",
+    "Dominikańska Wrocław"
   ];
 
   const categoryGroups = [
@@ -496,6 +527,10 @@ export default function SprzedazPage() {
       };
       
       setSales(prev => [newSale, ...prev]);
+      
+      const existingSales = getLocalStorageSafe('sprzedaz_sales', []);
+      localStorage.setItem('sprzedaz_sales', JSON.stringify([newSale, ...existingSales]));
+      
       addToast({ message: `Sprzedaż dodana (${newSale.items.length} pozycji)`, variant: "success" });
       
       const employeeName = getSessionStorageSafe("userName", "Pracownik");
@@ -547,9 +582,64 @@ export default function SprzedazPage() {
     setPurchasePriceFromWarehouse(0);
   };
 
+  const handleAddCost = () => {
+    if (!newCost.amount || !newCost.description) {
+      addToast({ message: "Wypełnij kwotę i opis", variant: "error" });
+      return;
+    }
+    
+    const employeeName = getSessionStorageSafe("userName", "Pracownik");
+    const employeeId = getSessionStorageSafe("userId", "unknown");
+    
+    const cost: Cost = {
+      id: Math.random().toString(36).substr(2, 9),
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      category: newCost.category,
+      amount: parseFloat(newCost.amount),
+      description: newCost.description,
+      shop: selectedShop,
+      employeeId,
+      employeeName,
+      paymentMethod: newCost.paymentMethod
+    };
+    
+    setCosts(prev => [cost, ...prev]);
+    localStorage.setItem('sprzedaz_costs', JSON.stringify([cost, ...costs]));
+    
+    addAction({
+      type: 'koszt',
+      description: `Koszt (${newCost.category}): ${newCost.description}`,
+      employeeName,
+      employeeId,
+      shopName: selectedShop,
+      shopId: selectedShop,
+      details: `${newCost.amount} zł | ${newCost.paymentMethod}`
+    });
+    
+    addToast({ message: `Koszt dodany: ${newCost.amount} zł`, variant: "success" });
+    setNewCost({
+      category: 'zaliczka',
+      amount: '',
+      description: '',
+      paymentMethod: 'gotowka'
+    });
+    setIsCostDialogOpen(false);
+  };
+
+  const removeCost = (id: string) => {
+    const cost = costs.find(c => c.id === id);
+    setCosts(prev => prev.filter(c => c.id !== id));
+    const updated = costs.filter(c => c.id !== id);
+    localStorage.setItem('sprzedaz_costs', JSON.stringify(updated));
+    if (cost) addToast({ message: `Usunięto koszt: ${cost.description}`, variant: "info" });
+  };
+
   const removePosition = (id: string) => {
     const sale = sales.find(s => s.id === id);
     setSales(prev => prev.filter(s => s.id !== id));
+    const updatedSales = sales.filter(s => s.id !== id);
+    localStorage.setItem('sprzedaz_sales', JSON.stringify(updatedSales));
     if (sale) addToast({ message: `Usunięto sprzedaż (${sale.items.length} pozycji)`, variant: "info" });
   };
 
@@ -668,7 +758,265 @@ export default function SprzedazPage() {
           </div>
         </div>
 
-        {/* Main Table Card */}
+        {/* Tabs: Sprzedaż / Koszty */}
+        <div className="flex gap-2 bg-white p-1 rounded-2xl shadow-sm border border-primary/10 w-fit">
+          <button
+            onClick={() => setActiveTab('sprzedaz')}
+            className={`px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all ${
+              activeTab === 'sprzedaz' 
+                ? 'bg-primary text-white shadow-md' 
+                : 'text-muted-foreground hover:bg-accent/50'
+            }`}
+          >
+            🛒 Sprzedaż
+          </button>
+          <button
+            onClick={() => setActiveTab('koszty')}
+            className={`px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all ${
+              activeTab === 'koszty' 
+                ? 'bg-primary text-white shadow-md' 
+                : 'text-muted-foreground hover:bg-accent/50'
+            }`}
+          >
+            💰 Koszty
+          </button>
+        </div>
+
+        {activeTab === 'koszty' ? (
+          <>
+            {/* Koszty Header */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-foreground tracking-tight">Zarządzanie kosztami</h2>
+                <p className="text-primary/60 text-sm">Skupy, zaliczki, paczki, zasilanie gotówką</p>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className="flex gap-1 bg-white p-1 rounded-xl shadow-sm border border-primary/10">
+                  {['all', 'skup', 'zaliczka', 'paczki', 'gotowka'].map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setCostFilterCategory(cat)}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                        costFilterCategory === cat 
+                          ? 'bg-primary text-white' 
+                          : 'text-muted-foreground hover:bg-accent/50'
+                      }`}
+                    >
+                      {cat === 'all' ? 'Wszystkie' : cat}
+                    </button>
+                  ))}
+                </div>
+                
+                <Button 
+                  onClick={() => setIsCostDialogOpen(true)}
+                  className="bg-red-500 hover:bg-red-600 h-12 px-6 rounded-xl shadow-lg transition-all gap-2 border-none"
+                >
+                  <Plus className="h-5 w-5" />
+                  <span className="font-bold text-xs uppercase">Dodaj koszt</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: '📱 Skupy', value: costs.filter(c => c.category === 'skup').reduce((sum, c) => sum + c.amount, 0), color: 'bg-blue-50 border-blue-200', subtitle: 'Automatycznie z magazynu' },
+                { label: '💰 Zaliczki', value: costs.filter(c => c.category === 'zaliczka').reduce((sum, c) => sum + c.amount, 0), color: 'bg-yellow-50 border-yellow-200' },
+                { label: '📦 Paczki', value: costs.filter(c => c.category === 'paczki').reduce((sum, c) => sum + c.amount, 0), color: 'bg-green-50 border-green-200' },
+                { label: '💵 Gotówka', value: costs.filter(c => c.category === 'gotowka').reduce((sum, c) => sum + c.amount, 0), color: 'bg-purple-50 border-purple-200' },
+              ].map((item, idx) => (
+                <Card key={idx} className={`${item.color} border`}>
+                  <CardContent className="p-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">{item.label}</p>
+                    <p className="text-2xl font-black text-foreground">{item.value.toFixed(2)} zł</p>
+                    {item.subtitle && (
+                      <p className="text-[9px] font-medium text-muted-foreground/70 mt-1">{item.subtitle}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Costs Table */}
+            <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden">
+              <CardHeader className="border-b border-primary/5 bg-gradient-to-r from-red-50 to-orange-50 px-6 py-4">
+                <CardTitle className="flex items-center gap-3">
+                  <DollarSign className="h-6 w-6 text-red-500" />
+                  <span className="font-black text-lg uppercase tracking-tight">Historia kosztów</span>
+                  <Badge variant="secondary" className="ml-auto">{costs.length} pozycji</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {costs.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <Wallet className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
+                    <p className="text-muted-foreground font-medium">Brak kosztów</p>
+                    <p className="text-sm text-muted-foreground/60 mt-1">Kliknij "Dodaj koszt", aby rozpocząć</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-accent/30 hover:bg-accent/30">
+                        <TableHead className="font-black uppercase text-[11px] tracking-wider">Data</TableHead>
+                        <TableHead className="font-black uppercase text-[11px] tracking-wider">Kategoria</TableHead>
+                        <TableHead className="font-black uppercase text-[11px] tracking-wider">Opis</TableHead>
+                        <TableHead className="font-black uppercase text-[11px] tracking-wider">Kwota</TableHead>
+                        <TableHead className="font-black uppercase text-[11px] tracking-wider">Płatność</TableHead>
+                        <TableHead className="font-black uppercase text-[11px] tracking-wider">Pracownik</TableHead>
+                        <TableHead className="font-black uppercase text-[11px] tracking-wider text-right">Akcje</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {costs
+                        .filter(cost => costFilterCategory === 'all' || cost.category === costFilterCategory)
+                        .map(cost => (
+                          <TableRow key={cost.id} className="hover:bg-accent/20 transition-colors">
+                            <TableCell className="font-medium text-sm">
+                              <div>{new Date(cost.date).toLocaleDateString('pl-PL')}</div>
+                              <div className="text-[10px] text-muted-foreground">{cost.time}</div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant="secondary" 
+                                className={
+                                  cost.category === 'skup' ? 'bg-blue-100 text-blue-700' :
+                                  cost.category === 'zaliczka' ? 'bg-yellow-100 text-yellow-700' :
+                                  cost.category === 'paczki' ? 'bg-green-100 text-green-700' :
+                                  'bg-purple-100 text-purple-700'
+                                }
+                              >
+                                {cost.category === 'skup' && '📱 '}
+                                {cost.category === 'zaliczka' && '💰 '}
+                                {cost.category === 'paczki' && '📦 '}
+                                {cost.category === 'gotowka' && '💵 '}
+                                {cost.category}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium text-sm max-w-[300px] truncate">{cost.description}</TableCell>
+                            <TableCell className="font-bold text-base text-red-600">{cost.amount.toFixed(2)} zł</TableCell>
+                            <TableCell>
+                              <span className="text-xs font-medium text-muted-foreground">
+                                {cost.paymentMethod === 'gotowka' ? '💵 Gotówka' : '🏦 Przelew'}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{cost.employeeName}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50"
+                                onClick={() => removeCost(cost.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Cost Dialog */}
+            <Dialog open={isCostDialogOpen} onOpenChange={setIsCostDialogOpen}>
+              <DialogContent className="sm:max-w-[500px] rounded-3xl border-none shadow-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-3 text-xl">
+                    <DollarSign className="h-6 w-6 text-red-500" />
+                    Nowy koszt
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Kategoria</Label>
+                    <UISelect 
+                      value={newCost.category} 
+                      onValueChange={(val) => setNewCost(prev => ({ ...prev, category: val as Cost['category'] }))}
+                      items={[
+                        { value: 'zaliczka', label: '💰 Zaliczka' },
+                        { value: 'paczki', label: '📦 Paczki' },
+                        { value: 'gotowka', label: '💵 Zasilanie gotówką' }
+                      ]}
+                    >
+                      <UISelectTrigger className="h-12 rounded-xl bg-accent/30 border-none font-bold text-sm">
+                        <UISelectValue placeholder="Wybierz kategorię" />
+                      </UISelectTrigger>
+                      <UISelectContent className="rounded-xl">
+                        <UISelectItem value="zaliczka">💰 Zaliczka</UISelectItem>
+                        <UISelectItem value="paczki">📦 Paczki</UISelectItem>
+                        <UISelectItem value="gotowka">💵 Zasilanie gotówką</UISelectItem>
+                      </UISelectContent>
+                    </UISelect>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Kwota (zł)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={newCost.amount}
+                      onChange={(e) => setNewCost(prev => ({ ...prev, amount: e.target.value }))}
+                      placeholder="0.00"
+                      className="h-12 rounded-xl bg-accent/30 border-none font-bold text-lg"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Opis</Label>
+                    <textarea
+                      value={newCost.description}
+                      onChange={(e) => setNewCost(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="np. iPhone 15 Pro, Zaliczka za maj, Paczka kurierska..."
+                      className="w-full h-24 px-4 py-3 rounded-xl bg-accent/30 border-none resize-none font-medium text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Forma płatności</Label>
+                    <UISelect 
+                      value={newCost.paymentMethod} 
+                      onValueChange={(val) => setNewCost(prev => ({ ...prev, paymentMethod: val as Cost['paymentMethod'] }))}
+                      items={[
+                        { value: 'gotowka', label: '💵 Gotówka' },
+                        { value: 'przelew', label: '🏦 Przelew' }
+                      ]}
+                    >
+                      <UISelectTrigger className="h-12 rounded-xl bg-accent/30 border-none font-bold text-sm">
+                        <UISelectValue placeholder="Wybierz formę" />
+                      </UISelectTrigger>
+                      <UISelectContent className="rounded-xl">
+                        <UISelectItem value="gotowka">💵 Gotówka</UISelectItem>
+                        <UISelectItem value="przelew">🏦 Przelew</UISelectItem>
+                      </UISelectContent>
+                    </UISelect>
+                  </div>
+                </div>
+
+                <DialogFooter className="gap-3 mt-6">
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => setIsCostDialogOpen(false)}
+                    className="flex-1 h-12 rounded-xl font-bold text-muted-foreground hover:bg-accent"
+                  >
+                    Anuluj
+                  </Button>
+                  <Button 
+                    onClick={handleAddCost}
+                    className="flex-1 h-12 rounded-xl bg-red-500 hover:bg-red-600 font-bold text-white shadow-lg shadow-red-500/20 transition-all active:scale-95"
+                  >
+                    Dodaj koszt
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
+        ) : null}
+
+        {/* Main Table Card - tylko w zakładce Sprzedaż */}
+        {activeTab === 'sprzedaz' && (
         <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden border border-primary/5">
           <CardHeader className="border-b border-primary/5 bg-accent/30 px-6 py-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -709,7 +1057,7 @@ export default function SprzedazPage() {
                 <div className="h-12 w-px bg-primary/10 hidden md:block" />
 
                 <div className="w-[200px]">
-                  <UISelect value="Trzy Stawy Katowice" onValueChange={(val) => setSelectedShop(val || "Trzy Stawy Katowice")} items={shops.map(shop => ({ value: shop, label: shop }))}>
+                  <UISelect value="Kaufland Włocławek" onValueChange={(val) => setSelectedShop(val || "Kaufland Włocławek")} items={shops.map(shop => ({ value: shop, label: shop }))}>
                     <UISelectTrigger className="h-12 rounded-2xl bg-white border-primary/10 font-bold text-xs">
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-primary" />
@@ -728,11 +1076,11 @@ export default function SprzedazPage() {
               <div className="flex items-center gap-3">
                 <div className="bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100">
                   <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none mb-1">Zysk</p>
-                  <p className="text-xl font-black text-emerald-700">{totalProfit} <span className="text-xs font-bold opacity-60">PLN</span></p>
+                  <p className="text-xl font-black text-emerald-700">{totalProfit} <span className="text-xs font-bold opacity-60">zł</span></p>
                 </div>
                 <div className="bg-primary/5 px-4 py-2 rounded-2xl border border-primary/10">
                   <p className="text-[10px] font-black text-primary uppercase tracking-widest leading-none mb-1">Wpływ</p>
-                  <p className="text-xl font-black text-foreground">{totalAmount} <span className="text-xs font-bold opacity-40">PLN</span></p>
+                  <p className="text-xl font-black text-foreground">{totalAmount} <span className="text-xs font-bold opacity-40">zł</span></p>
                 </div>
               </div>
             </div>
@@ -966,6 +1314,7 @@ export default function SprzedazPage() {
             </div>
           </CardContent>
         </Card>
+        )}
       </main>
 
       {/* Sale Details Dialog */}
@@ -1454,7 +1803,7 @@ export default function SprzedazPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Cena (PLN)</Label>
+                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Cena (zł)</Label>
                 <Input 
                   type="number"
                   placeholder="0.00" 
@@ -1474,7 +1823,7 @@ export default function SprzedazPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Zysk (PLN)</Label>
+                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Zysk (zł)</Label>
                 <Input 
                   type="number"
                   placeholder="0.00" 
@@ -1963,7 +2312,7 @@ export default function SprzedazPage() {
           <div className="space-y-2">
             <Label className="text-primary text-xs font-black uppercase tracking-widest">punkt</Label>
             {userRole === "owner" ? (
-              <UISelect value={selectedShop} onValueChange={(val) => setSelectedShop(val || "Trzy Stawy Katowice")} items={shops.map(shop => ({ value: shop, label: shop }))}>
+              <UISelect value={selectedShop} onValueChange={(val) => setSelectedShop(val || "Kaufland Włocławek")} items={shops.map(shop => ({ value: shop, label: shop }))}>
                 <UISelectTrigger className="bg-white/5 border-white/10 h-12 text-white font-bold rounded-xl focus:ring-primary">
                   <span>{selectedShop}</span>
                 </UISelectTrigger>

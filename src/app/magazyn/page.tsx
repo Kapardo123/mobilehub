@@ -43,7 +43,7 @@ import {
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useLocalStorage, useSessionStorage } from "@/lib/storage";
+import { useLocalStorage, useSessionStorage, getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
 import {
   Select,
   SelectContent,
@@ -74,7 +74,23 @@ type InventoryItem = {
   setIncludes?: string;
   notes?: string;
   purchasePrice?: string;
+  addedBy?: string;
+  addedDate?: string;
+  shop?: string;
 };
+
+interface Cost {
+  id: string;
+  date: string;
+  time: string;
+  category: 'skup' | 'zaliczka' | 'paczki' | 'gotowka';
+  amount: number;
+  description: string;
+  shop: string;
+  employeeId: string;
+  employeeName: string;
+  paymentMethod: 'gotowka' | 'przelew';
+}
 
 export default function MagazynPage() {
   const router = useRouter();
@@ -135,14 +151,29 @@ export default function MagazynPage() {
   });
 
   const getDefaultInventory = () => [
-    { name: "iPhone 15 Pro", category: "telefon", stock: 1, price: "4500 zł", alert: false, imei: "351234567890123", battery: "100%", color: "Natural Titanium", condition: "Nowy", memory: "256GB", brand: "Apple", model: "15 Pro", purchasePrice: "3800", taxType: "marża", purchaseDate: "2024-01-15", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Bez rys, like new", statusSprzedany: false, dataSprzedazy: "" },
-    { name: "iPhone 13", category: "telefon", stock: 1, price: "2100 zł", alert: false, imei: "359876543210987", battery: "89%", color: "Midnight", condition: "Używany", memory: "128GB", brand: "Apple", model: "13", purchasePrice: "1700", taxType: "marża", purchaseDate: "2024-02-10", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Lekkie ryski na obudowie", statusSprzedany: true, dataSprzedazy: "2024-05-10" },
-    { name: "Samsung S23 Ultra", category: "telefon", stock: 1, price: "3200 zł", alert: false, imei: "354455667788990", battery: "95%", color: "Phantom Black", condition: "Używany", memory: "512GB", brand: "Samsung", model: "S23 Ultra", purchasePrice: "2600", taxType: "VAT", purchaseDate: "2024-03-05", warranty: "12 m-cy", setIncludes: "pudełko, kabel, rysik", notes: "Perfekcyjny stan", statusSprzedany: false, dataSprzedazy: "" },
-    { name: "iPhone 14 Pro Max", category: "telefon", stock: 1, price: "4200 zł", alert: false, imei: "356789012345678", battery: "97%", color: "Deep Purple", condition: "Używany", memory: "256GB", brand: "Apple", model: "14 Pro Max", purchasePrice: "3500", taxType: "marża", purchaseDate: "2024-04-01", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Zadbany", statusSprzedany: false, dataSprzedazy: "" },
-    { name: "Xiaomi 13 Pro", category: "telefon", stock: 1, price: "2800 zł", alert: false, imei: "357890123456789", battery: "92%", color: "Ceramic Black", condition: "Używany", memory: "256GB", brand: "Xiaomi", model: "13 Pro", purchasePrice: "2200", taxType: "VAT", purchaseDate: "2024-03-20", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Stan idealny", statusSprzedany: false, dataSprzedazy: "" },
-    { name: "iPhone 12 Mini", category: "telefon", stock: 1, price: "1600 zł", alert: false, imei: "358901234567890", battery: "85%", color: "Blue", condition: "Używany", memory: "64GB", brand: "Apple", model: "12 Mini", purchasePrice: "1300", taxType: "marża", purchaseDate: "2024-02-25", warranty: "3 m-ce", setIncludes: "pudełko", notes: "Drobne ryski", statusSprzedany: false, dataSprzedazy: "" },
-    { name: "Samsung S22", category: "telefon", stock: 1, price: "1900 zł", alert: false, imei: "359012345678901", battery: "90%", color: "Green", condition: "Używany", memory: "128GB", brand: "Samsung", model: "S22", purchasePrice: "1500", taxType: "VAT", purchaseDate: "2024-03-10", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Bardzo zadbany", statusSprzedany: false, dataSprzedazy: "" },
-    { name: "iPhone 11", category: "telefon", stock: 1, price: "1200 zł", alert: false, imei: "350123456789012", battery: "78%", color: "Purple", condition: "Używany", memory: "64GB", brand: "Apple", model: "11", purchasePrice: "900", taxType: "marża", purchaseDate: "2024-01-20", warranty: "3 m-ce", setIncludes: "kabel", notes: "Ślady użytkowania", statusSprzedany: false, dataSprzedazy: "" },
+    { name: "iPhone 15 Pro", category: "telefon", stock: 1, price: "4500 zł", alert: false, imei: "351234567890123", battery: "100%", color: "Natural Titanium", condition: "Nowy", memory: "256GB", brand: "Apple", model: "15 Pro", purchasePrice: "3800", taxType: "marża", purchaseDate: "2024-01-15", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Bez rys, like new", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
+    { name: "iPhone 13", category: "telefon", stock: 1, price: "2100 zł", alert: false, imei: "359876543210987", battery: "89%", color: "Midnight", condition: "Używany", memory: "128GB", brand: "Apple", model: "13", purchasePrice: "1700", taxType: "marża", purchaseDate: "2024-02-10", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Lekkie ryski na obudowie", statusSprzedany: true, dataSprzedazy: "2024-05-10", shop: "Kaufland Włocławek" },
+    { name: "Samsung S23 Ultra", category: "telefon", stock: 1, price: "3200 zł", alert: false, imei: "354455667788990", battery: "95%", color: "Phantom Black", condition: "Używany", memory: "512GB", brand: "Samsung", model: "S23 Ultra", purchasePrice: "2600", taxType: "VAT", purchaseDate: "2024-03-05", warranty: "12 m-cy", setIncludes: "pudełko, kabel, rysik", notes: "Perfekcyjny stan", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
+    { name: "iPhone 14 Pro Max", category: "telefon", stock: 1, price: "4200 zł", alert: false, imei: "356789012345678", battery: "97%", color: "Deep Purple", condition: "Używany", memory: "256GB", brand: "Apple", model: "14 Pro Max", purchasePrice: "3500", taxType: "marża", purchaseDate: "2024-04-01", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Zadbany", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
+    { name: "Xiaomi 13 Pro", category: "telefon", stock: 1, price: "2800 zł", alert: false, imei: "357890123456789", battery: "92%", color: "Ceramic Black", condition: "Używany", memory: "256GB", brand: "Xiaomi", model: "13 Pro", purchasePrice: "2200", taxType: "VAT", purchaseDate: "2024-03-20", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Stan idealny", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
+    { name: "iPhone 12 Mini", category: "telefon", stock: 1, price: "1600 zł", alert: false, imei: "358901234567890", battery: "85%", color: "Blue", condition: "Używany", memory: "64GB", brand: "Apple", model: "12 Mini", purchasePrice: "1300", taxType: "marża", purchaseDate: "2024-02-25", warranty: "3 m-ce", setIncludes: "pudełko", notes: "Drobne ryski", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
+    { name: "Samsung S22", category: "telefon", stock: 1, price: "1900 zł", alert: false, imei: "359012345678901", battery: "90%", color: "Green", condition: "Używany", memory: "128GB", brand: "Samsung", model: "S22", purchasePrice: "1500", taxType: "VAT", purchaseDate: "2024-03-10", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Bardzo zadbany", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
+    { name: "iPhone 11", category: "telefon", stock: 1, price: "1200 zł", alert: false, imei: "350123456789012", battery: "78%", color: "Purple", condition: "Używany", memory: "64GB", brand: "Apple", model: "11", purchasePrice: "900", taxType: "marża", purchaseDate: "2024-01-20", warranty: "3 m-ce", setIncludes: "kabel", notes: "Ślady użytkowania", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
+
+    { name: "iPhone 16 Pro Max", category: "telefon", stock: 1, price: "5200 zł", alert: false, imei: "350987654321098", battery: "99%", color: "Desert Titanium", condition: "Nowy", memory: "512GB", brand: "Apple", model: "16 Pro Max", purchasePrice: "4500", taxType: "VAT", purchaseDate: "2024-06-01", warranty: "24 m-cy", setIncludes: "pełne pudełko", notes: "Folia na ekranie", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
+    { name: "Samsung S24 Ultra", category: "telefon", stock: 1, price: "4800 zł", alert: false, imei: "351098765432109", battery: "96%", color: "Titanium Gray", condition: "Nowy", memory: "256GB", brand: "Samsung", model: "S24 Ultra", purchasePrice: "4200", taxType: "VAT", purchaseDate: "2024-05-20", warranty: "24 m-cy", setIncludes: "pudełko, kabel, ładowarka, rysik", notes: "Folia na ekranie, pełne pudełko", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
+    { name: "iPhone 15", category: "telefon", stock: 1, price: "3800 zł", alert: false, imei: "352109876543210", battery: "94%", color: "Blue", condition: "Używany", memory: "128GB", brand: "Apple", model: "15", purchasePrice: "3200", taxType: "marża", purchaseDate: "2024-04-15", warranty: "9 m-cy", setIncludes: "pudełko, kabel", notes: "Lekkie ślady", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
+    { name: "Xiaomi 14 Ultra", category: "telefon", stock: 1, price: "3600 zł", alert: false, imei: "353210987654321", battery: "91%", color: "White", condition: "Używany", memory: "512GB", brand: "Xiaomi", model: "14 Ultra", purchasePrice: "2900", taxType: "VAT", purchaseDate: "2024-03-25", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka, etui", notes: "Bardzo zadbany", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
+    { name: "Samsung A54", category: "telefon", stock: 1, price: "1400 zł", alert: false, imei: "354321098765432", battery: "88%", color: "Lavender", condition: "Używany", memory: "128GB", brand: "Samsung", model: "A54", purchasePrice: "1100", taxType: "VAT", purchaseDate: "2024-02-18", warranty: "6 m-cy", setIncludes: "kabel", notes: "Normalne ślady", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
+    { name: "iPhone SE (2nd gen)", category: "telefon", stock: 1, price: "950 zł", alert: false, imei: "355432109876543", battery: "82%", color: "Red", condition: "Używany", memory: "64GB", brand: "Apple", model: "SE (2nd gen)", purchasePrice: "750", taxType: "marża", purchaseDate: "2024-01-28", warranty: "3 m-ce", setIncludes: "kabel", notes: "Drobne ryski", statusSprzedany: true, dataSprzedazy: "2024-06-05", shop: "Riviera Gdynia" },
+
+    { name: "iPhone 14 Plus", category: "telefon", stock: 1, price: "3400 zł", alert: false, imei: "356543210987654", battery: "93%", color: "Starlight", condition: "Używany", memory: "256GB", brand: "Apple", model: "14 Plus", purchasePrice: "2800", taxType: "marża", purchaseDate: "2024-04-08", warranty: "8 m-cy", setIncludes: "pudełko, kabel", notes: "Zadbany egzemplarz", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
+    { name: "Samsung S23 FE", category: "telefon", stock: 1, price: "2400 zł", alert: false, imei: "357654321098765", battery: "89%", color: "Cream", condition: "Używany", memory: "128GB", brand: "Samsung", model: "S23 FE", purchasePrice: "1900", taxType: "VAT", purchaseDate: "2024-03-30", warranty: "9 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Lekkie ślady na ramce", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
+    { name: "Xiaomi 13T Pro", category: "telefon", stock: 1, price: "2600 zł", alert: false, imei: "358765432109876", battery: "87%", color: "Black", condition: "Używany", memory: "256GB", brand: "Xiaomi", model: "13T Pro", purchasePrice: "2000", taxType: "VAT", purchaseDate: "2024-02-22", warranty: "10 m-cy", setIncludes: "pudełko, kabel, ładowarka 67W", notes: "Działa bez zarzutów", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
+    { name: "iPhone 12", category: "telefon", stock: 1, price: "1400 zł", alert: false, imei: "359876543210987", battery: "80%", color: "White", condition: "Używany", memory: "64GB", brand: "Apple", model: "12", purchasePrice: "1050", taxType: "marża", purchaseDate: "2024-01-15", warranty: "3 m-ce", setIncludes: "kabel", notes: "Widoczne ślady użytkowania", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
+    { name: "Samsung A34", category: "telefon", stock: 1, price: "1200 zł", alert: false, imei: "350111222333444", battery: "86%", color: "Graphite", condition: "Używany", memory: "128GB", brand: "Samsung", model: "A34", purchasePrice: "950", taxType: "VAT", purchaseDate: "2024-02-10", warranty: "6 m-cy", setIncludes: "kabel", notes: "Średni stan", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
+    { name: "Redmi Note 13 Pro+", category: "telefon", stock: 1, price: "1800 zł", alert: false, imei: "351222333444555", battery: "92%", color: "Black", condition: "Nowy", memory: "256GB", brand: "Xiaomi", model: "Note 13 Pro+", purchasePrice: "1600", taxType: "VAT", purchaseDate: "2024-05-15", warranty: "24 m-cy", setIncludes: "pełne pudełko, ładowarka 120W", notes: "Odblokowany, folia na ekranie", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
+
     { name: "Etui guma", category: "akcesoria", stock: 0, price: "", alert: false },
     { name: "Etui book", category: "akcesoria", stock: 0, price: "", alert: false },
     { name: "Szkło", category: "akcesoria", stock: 0, price: "", alert: false },
@@ -193,17 +224,30 @@ export default function MagazynPage() {
   useEffect(() => {
     if (!isMounted) return;
     const defaultItems = getDefaultInventory();
-    const nonPhoneDefaults = defaultItems.filter(item => item.category !== "telefon");
-    const existingNonPhoneNames = inventory
-      .filter(item => item.category !== "telefon")
-      .map(item => item.name);
-    const missingItems = nonPhoneDefaults.filter(
-      item => !existingNonPhoneNames.includes(item.name)
+    const existingNames = inventory.map(item => item.name);
+    const missingItems = defaultItems.filter(
+      item => !existingNames.includes(item.name)
     );
     if (missingItems.length > 0) {
       setInventory([...inventory, ...missingItems] as InventoryItem[]);
     }
   }, [isMounted]);
+
+  useEffect(() => {
+    if (!isMounted || typeof window === "undefined") return;
+    
+    const currentShop = getSessionStorageSafe("shopName", "Kaufland Włocławek");
+    const needsMigration = inventory.some(item => item.category === "telefon" && !item.shop);
+    if (needsMigration) {
+      const updatedInventory = inventory.map(item => {
+        if (item.category === "telefon" && !item.shop) {
+          return { ...item, shop: currentShop };
+        }
+        return item;
+      });
+      setInventory(updatedInventory);
+    }
+  }, [isMounted, inventory]);
 
   useEffect(() => {
     if (!isMounted || typeof window === "undefined") return;
@@ -215,44 +259,77 @@ export default function MagazynPage() {
   const filteredItems = useMemo(() => {
     let items = [...inventory];
     
+    const currentShop = getSessionStorageSafe("shopName", "Kaufland Włocławek");
+    
     if (selectedCategory) {
       items = items.filter(item => item.category === selectedCategory);
     }
     
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      items = items.filter(item => 
+      items = items.filter(item =>
         item.name.toLowerCase().includes(query) ||
         (item.imei && item.imei.toLowerCase().includes(query)) ||
         (item.brand && item.brand.toLowerCase().includes(query)) ||
         (item.model && item.model.toLowerCase().includes(query))
       );
     }
-    
-    items.sort((a, b) => {
-      // Najpierw sprawdz czy sprzedane - przenies na koniec
-      if (a.statusSprzedany !== b.statusSprzedany) {
-        return a.statusSprzedany ? 1 : -1;
-      }
-      
-      switch (sortBy) {
-        case "alfanum-asc":
-          return a.name.localeCompare(b.name);
-        case "alfanum-desc":
-          return b.name.localeCompare(a.name);
-        case "cena-asc":
-          return (parseInt(a.price) || 0) - (parseInt(b.price) || 0);
-        case "cena-desc":
-          return (parseInt(b.price) || 0) - (parseInt(a.price) || 0);
-        case "stan-asc":
-          return (a.stock || 0) - (b.stock || 0);
-        case "stan-desc":
-          return (b.stock || 0) - (a.stock || 0);
-        default:
-          return 0;
-      }
-    });
-    
+
+    if (selectedCategory === "telefon") {
+      items.sort((a, b) => {
+        if (a.statusSprzedany !== b.statusSprzedany) {
+          return a.statusSprzedany ? 1 : -1;
+        }
+
+        const aIsCurrentShop = (a.shop || "") === currentShop;
+        const bIsCurrentShop = (b.shop || "") === currentShop;
+
+        if (aIsCurrentShop !== bIsCurrentShop) {
+          return aIsCurrentShop ? -1 : 1;
+        }
+
+        switch (sortBy) {
+          case "alfanum-asc":
+            return a.name.localeCompare(b.name);
+          case "alfanum-desc":
+            return b.name.localeCompare(a.name);
+          case "cena-asc":
+            return (parseInt(a.price) || 0) - (parseInt(b.price) || 0);
+          case "cena-desc":
+            return (parseInt(b.price) || 0) - (parseInt(a.price) || 0);
+          case "stan-asc":
+            return (a.stock || 0) - (b.stock || 0);
+          case "stan-desc":
+            return (b.stock || 0) - (a.stock || 0);
+          default:
+            return 0;
+        }
+      });
+    } else {
+      items.sort((a, b) => {
+        if (a.statusSprzedany !== b.statusSprzedany) {
+          return a.statusSprzedany ? 1 : -1;
+        }
+
+        switch (sortBy) {
+          case "alfanum-asc":
+            return a.name.localeCompare(b.name);
+          case "alfanum-desc":
+            return b.name.localeCompare(a.name);
+          case "cena-asc":
+            return (parseInt(a.price) || 0) - (parseInt(b.price) || 0);
+          case "cena-desc":
+            return (parseInt(b.price) || 0) - (parseInt(a.price) || 0);
+          case "stan-asc":
+            return (a.stock || 0) - (b.stock || 0);
+          case "stan-desc":
+            return (b.stock || 0) - (a.stock || 0);
+          default:
+            return 0;
+        }
+      });
+    }
+
     return items;
   }, [inventory, selectedCategory, searchQuery, sortBy]);
 
@@ -275,6 +352,9 @@ export default function MagazynPage() {
       sellingDate: newItem.sellingDate || "",
       statusSprzedany: false,
       dataSprzedazy: "",
+      addedBy: userRole === "owner" ? "Właściciel" : (getSessionStorageSafe("userName", "") || "Pracownik"),
+      addedDate: new Date().toISOString().split('T')[0],
+      shop: getSessionStorageSafe("shopName", "Kaufland Włocławek"),
     };
 
     const item = newItem.category === "telefon"
@@ -296,6 +376,31 @@ export default function MagazynPage() {
       : baseItem;
 
     setInventory([...inventory, item as any]);
+    
+    if (newItem.category === "telefon" && newItem.purchasePrice && parseFloat(newItem.purchasePrice) > 0) {
+      const employeeName = getSessionStorageSafe("userName", "Pracownik");
+      const employeeId = getSessionStorageSafe("userId", "unknown");
+      const shopName = getSessionStorageSafe("shopName", "Kaufland Włocławek");
+      
+      const cost: Cost = {
+        id: Math.random().toString(36).substr(2, 9),
+        date: new Date().toISOString().split('T')[0],
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        category: 'skup',
+        amount: parseFloat(newItem.purchasePrice),
+        description: `Skup: ${phoneName}`,
+        shop: shopName,
+        employeeId,
+        employeeName,
+        paymentMethod: 'gotowka'
+      };
+      
+      const existingCosts = getLocalStorageSafe('sprzedaz_costs', []);
+      localStorage.setItem('sprzedaz_costs', JSON.stringify([cost, ...existingCosts]));
+      
+      addToast({ message: `Koszt skupu dodany: ${newItem.purchasePrice} zł`, variant: "success" });
+    }
+    
     setNewItem({
       name: "",
       category: "akcesoria",
@@ -551,8 +656,7 @@ export default function MagazynPage() {
                           <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Stan</Label>
                           <Select value={newItem.condition} onValueChange={(val) => val && setNewItem({...newItem, condition: val})} items={[
                             { value: "nowy", label: "Nowy" },
-                            { value: "używany", label: "Używany" },
-                            { value: "powystawowy", label: "Powystawowy" }
+                            { value: "używany", label: "Używany" }
                           ]}>
                             <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl">
                               <SelectValue placeholder="Wybierz..." />
@@ -560,7 +664,6 @@ export default function MagazynPage() {
                             <SelectContent>
                               <SelectItem value="nowy">Nowy</SelectItem>
                               <SelectItem value="używany">Używany</SelectItem>
-                              <SelectItem value="powystawowy">Powystawowy</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -719,8 +822,7 @@ export default function MagazynPage() {
                           <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Stan</Label>
                           <Select value={editItem.condition} onValueChange={(val) => val && setEditItem({...editItem, condition: val})} items={[
                             { value: "nowy", label: "Nowy" },
-                            { value: "używany", label: "Używany" },
-                            { value: "powystawowy", label: "Powystawowy" }
+                            { value: "używany", label: "Używany" }
                           ]}>
                             <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl">
                               <SelectValue placeholder="Wybierz..." />
@@ -728,7 +830,6 @@ export default function MagazynPage() {
                             <SelectContent>
                               <SelectItem value="nowy">Nowy</SelectItem>
                               <SelectItem value="używany">Używany</SelectItem>
-                              <SelectItem value="powystawowy">Powystawowy</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1059,7 +1160,7 @@ export default function MagazynPage() {
           </div>
         )}
 
-        <div className="space-y-3">
+        <div className="space-y-1">
           {isMounted ? (
             <>
               {filteredItems.map((item, index) => {
@@ -1069,164 +1170,111 @@ export default function MagazynPage() {
               "Xiaomi": "from-slate-50 to-orange-50 border-l-orange-400",
             };
             const brandAccent = brandGradients[item.brand || ""] || "from-slate-50 to-slate-100 border-l-slate-300";
-            const conditionColors: Record<string, string> = {
-              "nowy": "bg-emerald-100 text-emerald-700",
-              "Nowy": "bg-emerald-100 text-emerald-700",
-              "używany": "bg-amber-100 text-amber-700",
-              "Używany": "bg-amber-100 text-amber-700",
-              "powystawowy": "bg-sky-100 text-sky-700",
-              "Powystawowy": "bg-sky-100 text-sky-700",
-            };
 
             return (
-            <Card key={index} className={cn(
-              "border-none shadow-sm hover:shadow-lg transition-all duration-300 rounded-2xl overflow-hidden bg-gradient-to-r border-l-4",
-              item.statusSprzedany ? "from-gray-50 to-gray-100 border-l-gray-300 opacity-75" : brandAccent
+            <div key={index} className={cn(
+              "flex items-center justify-between px-4 py-3 rounded-xl border-l-4 bg-gradient-to-r hover:shadow-md transition-all duration-200 group",
+              item.statusSprzedany ? "from-gray-50 to-gray-100 border-l-gray-300 opacity-70" : brandAccent
             )}>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      {item.category === "telefon" && (
-                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0">
-                          <Smartphone className="h-5 w-5 text-primary" />
-                        </div>
-                      )}
-                      {item.category === "akcesoria" && (
-                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-100 to-amber-50 flex items-center justify-center shrink-0">
-                          <Package className="h-5 w-5 text-amber-600" />
-                        </div>
-                      )}
-                      {item.category === "usluga" && (
-                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center shrink-0">
-                          <Settings className="h-5 w-5 text-blue-600" />
-                        </div>
-                      )}
-                      {item.category === "serwis" && (
-                        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-100 to-violet-50 flex items-center justify-center shrink-0">
-                          <Wrench className="h-5 w-5 text-violet-600" />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-sm text-foreground truncate tracking-tight">{item.name}</h3>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          {item.brand && (
-                            <span className="text-[11px] font-semibold text-muted-foreground">{item.brand}</span>
-                          )}
-                          {item.model && (
-                            <span className="text-[11px] text-muted-foreground">{item.model}</span>
-                          )}
-                        </div>
-                      </div>
-                      {item.alert && (
-                        <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 ml-auto" />
-                      )}
-                      {item.statusSprzedany && (
-                        <Badge variant="secondary" className="text-[9px] h-5 px-2 uppercase font-bold bg-emerald-100 text-emerald-700 border-none ml-auto">
-                          Sprzedany
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 ml-12">
-                      {item.category === "telefon" && (
-                        <>
-                          {item.memory && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md">
-                              {item.memory}
-                            </span>
-                          )}
-                          {item.color && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md">
-                              {item.color}
-                            </span>
-                          )}
-                          {item.battery && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md">
-                              🔋 {item.battery}
-                            </span>
-                          )}
-                          {item.condition && (
-                            <span className={cn(
-                              "inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-md",
-                              conditionColors[item.condition] || "bg-muted/50 text-muted-foreground"
-                            )}>
-                              {item.condition}
-                            </span>
-                          )}
-                        </>
-                      )}
-                      {item.category === "akcesoria" && (
-                        <span className="text-[11px] font-semibold uppercase tracking-tight text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md">Akcesoria</span>
-                      )}
-                      {item.category === "usluga" && (
-                        <span className="text-[11px] font-semibold uppercase tracking-tight text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Usługa</span>
-                      )}
-                      {item.category === "serwis" && (
-                        <span className="text-[11px] font-semibold uppercase tracking-tight text-violet-600 bg-violet-50 px-2 py-0.5 rounded-md">Serwis</span>
-                      )}
-                    </div>
-                    
-                    {item.imei && (
-                      <div className="flex items-center gap-1.5 mt-2 ml-12">
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">IMEI:</span>
-                        <code className="text-[11px] font-mono text-primary bg-primary/5 px-1.5 py-0.5 rounded cursor-pointer hover:bg-primary/10 transition-colors" onClick={() => item.imei && copyToClipboard(item.imei)}>
-                          {item.imei}
-                        </code>
-                        <Copy 
-                          className="h-3 w-3 text-muted-foreground cursor-pointer hover:text-primary transition-colors" 
-                          onClick={() => item.imei && copyToClipboard(item.imei)} 
-                        />
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    {item.category === "telefon" && (
-                      <span className="text-base font-bold text-foreground tracking-tight">{item.price}</span>
-                    )}
-                    {item.statusSprzedany ? (
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="flex items-center gap-1 text-emerald-600">
-                          <CheckCircle2 className="h-4 w-4" />
-                          <span className="text-[10px] font-bold uppercase">{item.dataSprzedazy}</span>
-                        </div>
-                        <button 
-                          onClick={() => { setPreviewItem(item); setIsPreviewDialogOpen(true); }}
-                          className="p-1.5 rounded-lg hover:bg-emerald-50 text-muted-foreground hover:text-emerald-600 transition-colors"
-                          title="Podgląd"
-                        >
-                          <List className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : item.category === "telefon" ? (
-                      <Badge variant={item.stock > 0 ? "default" : "destructive"} className="text-[10px] font-bold uppercase px-2">
-                        {item.stock > 0 ? `${item.stock} szt.` : "Brak"}
-                      </Badge>
-                    ) : null}
-                    
-                    {!item.statusSprzedany && userRole === "owner" && (
-                      <div className="flex items-center gap-0.5">
-                        <button 
-                          onClick={() => handleEditItem(index)}
-                          className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-                          title="Edytuj"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteItem(index)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors"
-                          title="Usuń"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className={cn(
+                  "h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-all",
+                  item.category === "telefon" && "bg-gradient-to-br from-primary/10 to-primary/5",
+                  item.category === "akcesoria" && "bg-gradient-to-br from-amber-100 to-amber-50",
+                  item.category === "usluga" && "bg-gradient-to-br from-blue-100 to-blue-50",
+                  item.category === "serwis" && "bg-gradient-to-br from-violet-100 to-violet-50"
+                )}>
+                  {item.category === "telefon" && <Smartphone className="h-4 w-4 text-primary" />}
+                  {item.category === "akcesoria" && <Package className="h-4 w-4 text-amber-600" />}
+                  {item.category === "usluga" && <Settings className="h-4 w-4 text-blue-600" />}
+                  {item.category === "serwis" && <Wrench className="h-4 w-4 text-violet-600" />}
                 </div>
-              </CardContent>
-            </Card>
+                
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <h3 className="font-semibold text-sm text-foreground truncate">{item.name}</h3>
+                  
+                  {item.category === "telefon" && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {item.condition && (
+                        <span className={cn(
+                          "text-[10px] font-bold px-1 py-0.5 rounded border",
+                          item.condition.toLowerCase() === "nowy" && "bg-emerald-50 text-emerald-700 border-emerald-200",
+                          item.condition.toLowerCase() === "używany" && "bg-amber-50 text-amber-700 border-amber-200",
+                          !["nowy", "używany"].includes(item.condition.toLowerCase()) && "bg-gray-50 text-gray-700 border-gray-200"
+                        )}>
+                          {item.condition.toLowerCase() === "nowy" ? "✨" :
+                           item.condition.toLowerCase() === "używany" ? "🔄" : "•"}
+                        </span>
+                      )}
+                      {item.memory && (
+                        <span className="text-[10px] font-medium text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">{item.memory}</span>
+                      )}
+                      {item.color && (
+                        <span className="text-[10px] font-medium text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded hidden sm:inline">{item.color}</span>
+                      )}
+                      {item.battery && (
+                        <span className="text-[10px] font-medium text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">🔋{item.battery}</span>
+                      )}
+                      {item.shop ? (
+                        <span className={cn(
+                          "text-[10px] font-bold px-1.5 py-0.5 rounded border",
+                          item.shop === getSessionStorageSafe("shopName", "")
+                            ? "bg-primary/10 text-primary border-primary/20"
+                            : "bg-amber-50 text-amber-700 border-amber-200"
+                        )}>
+                          📍{item.shop}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-gray-100 text-gray-600 border-gray-200">
+                          📍Brak danych
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  
+                  {item.statusSprzedany && (
+                    <Badge variant="secondary" className="text-[8px] h-4 px-1.5 uppercase font-bold bg-emerald-100 text-emerald-700 border-none shrink-0">
+                      Sprzedany
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                {item.category === "telefon" && (
+                  <span className="text-sm font-bold text-foreground tracking-tight min-w-[60px] text-right">{item.price}</span>
+                )}
+                
+                {!item.statusSprzedany && userRole === "owner" && (
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => handleEditItem(index)}
+                      className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                      title="Edytuj"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteItem(index)}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors"
+                      title="Usuń"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {item.statusSprzedany && (
+                  <button 
+                    onClick={() => { setPreviewItem(item); setIsPreviewDialogOpen(true); }}
+                    className="p-1.5 rounded-lg hover:bg-emerald-50 text-muted-foreground hover:text-emerald-600 transition-colors"
+                    title="Podgląd"
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
           )})}
           
           {filteredItems.length === 0 && (
