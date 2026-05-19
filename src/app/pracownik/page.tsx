@@ -236,7 +236,7 @@ export default function PracownikDashboard() {
                         </div>
                         <span className="text-[9px] font-black uppercase tracking-[0.15em] text-emerald-400/70">Kasa</span>
                       </div>
-                      <p className="text-2xl font-black text-white tabular-nums">{kasaDzis.toFixed(0)}</p>
+                      <p className="text-2xl font-black text-white tabular-nums">{cashSalesToday.toFixed(0)}</p>
                       <div className="h-0.5 w-12 bg-emerald-500/20 rounded-full" />
                     </div>
                   </div>
