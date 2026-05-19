@@ -161,7 +161,7 @@ export default function MagazynPage() {
     { name: "iPhone 11", category: "telefon", stock: 1, price: "1200 zł", alert: false, imei: "350123456789012", battery: "78%", color: "Purple", condition: "Używany", memory: "64GB", brand: "Apple", model: "11", purchasePrice: "900", taxType: "marża", purchaseDate: "2024-01-20", warranty: "3 m-ce", setIncludes: "kabel", notes: "Ślady użytkowania", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
 
     { name: "iPhone 16 Pro Max", category: "telefon", stock: 1, price: "5200 zł", alert: false, imei: "350987654321098", battery: "99%", color: "Desert Titanium", condition: "Nowy", memory: "512GB", brand: "Apple", model: "16 Pro Max", purchasePrice: "4500", taxType: "VAT", purchaseDate: "2024-06-01", warranty: "24 m-cy", setIncludes: "pełne pudełko", notes: "Folia na ekranie", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
-    { name: "Samsung S24 Ultra", category: "telefon", stock: 1, price: "4800 zł", alert: false, imei: "351098765432109", battery: "96%", color: "Titanium Gray", condition: "Nowy", memory: "256GB", brand: "Samsung", model: "S24 Ultra", purchasePrice: "4200", taxType: "VAT", purchaseDate: "2024-05-20", warranty: "24 m-cy", setIncludes: "pudełko, kabel, ładowarka, rysik", notes: "Folia na ekranie, pełne pudełko", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
+    { name: "Samsung S24 Ultra", category: "telefon", stock: 1, price: "4800 zł", alert: false, imei: "351098765432109", battery: "96%", color: "Titanium Gray", condition: "Używany", memory: "256GB", brand: "Samsung", model: "S24 Ultra", purchasePrice: "4200", taxType: "VAT", purchaseDate: "2024-05-20", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka, rysik", notes: "Bardzo zadbany, folia na ekranie", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
     { name: "iPhone 15", category: "telefon", stock: 1, price: "3800 zł", alert: false, imei: "352109876543210", battery: "94%", color: "Blue", condition: "Używany", memory: "128GB", brand: "Apple", model: "15", purchasePrice: "3200", taxType: "marża", purchaseDate: "2024-04-15", warranty: "9 m-cy", setIncludes: "pudełko, kabel", notes: "Lekkie ślady", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
     { name: "Xiaomi 14 Ultra", category: "telefon", stock: 1, price: "3600 zł", alert: false, imei: "353210987654321", battery: "91%", color: "White", condition: "Używany", memory: "512GB", brand: "Xiaomi", model: "14 Ultra", purchasePrice: "2900", taxType: "VAT", purchaseDate: "2024-03-25", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka, etui", notes: "Bardzo zadbany", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
     { name: "Samsung A54", category: "telefon", stock: 1, price: "1400 zł", alert: false, imei: "354321098765432", battery: "88%", color: "Lavender", condition: "Używany", memory: "128GB", brand: "Samsung", model: "A54", purchasePrice: "1100", taxType: "VAT", purchaseDate: "2024-02-18", warranty: "6 m-cy", setIncludes: "kabel", notes: "Normalne ślady", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
@@ -1164,12 +1164,7 @@ export default function MagazynPage() {
           {isMounted ? (
             <>
               {filteredItems.map((item, index) => {
-            const brandGradients: Record<string, string> = {
-              "Apple": "from-slate-50 to-blue-50 border-l-blue-400",
-              "Samsung": "from-slate-50 to-indigo-50 border-l-indigo-400",
-              "Xiaomi": "from-slate-50 to-orange-50 border-l-orange-400",
-            };
-            const brandAccent = brandGradients[item.brand || ""] || "from-slate-50 to-slate-100 border-l-slate-300";
+            const brandAccent = "from-slate-50 to-slate-100 border-l-primary";
 
             return (
             <div key={index} className={cn(
