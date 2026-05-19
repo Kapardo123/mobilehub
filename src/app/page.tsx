@@ -85,6 +85,7 @@ export default function Home() {
   // Prawdziwe obliczenia
   const kasaDzis = stanKasyPoprzedniegoDnia + cashSalesToday + doladowaniaToday;
   const sumaTotal = kasaDzis + cardSalesToday;
+  const dzienTotal = totalSalesToday - totalCostsToday;
   const zyskNetto = totalSalesToday - totalCostsToday + doladowaniaToday;
 
   useEffect(() => {
@@ -216,7 +217,7 @@ export default function Home() {
                       <CalendarIcon className="h-3.5 w-3.5 text-white/40 group-hover:text-white/60 transition-colors" />
                       <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-white/50">Dzień</span>
                     </div>
-                    <p className="text-2xl font-bold text-white tabular-nums">{totalSalesToday.toFixed(0)}</p>
+                    <p className="text-2xl font-bold text-white tabular-nums">{dzienTotal.toFixed(0)}</p>
                   </div>
 
                   <div className="bg-white/[0.04] border border-white/8 hover:border-white/15 rounded-xl p-4 transition-all group">

@@ -97,8 +97,8 @@ export default function PracownikDashboard() {
   const kasaDzis = stanKasyPoprzedniegoDnia + cashSalesToday + doladowaniaToday;
   const sumaTotal = kasaDzis + cardSalesToday;
   
-  // Dzień (sprzedaż + koszty)
-  const dzienTotal = totalSalesToday + totalCostsToday;
+  // Dzień (sprzedaż - koszty)
+  const dzienTotal = totalSalesToday - totalCostsToday;
   
   // Zysk
   const zyskNetto = totalSalesToday - totalCostsToday + doladowaniaToday;
