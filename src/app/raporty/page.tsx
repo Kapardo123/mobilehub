@@ -697,7 +697,7 @@ export default function RaportyPage() {
                         <div className="flex justify-between items-start mb-1">
                           <h3 className="font-black text-foreground group-hover:text-primary transition-colors">{emp.name}</h3>
                           <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/10 text-primary">
-                            {emp.shops[0]}
+                            {emp.shops?.[0] || 'Brak danych'}
                           </Badge>
                         </div>
                         <div className="grid grid-cols-2 gap-2 mt-2">
