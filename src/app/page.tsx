@@ -62,21 +62,21 @@ export default function Home() {
   
   // Koszty dzisiaj
   const todayCosts = costs.filter(c => c.date === today);
-  const totalCostsToday = todayCosts.reduce((sum, c) => sum + c.amount, 0);
-  
+  const totalCostsToday = todayCosts.reduce((sum: number, c) => sum + c.amount, 0);
+
   // Doładowania (zasilanie gotówką)
   const doladowaniaToday = todayCosts
     .filter(c => c.category === 'gotowka')
-    .reduce((sum, c) => sum + c.amount, 0);
+    .reduce((sum: number, c) => sum + c.amount, 0);
   
   // Sprzedaż dzisiaj
   const todaySales = sales.filter(s => s.date === today);
   const cashSalesToday = todaySales
     .filter(s => s.payment === 'gotówka')
-    .reduce((sum, s) => sum + s.items.reduce((itemSum, item) => itemSum + item.price, 0), 0);
+    .reduce((sum: number, s) => sum + s.items.reduce((itemSum: number, item: any) => itemSum + item.price, 0), 0);
   const cardSalesToday = todaySales
     .filter(s => s.payment === 'karta')
-    .reduce((sum, s) => sum + s.items.reduce((itemSum, item) => itemSum + item.price, 0), 0);
+    .reduce((sum: number, s) => sum + s.items.reduce((itemSum: number, item: any) => itemSum + item.price, 0), 0);
   const totalSalesToday = cashSalesToday + cardSalesToday;
   
   // Stan kasy z poprzedniego dnia (mock - można potem rozwinąć)

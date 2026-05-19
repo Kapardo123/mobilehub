@@ -2,7 +2,7 @@
 
 import { Navbar } from "@/components/navbar";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Search, Filter, User, Store, Clock, ShoppingCart, Package, Wrench, Settings } from "lucide-react";
+import { ArrowLeft, Search, Filter, User, Store, Clock, ShoppingCart, Package, Wrench, Settings, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 
 export interface Action {
   id: string;
-  type: "sprzedaz" | "przyjecie" | "serwis" | "edycja" | "logowanie" | "inna";
+  type: "sprzedaz" | "przyjecie" | "serwis" | "edycja" | "logowanie" | "inna" | "koszt";
   description: string;
   employeeName: string;
   employeeId: string;
@@ -38,6 +38,7 @@ const actionTypes = {
   edycja: { label: "Edycja", icon: Settings, color: "bg-purple-100 text-purple-700", bgColor: "bg-purple-50" },
   logowanie: { label: "Logowanie", icon: User, color: "bg-gray-100 text-gray-700", bgColor: "bg-gray-50" },
   inna: { label: "Inna", icon: Clock, color: "bg-primary/10 text-primary", bgColor: "bg-primary/5" },
+  koszt: { label: "Koszt", icon: DollarSign, color: "bg-red-100 text-red-700", bgColor: "bg-red-50" },
 };
 
 const defaultActions: Action[] = [];
