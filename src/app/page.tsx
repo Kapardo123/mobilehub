@@ -194,20 +194,18 @@ export default function Home() {
                   </div>
 
                   {/* Suma Kosztów - Red Alert */}
-                  {totalCostsToday > 0 && (
-                    <div className="relative overflow-hidden bg-gradient-to-r from-red-500/15 via-red-500/10 to-transparent border border-red-500/25 rounded-2xl px-5 py-3">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-red-500 rounded-l-2xl" />
-                      <div className="flex items-center justify-between pl-2">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-7 w-7 rounded-lg bg-red-500/20 flex items-center justify-center">
-                            <DollarSign className="h-4 w-4 text-red-400" />
-                          </div>
-                          <span className="text-xs font-bold uppercase tracking-wider text-red-300">Suma Kosztów</span>
+                  <div className="relative overflow-hidden bg-gradient-to-r from-red-500/15 via-red-500/10 to-transparent border border-red-500/25 rounded-2xl px-5 py-3">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-red-500 rounded-l-2xl" />
+                    <div className="flex items-center justify-between pl-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-lg bg-red-500/20 flex items-center justify-center">
+                          <DollarSign className="h-4 w-4 text-red-400" />
                         </div>
-                        <span className="text-xl font-black text-red-400 tabular-nums">-{totalCostsToday.toFixed(0)} zł</span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-red-300">Suma Kosztów</span>
                       </div>
+                      <span className="text-xl font-black text-red-400 tabular-nums">{totalCostsToday > 0 ? `-${totalCostsToday.toFixed(0)} zł` : '0 zł'}</span>
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* Dzień + Wpływy - Split Cards */}
