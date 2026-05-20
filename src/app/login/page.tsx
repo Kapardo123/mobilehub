@@ -170,19 +170,10 @@ export default function LoginPage() {
                         <span className="font-mono font-semibold">pracownik</span> / <span className="font-mono font-semibold">mobilehub</span> (JK)
                       </p>
                       <p className="text-muted-foreground text-[9px]">
-                        <span className="font-mono font-semibold">tomasz</span> / <span className="font-mono font-semibold">lewandowski</span> (TL)
-                      </p>
-                      <p className="text-muted-foreground text-[9px]">
-                        <span className="font-mono font-semibold">marta</span> / <span className="font-mono font-semibold">kowalczyk</span> (MK)
-                      </p>
-                      <p className="text-muted-foreground text-[9px]">
                         <span className="font-mono font-semibold">kamil</span> / <span className="font-mono font-semibold">nowicki</span> (KN)
                       </p>
                       <p className="text-muted-foreground text-[9px]">
                         <span className="font-mono font-semibold">anna</span> / <span className="font-mono font-semibold">nowak</span> (AN)
-                      </p>
-                      <p className="text-muted-foreground text-[9px]">
-                        <span className="font-mono font-semibold">pawel</span> / <span className="font-mono font-semibold">wisniewski</span> (PW)
                       </p>
                     </div>
                   </div>
