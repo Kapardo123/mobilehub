@@ -116,28 +116,31 @@ export default function RaportyPage() {
     let employeeData = savedEmployees;
     if (!employeeData || employeeData.length === 0) {
       employeeData = [
-        { id: "1", name: "Tomasz Lewandowski", initials: "TL", role: "employee", shop: "Kaufland Włocławek" },
-        { id: "2", name: "Marta Kowalczyk", initials: "MK", role: "employee", shop: "Riviera Gdynia" },
-        { id: "3", name: "Kamil Nowicki", initials: "KN", role: "employee", shop: "Dominikańska Wrocław" }
+        { id: "1", name: "Tomasz Lewandowski", initials: "TL", role: "Pracownik", shop: "Kaufland Włocławek" },
+        { id: "2", name: "Marta Kowalczyk", initials: "MK", role: "Pracownik", shop: "Riviera Gdynia" },
+        { id: "3", name: "Kamil Nowicki", initials: "KN", role: "Pracownik", shop: "Dominikańska Wrocław" }
       ];
     }
 
-    // Migracja: upewnij się że każdy pracownik ma pole shops
+    // Migracja: upewnij się że każdy pracownik ma pole shops i poprawną rolę
     employeeData = employeeData.map((emp: any) => {
+      // Zamień "employee" na "Pracownik"
+      const normalizedRole = emp.role === 'employee' ? 'Pracownik' : emp.role;
+      
       if (!emp.shops && !emp.shop) {
         // Spróbuj pobrać sklep z sessionStorage lub użyj domyślnej wartości
         const sessionShop = typeof window !== 'undefined' ? sessionStorage.getItem('shopName') : null;
-        return { ...emp, shop: sessionShop || 'Brak danych' };
+        return { ...emp, role: normalizedRole, shop: sessionShop || 'Brak danych' };
       }
       if (!emp.shops && emp.shop) {
         // Konwertuj shop (singular) na shops (array)
-        return { ...emp, shops: [emp.shop] };
+        return { ...emp, role: normalizedRole, shops: [emp.shop] };
       }
       if (typeof emp.shops === 'string') {
         // Konwersja string na array
-        return { ...emp, shops: [emp.shops] };
+        return { ...emp, role: normalizedRole, shops: [emp.shops] };
       }
-      return emp;
+      return { ...emp, role: normalizedRole };
     });
 
     setEmployees(employeeData);
@@ -760,7 +763,7 @@ export default function RaportyPage() {
                           {selectedEmployee.shops?.[0] || 'Brak danych'}
                         </Badge>
                         <span className="text-white/70 text-[10px] font-bold uppercase tracking-widest">
-                          {selectedEmployee.role === 'employee' ? 'Pracownik' : selectedEmployee.role}
+                          {selectedEmployee.role}
                         </span>
                       </div>
                     </div>
