@@ -111,7 +111,7 @@ export default function RaportyPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const savedEmployees = getLocalStorageSafe('pracownicy_employees', []);
-    
+
     // Add mock employees if none exists
     let employeeData = savedEmployees;
     if (!employeeData || employeeData.length === 0) {
@@ -121,7 +121,25 @@ export default function RaportyPage() {
         { id: "3", name: "Kamil Nowicki", initials: "KN", role: "employee", shop: "Dominikańska Wrocław" }
       ];
     }
-    
+
+    // Migracja: upewnij się że każdy pracownik ma pole shops
+    employeeData = employeeData.map((emp: any) => {
+      if (!emp.shops && !emp.shop) {
+        // Spróbuj pobrać sklep z sessionStorage lub użyj domyślnej wartości
+        const sessionShop = typeof window !== 'undefined' ? sessionStorage.getItem('shopName') : null;
+        return { ...emp, shop: sessionShop || 'Brak danych' };
+      }
+      if (!emp.shops && emp.shop) {
+        // Konwertuj shop (singular) na shops (array)
+        return { ...emp, shops: [emp.shop] };
+      }
+      if (typeof emp.shops === 'string') {
+        // Konwersja string na array
+        return { ...emp, shops: [emp.shops] };
+      }
+      return emp;
+    });
+
     setEmployees(employeeData);
     
     const savedSales = localStorage.getItem('sales');
