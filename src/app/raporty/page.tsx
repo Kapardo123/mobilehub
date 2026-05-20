@@ -356,8 +356,10 @@ export default function RaportyPage() {
     // First, initialize with all employees from employees list
     employees.forEach(emp => {
       if (emp.role.toLowerCase() !== 'właściciel') {
-        let employeeShops = emp.shops;
-        if (typeof employeeShops === 'string') {
+        let employeeShops = emp.shops || emp.shop;
+        if (!employeeShops) {
+          employeeShops = ['Brak danych'];
+        } else if (typeof employeeShops === 'string') {
           employeeShops = [employeeShops];
         }
         
