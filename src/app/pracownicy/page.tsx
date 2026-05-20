@@ -35,6 +35,11 @@ export default function PracownicyPage() {
     const role = getSessionStorageSafe("userRole", "");
     if (!role) {
       router.push("/login");
+      return;
+    }
+    if (role === "employee") {
+      router.push("/pracownik");
+      return;
     }
   }, [router]);
 

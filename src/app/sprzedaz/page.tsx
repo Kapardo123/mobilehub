@@ -32,7 +32,8 @@ import {
   ChevronDown,
   ChevronLeft,
   Filter,
-  FileDown
+  FileDown,
+  Users
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -282,6 +283,35 @@ export default function SprzedazPage() {
   });
   const [savedCustomers, setSavedCustomers] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [activeEmployees, setActiveEmployees] = useState<any[]>([]);
+  const [selectedEmployeeForSale, setSelectedEmployeeForSale] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const active = sessionStorage.getItem('activeEmployees');
+    if (active) {
+      const parsed = JSON.parse(active);
+      setActiveEmployees(parsed);
+      if (parsed.length > 0) {
+        const currentId = sessionStorage.getItem('selectedEmployeeId');
+        if (currentId) {
+          setSelectedEmployeeForSale(currentId);
+        } else {
+          setSelectedEmployeeForSale(parsed[0].id);
+        }
+      }
+    } else {
+      const singleEmployee = {
+        id: getSessionStorageSafe("userId", "unknown"),
+        name: getSessionStorageSafe("userName", "Pracownik"),
+        initials: getSessionStorageSafe("userInitials", "PR"),
+        shop: getSessionStorageSafe("shopName", "Sklep"),
+        shopId: getSessionStorageSafe("shopId", "unknown")
+      };
+      setActiveEmployees([singleEmployee]);
+      setSelectedEmployeeForSale(singleEmployee.id);
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -528,15 +558,23 @@ export default function SprzedazPage() {
       
       setSales(prev => [newSale, ...prev]);
       
+      const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForSale);
+      const employeeName = selectedEmp?.name || getSessionStorageSafe("userName", "Pracownik");
+      const employeeId = selectedEmp?.id || getSessionStorageSafe("userId", "unknown");
+      const shopName = selectedEmp?.shop || getSessionStorageSafe("shopName", "Sklep");
+      const shopId = selectedEmp?.shopId || getSessionStorageSafe("shopId", "unknown");
+      
+      const saleWithEmployee = {
+        ...newSale,
+        ini: selectedEmp?.initials || newEntry.ini || "PZ",
+        employeeName,
+        employeeId
+      };
+      
       const existingSales = getLocalStorageSafe('sprzedaz_sales', []);
-      localStorage.setItem('sprzedaz_sales', JSON.stringify([newSale, ...existingSales]));
+      localStorage.setItem('sprzedaz_sales', JSON.stringify([saleWithEmployee, ...existingSales]));
       
       addToast({ message: `Sprzedaż dodana (${newSale.items.length} pozycji)`, variant: "success" });
-      
-      const employeeName = getSessionStorageSafe("userName", "Pracownik");
-      const employeeId = getSessionStorageSafe("userId", "unknown");
-      const shopName = getSessionStorageSafe("shopName", "Sklep");
-      const shopId = getSessionStorageSafe("shopId", "unknown");
       
       addAction({
         type: "sprzedaz",
@@ -588,8 +626,9 @@ export default function SprzedazPage() {
       return;
     }
     
-    const employeeName = getSessionStorageSafe("userName", "Pracownik");
-    const employeeId = getSessionStorageSafe("userId", "unknown");
+    const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForSale);
+    const employeeName = selectedEmp?.name || getSessionStorageSafe("userName", "Pracownik");
+    const employeeId = selectedEmp?.id || getSessionStorageSafe("userId", "unknown");
     
     const cost: Cost = {
       id: Math.random().toString(36).substr(2, 9),
@@ -993,6 +1032,29 @@ export default function SprzedazPage() {
                       </UISelectContent>
                     </UISelect>
                   </div>
+
+                  {activeEmployees.length > 1 && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5" />
+                        Pracownik
+                      </Label>
+                      <UISelect value={selectedEmployeeForSale} onValueChange={(value) => setSelectedEmployeeForSale(value || "")}>
+                        <UISelectTrigger className="h-12 rounded-xl bg-accent/30 border-none font-bold text-sm">
+                          <UISelectValue placeholder="Wybierz pracownika...">
+                            {selectedEmployeeForSale ? String(activeEmployees.find((e: any) => e.id === selectedEmployeeForSale)?.name || selectedEmployeeForSale) : "Wybierz pracownika..."}
+                          </UISelectValue>
+                        </UISelectTrigger>
+                        <UISelectContent>
+                          {activeEmployees.map((emp: any) => (
+                            <UISelectItem key={emp.id} value={emp.id} className="font-semibold">
+                              {String(emp.name || emp.id)}
+                            </UISelectItem>
+                          ))}
+                        </UISelectContent>
+                      </UISelect>
+                    </div>
+                  )}
                 </div>
 
                 <DialogFooter className="gap-3 mt-6">
@@ -1843,6 +1905,29 @@ export default function SprzedazPage() {
                 onChange={(e) => setNewEntry({...newEntry, comment: e.target.value})}
               />
             </div>
+
+            {activeEmployees.length > 1 && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" />
+                  Pracownik
+                </Label>
+                <UISelect value={selectedEmployeeForSale} onValueChange={(value) => setSelectedEmployeeForSale(value || "")}>
+                  <UISelectTrigger className="bg-accent/30 border-none h-12 rounded-xl font-bold">
+                    <UISelectValue placeholder="Wybierz pracownika...">
+                      {selectedEmployeeForSale ? String(activeEmployees.find((e: any) => e.id === selectedEmployeeForSale)?.name || selectedEmployeeForSale) : "Wybierz pracownika..."}
+                    </UISelectValue>
+                  </UISelectTrigger>
+                  <UISelectContent>
+                    {activeEmployees.map((emp: any) => (
+                      <UISelectItem key={emp.id} value={emp.id} className="font-semibold">
+                        {String(emp.name || emp.id)}
+                      </UISelectItem>
+                    ))}
+                  </UISelectContent>
+                </UISelect>
+              </div>
+            )}
 
             <div className="space-y-3">
               <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Metoda Płatności</Label>

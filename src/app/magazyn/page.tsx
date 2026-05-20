@@ -38,7 +38,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   List,
-  Copy
+  Copy,
+  Users
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -127,6 +128,35 @@ export default function MagazynPage() {
     statusSprzedany: false,
     dataSprzedazy: "",
   });
+
+  const [activeEmployees, setActiveEmployees] = useState<any[]>([]);
+  const [selectedEmployeeForItem, setSelectedEmployeeForItem] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const active = sessionStorage.getItem('activeEmployees');
+    if (active) {
+      const parsed = JSON.parse(active);
+      setActiveEmployees(parsed);
+      if (parsed.length > 0) {
+        const currentId = sessionStorage.getItem('selectedEmployeeId');
+        if (currentId) {
+          setSelectedEmployeeForItem(currentId);
+        } else {
+          setSelectedEmployeeForItem(parsed[0].id);
+        }
+      }
+    } else {
+      const singleEmployee = {
+        id: getSessionStorageSafe("userId", "unknown"),
+        name: getSessionStorageSafe("userName", "Pracownik"),
+        initials: getSessionStorageSafe("userInitials", "PR"),
+        shop: getSessionStorageSafe("shopName", "Sklep")
+      };
+      setActiveEmployees([singleEmployee]);
+      setSelectedEmployeeForItem(singleEmployee.id);
+    }
+  }, []);
   const [newItem, setNewItem] = useState({
     name: "",
     category: "akcesoria",
@@ -352,9 +382,15 @@ export default function MagazynPage() {
       sellingDate: newItem.sellingDate || "",
       statusSprzedany: false,
       dataSprzedazy: "",
-      addedBy: userRole === "owner" ? "Właściciel" : (getSessionStorageSafe("userName", "") || "Pracownik"),
+      addedBy: (() => {
+        const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForItem);
+        return selectedEmp?.name || (userRole === "owner" ? "Właściciel" : (getSessionStorageSafe("userName", "") || "Pracownik"));
+      })(),
       addedDate: new Date().toISOString().split('T')[0],
-      shop: getSessionStorageSafe("shopName", "Kaufland Włocławek"),
+      shop: (() => {
+        const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForItem);
+        return selectedEmp?.shop || getSessionStorageSafe("shopName", "Kaufland Włocławek");
+      })(),
     };
 
     const item = newItem.category === "telefon"
@@ -378,9 +414,10 @@ export default function MagazynPage() {
     setInventory([...inventory, item as any]);
     
     if (newItem.category === "telefon" && newItem.purchasePrice && parseFloat(newItem.purchasePrice) > 0) {
-      const employeeName = getSessionStorageSafe("userName", "Pracownik");
-      const employeeId = getSessionStorageSafe("userId", "unknown");
-      const shopName = getSessionStorageSafe("shopName", "Kaufland Włocławek");
+      const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForItem);
+      const employeeName = selectedEmp?.name || getSessionStorageSafe("userName", "Pracownik");
+      const employeeId = selectedEmp?.id || getSessionStorageSafe("userId", "unknown");
+      const shopName = selectedEmp?.shop || getSessionStorageSafe("shopName", "Kaufland Włocławek");
       
       const cost: Cost = {
         id: Math.random().toString(36).substr(2, 9),
@@ -716,6 +753,30 @@ export default function MagazynPage() {
                       </div>
                     )}
                   </div>
+
+                  {activeEmployees.length > 1 && (
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5" />
+                        Pracownik
+                      </Label>
+                      <Select value={selectedEmployeeForItem} onValueChange={(value) => setSelectedEmployeeForItem(value || "")}>
+                        <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-sm">
+                          <SelectValue placeholder="Wybierz pracownika...">
+                            {selectedEmployeeForItem ? String(activeEmployees.find((e: any) => e.id === selectedEmployeeForItem)?.name || selectedEmployeeForItem) : "Wybierz pracownika..."}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {activeEmployees.map((emp: any) => (
+                            <SelectItem key={emp.id} value={emp.id} className="font-semibold">
+                              {String(emp.name || emp.id)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <DialogFooter className="p-8 pt-0 shrink-0">
                     <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="rounded-xl border-primary/10">Anuluj</Button>
                     <Button onClick={handleAddItem} className="rounded-xl bg-primary hover:bg-primary/90 text-white">Dodaj</Button>

@@ -76,6 +76,11 @@ export default function RaportyPage() {
     const role = getSessionStorageSafe("userRole", "");
     if (!role) {
       router.push("/login");
+      return;
+    }
+    if (role === "employee") {
+      router.push("/pracownik");
+      return;
     }
     setUserRole(role);
   }, [router]);
