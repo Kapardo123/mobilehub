@@ -737,7 +737,7 @@ export default function RaportyPage() {
                       <DialogTitle className="text-2xl font-black mb-1">{selectedEmployee.name}</DialogTitle>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="bg-white/10 text-white border-none px-2 py-0.5 font-black text-[9px] uppercase">
-                          {selectedEmployee.shops[0]}
+                          {selectedEmployee.shops?.[0] || 'Brak danych'}
                         </Badge>
                         <span className="text-white/70 text-[10px] font-bold uppercase tracking-widest">
                           {selectedEmployee.role}
