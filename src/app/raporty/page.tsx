@@ -760,7 +760,7 @@ export default function RaportyPage() {
                           {selectedEmployee.shops?.[0] || 'Brak danych'}
                         </Badge>
                         <span className="text-white/70 text-[10px] font-bold uppercase tracking-widest">
-                          {selectedEmployee.role}
+                          {selectedEmployee.role === 'employee' ? 'Pracownik' : selectedEmployee.role}
                         </span>
                       </div>
                     </div>
