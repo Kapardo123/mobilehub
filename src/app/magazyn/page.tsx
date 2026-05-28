@@ -46,6 +46,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useLocalStorage, useSessionStorage, getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
 import { formatDatePL, getCurrentDatePL, getCurrentTimePL, toISODateString } from "@/lib/dateFormat";
+import { inventoryService } from "@/lib/supabase/inventory";
 import {
   Select,
   SelectContent,
@@ -302,6 +303,62 @@ export default function MagazynPage() {
       console.log('Magazyn: ✅ Użytkownik zalogowany, rola:', userRole);
     }
   }, [userRole, router, isMounted, isSessionChecked]);
+
+  useEffect(() => {
+    if (!isMounted || !userRole || typeof window === "undefined") return;
+
+    const loadInventoryFromSupabase = async () => {
+      try {
+        const shopId = getSessionStorageSafe("shopId", "");
+        console.log('Magazyn: Ładowanie danych z Supabase, shopId:', shopId);
+
+        let supabaseData;
+        if (shopId) {
+          supabaseData = await inventoryService.getByShop(shopId);
+        } else {
+          supabaseData = await inventoryService.getAll();
+        }
+
+        console.log('Magazyn: Pobrano', supabaseData.length, 'pozycji z Supabase');
+
+        if (supabaseData.length > 0) {
+          const mappedItems = supabaseData.map(item => ({
+            id: item.id,
+            name: item.name || '',
+            category: item.category || 'telefon',
+            stock: item.stock_quantity || 1,
+            price: item.selling_price ? `${item.selling_price} zł` : '',
+            alert: item.is_low_stock || false,
+            imei: item.imei || '',
+            battery: item.battery_health || '',
+            color: item.color || '',
+            condition: item.condition === 'nowy' ? 'Nowy' : item.condition === 'uzywany' ? 'Używany' : 'Używany',
+            memory: item.memory || '',
+            brand: item.brand || '',
+            model: item.model || '',
+            purchasePrice: item.purchase_price?.toString() || '',
+            taxType: item.tax_type === 'VAT' ? 'VAT' : 'marża',
+            purchaseDate: item.purchase_date || '',
+            warranty: item.warranty_months ? `${item.warranty_months} m-cy` : '',
+            setIncludes: item.set_includes || '',
+            notes: item.notes || '',
+            statusSprzedany: item.is_sold || false,
+            dataSprzedazy: item.sold_at || '',
+            shop: ''
+          }));
+
+          setInventory(mappedItems as any);
+          localStorage.setItem('magazyn_inventory', JSON.stringify(mappedItems));
+          window.dispatchEvent(new CustomEvent('magazyn_updated'));
+          console.log('Magazyn: ✅ Zaktualizowano magazyn danymi z Supabase');
+        }
+      } catch (error) {
+        console.error('Magazyn: Błąd ładowania z Supabase:', error);
+      }
+    };
+
+    loadInventoryFromSupabase();
+  }, [isMounted, userRole]);
 
   const filteredItems = useMemo(() => {
     let items = [...inventory];
