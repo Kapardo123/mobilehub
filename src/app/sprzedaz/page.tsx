@@ -68,6 +68,7 @@ import { shopsService } from "@/lib/supabase/shops";
 import { salesService } from "@/lib/supabase/sales";
 import { invoicesService, invoiceItemsService } from "@/lib/supabase/invoices";
 import { customersService } from "@/lib/supabase/customers";
+import { inventoryService } from "@/lib/supabase/inventory";
 import { formatDatePL, getCurrentDatePL, getCurrentTimePL, toISODateString } from "@/lib/dateFormat";
 
 export default function SprzedazPage() {
@@ -432,6 +433,81 @@ export default function SprzedazPage() {
     };
     loadSavedCustomers();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !isMounted) return;
+
+    const loadInventoryFromSupabase = async () => {
+      try {
+        const shopId = getSessionStorageSafe("shopId", "");
+        console.log('Sprzedaż: Ładowanie magazynu z Supabase, shopId:', shopId);
+
+        let supabaseData;
+        if (shopId) {
+          supabaseData = await inventoryService.getByShop(shopId);
+        } else {
+          supabaseData = await inventoryService.getAll();
+        }
+
+        console.log('Sprzedaż: Pobrano', supabaseData.length, 'pozycji z Supabase');
+
+        if (supabaseData.length > 0) {
+          const mappedItems = supabaseData.map((item: any) => ({
+            id: item.id,
+            name: item.name || '',
+            category: item.category || 'telefon',
+            stock: item.stock_quantity || 1,
+            price: item.selling_price ? `${item.selling_price} zł` : '',
+            alert: item.is_low_stock || false,
+            imei: item.imei || '',
+            battery: item.battery_health || '',
+            color: item.color || '',
+            condition: item.condition === 'nowy' ? 'Nowy' : item.condition === 'uzywany' ? 'Używany' : 'Używany',
+            memory: item.memory || '',
+            brand: item.brand || '',
+            model: item.model || '',
+            purchasePrice: item.purchase_price?.toString() || '',
+            taxType: item.tax_type === 'VAT' ? 'VAT' : 'marża',
+            purchaseDate: item.purchase_date || '',
+            warranty: item.warranty_months ? `${item.warranty_months} m-cy` : '',
+            setIncludes: item.set_includes || '',
+            notes: item.notes || '',
+            statusSprzedany: item.is_sold || false,
+            dataSprzedazy: item.sold_at || '',
+            shop: ''
+          }));
+
+          localStorage.setItem('magazyn_inventory', JSON.stringify(mappedItems));
+
+          const availablePhones = mappedItems.filter((item: any) =>
+            item.category === "telefon" && !item.statusSprzedany
+          );
+          const availableUslugi = mappedItems.filter((item: any) =>
+            item.category === "usluga"
+          );
+          const availableSerwisy = mappedItems.filter((item: any) =>
+            item.category === "serwis"
+          );
+          const availableAkcesoria = mappedItems.filter((item: any) =>
+            item.category === "akcesoria"
+          );
+
+          setWarehousePhones(availablePhones);
+          setWarehouseUslugi(availableUslugi);
+          setWarehouseSerwisy(availableSerwisy);
+          setWarehouseAkcesoria(availableAkcesoria);
+
+          console.log('Sprzedaż: ✅ Załadowano telefony:', availablePhones.length, '| Usługi:', availableUslugi.length, '| Serwisy:', availableSerwisy.length, '| Akcesoria:', availableAkcesoria.length);
+        } else {
+          console.log('Sprzedaż: ⚠️ Brak danych w Supabase - używam localStorage');
+        }
+      } catch (error) {
+        console.error('Sprzedaż: Błąd ładowania magazynu:', error);
+      }
+    };
+
+    loadInventoryFromSupabase();
+  }, [isMounted]);
 
   // Load sales from localStorage
   useEffect(() => {
