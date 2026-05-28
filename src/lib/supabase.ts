@@ -9,10 +9,30 @@ if (!supabaseUrl || !supabaseAnonKey) {
   }
 }
 
-export const supabase = createClient(
-  supabaseUrl || '',
-  supabaseAnonKey || ''
-);
+let _client: ReturnType<typeof createClient> | null = null;
+
+function createSupabaseClient() {
+  if (!_client) {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error(
+        'Brak konfiguracji Supabase. Ustaw NEXT_PUBLIC_SUPABASE_URL i NEXT_PUBLIC_SUPABASE_ANON_KEY'
+      );
+    }
+    _client = createClient(supabaseUrl, supabaseAnonKey);
+  }
+  return _client;
+}
+
+export const supabase = new Proxy({} as any, {
+  get(_, prop) {
+    const client = createSupabaseClient();
+    const value = (client as any)[prop];
+    if (typeof value === 'function') {
+      return value.bind(client);
+    }
+    return value;
+  }
+});
 
 export type Database = {
   public: {
@@ -647,12 +667,14 @@ export type Database = {
       };
       user_shops: {
         Row: {
+          id: string;
           user_id: string;
           shop_id: string;
           is_primary: boolean;
           created_at: string;
         };
         Insert: {
+          id?: string;
           user_id: string;
           shop_id: string;
           is_primary?: boolean;
@@ -662,11 +684,3 @@ export type Database = {
     };
   };
 };
-
-export type Sale = Database['public']['Tables']['sales']['Row'];
-export type Cost = Database['public']['Tables']['costs']['Row'];
-export type Customer = Database['public']['Tables']['customers']['Row'];
-export type Invoice = Database['public']['Tables']['invoices']['Row'];
-export type CashRegisterClosing = Database['public']['Tables']['cash_register_closings']['Row'];
-
-export * from './supabase/index';
