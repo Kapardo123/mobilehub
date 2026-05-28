@@ -40,6 +40,7 @@ interface SaleItem {
 interface Sale {
   id: string;
   ini: string;
+  employeeId?: string;
   payment: string;
   date: string;
   time: string;
@@ -66,10 +67,17 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import { shopsService } from "@/lib/supabase/shops";
+import { salesService } from "@/lib/supabase/sales";
+import { formatDatePL, toISODateString } from "@/lib/dateFormat";
+import { costsService } from "@/lib/supabase/costs";
+import { inventoryService } from "@/lib/supabase/inventory";
+import { usersService } from "@/lib/supabase/users";
 
 export default function RaportyPage() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -78,23 +86,42 @@ export default function RaportyPage() {
       router.push("/login");
       return;
     }
-    if (role === "employee") {
-      router.push("/pracownik");
-      return;
-    }
     setUserRole(role);
+    setIsMounted(true);
   }, [router]);
 
-  const [activeTab, setActiveTab] = useState<'sklepy' | 'pracownicy'>('sklepy');
+  const currentUserRole = isMounted ? userRole : null;
+  const currentShopId = isMounted ? getSessionStorageSafe("shopId", "") : "";
+  const currentShopName = isMounted ? getSessionStorageSafe("shopName", "") : "";
+  const currentUserId = isMounted ? getSessionStorageSafe("userId", "") : "";
+  const isEmployee = currentUserRole === 'employee';
+
+  console.log('🔐 Stan sesji raportów:', {
+    isMounted,
+    currentUserRole,
+    isEmployee,
+    currentUserId,
+    currentShopId,
+    currentShopName,
+    isUUID: currentShopId?.includes('-'),
+    shopIdLength: currentShopId?.length
+  });
+
+  const [activeTab, setActiveTab] = useState<'sklepy' | 'pracownicy'>(isEmployee ? 'pracownicy' : 'sklepy');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedShop, setSelectedShop] = useState<string>('all');
+  
+  // Zmienna pomocnicza dla UI (string ID)
+  const shopIdForUI = isEmployee ? currentShopName : selectedShop;
+  
+  // Zmienna dla API (UUID - będzie ustawiona w useEffect)
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [isEmployeeDetailsOpen, setIsEmployeeDetailsOpen] = useState(false);
   const [employees, setEmployees] = useState<any[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
-  const [isMounted, setIsMounted] = useState(false);
+  const [costs, setCosts] = useState<any[]>([]);
   const [showPurchasedPhones, setShowPurchasedPhones] = useState<string | null>(null);
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
   const [visiblePhoneCount, setVisiblePhoneCount] = useState(5);
@@ -106,207 +133,332 @@ export default function RaportyPage() {
 
   const daysOfWeek = ["niedziela", "poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota"];
 
+  const [shopsList, setShopsList] = useState<any[]>([]);
+  
   const shops = [
-    { id: "all", label: "Wszystkie sklepy" },
-    { id: "kaufland-wloclawek", label: "Kaufland Włocławek" },
-    { id: "riviera-gdynia", label: "Riviera Gdynia" },
-    { id: "dominikanska-wroclaw", label: "Dominikańska Wrocław" }
+    { id: "all", label: "Wszystkie sklepy", uuid: null },
+    { id: "kaufland-wloclawek", label: "Kaufland Włocławek", uuid: null },
+    { id: "riviera-gdynia", label: "Riviera Gdynia", uuid: null },
+    { id: "dominikanska-wroclaw", label: "Dominikańska Wrocław", uuid: null }
   ];
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const savedEmployees = getLocalStorageSafe('pracownicy_employees', []);
-
-    // Add mock employees if none exists
-    let employeeData = savedEmployees;
-    if (!employeeData || employeeData.length === 0) {
-      employeeData = [
-        { id: "1", name: "Tomasz Lewandowski", initials: "TL", role: "Pracownik", shop: "Kaufland Włocławek" },
-        { id: "2", name: "Marta Kowalczyk", initials: "MK", role: "Pracownik", shop: "Riviera Gdynia" },
-        { id: "3", name: "Kamil Nowicki", initials: "KN", role: "Pracownik", shop: "Dominikańska Wrocław" }
-      ];
-    }
-
-    // Migracja: upewnij się że każdy pracownik ma pole shops i poprawną rolę
-    employeeData = employeeData.map((emp: any) => {
-      // Zamień "employee" na "Pracownik"
-      const normalizedRole = emp.role === 'employee' ? 'Pracownik' : emp.role;
-      
-      if (!emp.shops && !emp.shop) {
-        // Spróbuj pobrać sklep z sessionStorage lub użyj domyślnej wartości
-        const sessionShop = typeof window !== 'undefined' ? sessionStorage.getItem('shopName') : null;
-        return { ...emp, role: normalizedRole, shop: sessionShop || 'Brak danych' };
-      }
-      if (!emp.shops && emp.shop) {
-        // Konwertuj shop (singular) na shops (array)
-        return { ...emp, role: normalizedRole, shops: [emp.shop] };
-      }
-      if (typeof emp.shops === 'string') {
-        // Konwersja string na array
-        return { ...emp, role: normalizedRole, shops: [emp.shops] };
-      }
-      return { ...emp, role: normalizedRole };
-    });
-
-    setEmployees(employeeData);
     
-    const savedSales = localStorage.getItem('sales');
-    if (savedSales) {
-      setSales(JSON.parse(savedSales));
-    } else {
-      // Mock sales data if none exists
-      const mockSales = [
-        { id: "s1", ini: "TL", payment: "gotówka", date: "2026-05-13", time: "10:30", items: [ { cat: "telefon", name: "iPhone 15 Pro", price: 4500, profit: 700, imei: "351234567890123" }, { cat: "akcesoria", name: "Szkło hartowane iPhone 15", price: 49, profit: 20 }, { cat: "akcesoria", name: "Etui MagSafe iPhone 14", price: 129, profit: 50 } ], shop: "Kaufland Włocławek" },
-        { id: "s2", ini: "MK", payment: "karta", date: "2026-05-13", time: "11:15", items: [ { cat: "telefon", name: "Samsung S23 Ultra", price: 3200, profit: 600, imei: "354455667788990" }, { cat: "akcesoria", name: "Kabel USB-C", price: 49, profit: 15 } ], shop: "Riviera Gdynia" },
-        { id: "s3", ini: "KN", payment: "gotówka", date: "2026-05-12", time: "12:00", items: [ { cat: "serwis", name: "Wymiana szybki", price: 150, profit: 80 }, { cat: "serwis", name: "Diagnostyka", price: 50, profit: 40 } ], shop: "Dominikańska Wrocław" },
-        { id: "s4", ini: "TL", payment: "karta", date: "2026-05-11", time: "13:30", items: [ { cat: "telefon", name: "iPhone 14 Pro Max", price: 4200, profit: 700, imei: "356789012345678" }, { cat: "akcesoria", name: "Ładowarka 20W", price: 99, profit: 30 }, { cat: "akcesoria", name: "Kabel USB-C Lightning", price: 79, profit: 25 }, { cat: "usluga", name: "Konfiguracja telefonu", price: 50, profit: 40 } ], shop: "Kaufland Włocławek" },
-        { id: "s5", ini: "MK", payment: "gotówka", date: "2026-05-10", time: "14:20", items: [ { cat: "telefon", name: "Xiaomi 13 Pro", price: 2800, profit: 600, imei: "357890123456789" } ], shop: "Riviera Gdynia" },
-        { id: "s6", ini: "KN", payment: "karta", date: "2026-05-09", time: "15:45", items: [ { cat: "akcesoria", name: "Powerbank 10000mAh", price: 149, profit: 50 }, { cat: "akcesoria", name: "Słuchawki Bluetooth", price: 199, profit: 70 }, { cat: "akcesoria", name: "Uchwyt samochodowy", price: 59, profit: 20 } ], shop: "Dominikańska Wrocław" },
-        { id: "s7", ini: "TL", payment: "gotówka", date: "2026-05-08", time: "16:10", items: [ { cat: "serwis", name: "Wymiana baterii", price: 120, profit: 60 }, { cat: "serwis", name: "Polerowanie obudowy", price: 80, profit: 50 } ], shop: "Kaufland Włocławek" },
-        { id: "s8", ini: "MK", payment: "karta", date: "2026-05-07", time: "10:00", items: [ { cat: "telefon", name: "iPhone 12 Mini", price: 1600, profit: 300, imei: "358901234567890" }, { cat: "akcesoria", name: "Etui iPhone 13 Pro", price: 99, profit: 35 } ], shop: "Riviera Gdynia" },
-        { id: "s9", ini: "KN", payment: "gotówka", date: "2026-05-06", time: "11:30", items: [ { cat: "serwis", name: "Naprawa gniazda ładowania", price: 180, profit: 100 }, { cat: "serwis", name: "Wymiana wyświetlacza OLED", price: 350, profit: 180 } ], shop: "Dominikańska Wrocław" },
-        { id: "s10", ini: "TL", payment: "karta", date: "2026-05-05", time: "13:00", items: [ { cat: "telefon", name: "Samsung S22", price: 1900, profit: 400, imei: "359012345678901" }, { cat: "akcesoria", name: "Szkło Samsung S22", price: 39, profit: 15 }, { cat: "usluga", name: "Transfer danych", price: 80, profit: 60 } ], shop: "Kaufland Włocławek" }
-      ];
-      setSales(mockSales);
-    }
-    
-    // Load inventory data for skup stats
-    const savedInventory = localStorage.getItem('magazyn_inventory');
-    let inventoryData = [];
-    
-    if (savedInventory) {
-      inventoryData = JSON.parse(savedInventory);
-    }
-    
-    // Add mock data for demonstration - always add if employee has less than 10 phones
-    const jkPhones = inventoryData.filter((item: any) => 
-      item.category === "telefon" && (item.addedBy === "TL" || item.addedBy === "MK" || item.addedBy === "KN")
-    );
-    
-    const totalPhones = jkPhones.length;
-    
-    if (totalPhones < 10) {
-      const mockInventory = [
-        { 
-          name: "iPhone 15 Pro", category: "telefon", stock: 1, price: "4500 zł", alert: false, 
-          imei: "351234567890123", battery: "100%", color: "Natural Titanium", condition: "Nowy", 
-          memory: "256GB", brand: "Apple", model: "15 Pro", purchasePrice: "3800", taxType: "marża",
-          purchaseDate: "2026-05-13", warranty: "12 m-cy", statusSprzedany: false,
-          addedBy: "TL", addedDate: "2026-05-13"
-        },
-        { 
-          name: "Samsung S23 Ultra", category: "telefon", stock: 1, price: "3200 zł", alert: false,
-          imei: "354455667788990", battery: "95%", color: "Phantom Black", condition: "Używany",
-          memory: "512GB", brand: "Samsung", model: "S23 Ultra", purchasePrice: "2600", taxType: "VAT",
-          purchaseDate: "2026-05-12", warranty: "6 m-cy", statusSprzedany: false,
-          addedBy: "MK", addedDate: "2026-05-12"
-        },
-        { 
-          name: "iPhone 14 Pro Max", category: "telefon", stock: 1, price: "4200 zł", alert: false,
-          imei: "356789012345678", battery: "97%", color: "Deep Purple", condition: "Używany",
-          memory: "256GB", brand: "Apple", model: "14 Pro Max", purchasePrice: "3500", taxType: "marża",
-          purchaseDate: "2026-05-11", warranty: "6 m-cy", statusSprzedany: true, dataSprzedazy: "2026-05-15",
-          addedBy: "KN", addedDate: "2026-05-11"
-        },
-        { 
-          name: "Google Pixel 8 Pro", category: "telefon", stock: 1, price: "3800 zł", alert: false,
-          imei: "360123456789012", battery: "98%", color: "Porcelain", condition: "Nowy",
-          memory: "256GB", brand: "Google", model: "Pixel 8 Pro", purchasePrice: "3200", taxType: "VAT",
-          purchaseDate: "2026-05-17", warranty: "24 m-ce", statusSprzedany: false,
-          addedBy: "TL", addedDate: "2026-05-17"
-        },
-        { 
-          name: "OnePlus 12", category: "telefon", stock: 1, price: "3500 zł", alert: false,
-          imei: "361234567890123", battery: "96%", color: "Flowy Emerald", condition: "Nowy",
-          memory: "512GB", brand: "OnePlus", model: "12", purchasePrice: "2900", taxType: "marża",
-          purchaseDate: "2026-05-16", warranty: "24 m-ce", statusSprzedany: false,
-          addedBy: "MK", addedDate: "2026-05-16"
-        },
-        { 
-          name: "Samsung S24 Ultra", category: "telefon", stock: 1, price: "5200 zł", alert: false,
-          imei: "362345678901234", battery: "99%", color: "Titanium Black", condition: "Nowy",
-          memory: "512GB", brand: "Samsung", model: "S24 Ultra", purchasePrice: "4500", taxType: "VAT",
-          purchaseDate: "2026-05-15", warranty: "24 m-ce", statusSprzedany: false,
-          addedBy: "KN", addedDate: "2026-05-15"
-        },
-        { 
-          name: "iPhone 15 Pro Max", category: "telefon", stock: 1, price: "5800 zł", alert: false,
-          imei: "363456789012345", battery: "100%", color: "Blue Titanium", condition: "Nowy",
-          memory: "256GB", brand: "Apple", model: "15 Pro Max", purchasePrice: "5100", taxType: "marża",
-          purchaseDate: "2026-05-14", warranty: "24 m-ce", statusSprzedany: false,
-          addedBy: "TL", addedDate: "2026-05-14"
-        },
-        { 
-          name: "Xiaomi 14 Ultra", category: "telefon", stock: 1, price: "4200 zł", alert: false,
-          imei: "364567890123456", battery: "94%", color: "Black", condition: "Używany",
-          memory: "512GB", brand: "Xiaomi", model: "14 Ultra", purchasePrice: "3400", taxType: "VAT",
-          purchaseDate: "2026-05-13", warranty: "12 m-cy", statusSprzedany: false,
-          addedBy: "MK", addedDate: "2026-05-13"
-        },
-        { 
-          name: "iPhone 13 Mini", category: "telefon", stock: 1, price: "2200 zł", alert: false,
-          imei: "365678901234567", battery: "88%", color: "Starlight", condition: "Używany",
-          memory: "128GB", brand: "Apple", model: "13 Mini", purchasePrice: "1800", taxType: "marża",
-          purchaseDate: "2026-05-10", warranty: "6 m-cy", statusSprzedany: true, dataSprzedazy: "2026-05-16",
-          addedBy: "KN", addedDate: "2026-05-10"
-        },
-        { 
-          name: "Samsung Z Fold5", category: "telefon", stock: 1, price: "6500 zł", alert: false,
-          imei: "366789012345678", battery: "93%", color: "Phantom Black", condition: "Używany",
-          memory: "256GB", brand: "Samsung", model: "Z Fold5", purchasePrice: "5500", taxType: "VAT",
-          purchaseDate: "2026-05-09", warranty: "18 m-cy", statusSprzedany: false,
-          addedBy: "TL", addedDate: "2026-05-09"
-        },
-        { 
-          name: "Google Pixel 7a", category: "telefon", stock: 1, price: "1800 zł", alert: false,
-          imei: "367890123456789", battery: "91%", color: "Snow", condition: "Używany",
-          memory: "128GB", brand: "Google", model: "Pixel 7a", purchasePrice: "1400", taxType: "marża",
-          purchaseDate: "2026-05-08", warranty: "12 m-cy", statusSprzedany: false,
-          addedBy: "MK", addedDate: "2026-05-08"
-        },
-        { 
-          name: "iPhone SE 2022", category: "telefon", stock: 1, price: "1900 zł", alert: false,
-          imei: "368901234567890", battery: "95%", color: "Midnight", condition: "Powystawowy",
-          memory: "64GB", brand: "Apple", model: "SE 2022", purchasePrice: "1500", taxType: "VAT",
-          purchaseDate: "2026-05-07", warranty: "6 m-cy", statusSprzedany: true, dataSprzedazy: "2026-05-13",
-          addedBy: "KN", addedDate: "2026-05-07"
-        },
-        { 
-          name: "Samsung A54 5G", category: "telefon", stock: 1, price: "1400 zł", alert: false,
-          imei: "369012345678901", battery: "89%", color: "Awesome Graphite", condition: "Używany",
-          memory: "128GB", brand: "Samsung", model: "A54 5G", purchasePrice: "1100", taxType: "marża",
-          purchaseDate: "2026-05-06", warranty: "12 m-cy", statusSprzedany: false,
-          addedBy: "TL", addedDate: "2026-05-06"
-        },
-        { 
-          name: "Xiaomi 13 Pro", category: "telefon", stock: 1, price: "2800 zł", alert: false,
-          imei: "357890123456789", battery: "92%", color: "Ceramic Black", condition: "Używany",
-          memory: "256GB", brand: "Xiaomi", model: "13 Pro", purchasePrice: "2200", taxType: "VAT",
-          purchaseDate: "2026-05-10", warranty: "12 m-cy", statusSprzedany: false,
-          addedBy: "MK", addedDate: "2026-05-10"
-        },
-        { 
-          name: "iPhone 12 Mini", category: "telefon", stock: 1, price: "1600 zł", alert: false,
-          imei: "358901234567890", battery: "85%", color: "Blue", condition: "Powystawowy",
-          memory: "64GB", brand: "Apple", model: "12 Mini", purchasePrice: "1300", taxType: "marża",
-          purchaseDate: "2026-05-09", warranty: "3 m-ce", statusSprzedany: false,
-          addedBy: "KN", addedDate: "2026-05-09"
-        },
-        { 
-          name: "Samsung S22", category: "telefon", stock: 1, price: "1900 zł", alert: false,
-          imei: "359012345678901", battery: "90%", color: "Green", condition: "Używany",
-          memory: "128GB", brand: "Samsung", model: "S22", purchasePrice: "1500", taxType: "VAT",
-          purchaseDate: "2026-05-08", warranty: "6 m-cy", statusSprzedany: true, dataSprzedazy: "2026-05-14",
-          addedBy: "TL", addedDate: "2026-05-08"
+    const loadReportData = async () => {
+      try {
+        console.log('📊 Ładowanie danych raportu z bazy...');
+        
+        // 0. Pobierz sklepy z bazy (dla mapowania ID na UUID)
+        const shopsFromDB = await shopsService.getAll();
+        console.log('🏪 Pobrano sklepy z bazy:', shopsFromDB.length, 'sztuk');
+        console.log('🏪 Szczegóły sklepów:', shopsFromDB.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          generatedKey: s.name?.toLowerCase()?.replace(/\s+/g, '-')
+        })));
+        setShopsList(shopsFromDB);
+        
+        // Stwórz mapę: string ID -> UUID
+        const shopIdToUuidMap: Record<string, string> = {};
+        
+        // Funkcja do normalizacji tekstu (usuwa polskie znaki)
+        const normalizeText = (text: string): string => {
+          return text
+            .toLowerCase()
+            .replace(/ą/g, 'a').replace(/ę/g, 'e').replace(/ś/g, 's')
+            .replace(/ć/g, 'c').replace(/ź/g, 'z').replace(/ż/g, 'z')
+            .replace(/ó/g, 'o').replace(/ł/g, 'l').replace(/ń/g, 'n')
+            .replace(/\s+/g, '-');
+        };
+        
+        shopsFromDB.forEach((shop: any) => {
+          // Generuj klucz BEZ polskich znaków
+          const stringId = normalizeText(shop.name || '');
+          if (stringId) {
+            shopIdToUuidMap[stringId] = shop.id;
+            console.log(`   📌 Mapuję: "${stringId}" (from "${shop.name}") -> ${shop.id}`);
+          }
+          
+          // Dodaj też oryginalną nazwę jako alternatywę
+          const originalKey = shop.name?.toLowerCase()?.replace(/\s+/g, '-') || '';
+          if (originalKey && originalKey !== stringId) {
+            shopIdToUuidMap[originalKey] = shop.id;
+            console.log(`   📌 Mapuję alternatywnie: "${originalKey}" -> ${shop.id}`);
+          }
+        });
+        
+        console.log('🗺️ Mapa ID->UUID (finalna):', shopIdToUuidMap);
+        
+        // 1. Pobierz pracowników
+        const employeesData = await usersService.getAllWithShops();
+        
+        // Pobierz nazwy aktywnych sklepów (tych, które istnieją w bazie)
+        const activeShopNames = shopsFromDB.map((shop: any) => shop.name?.toLowerCase());
+        console.log('🏪 Aktywne sklepy:', activeShopNames);
+        
+        // Filtruj pracowników:
+        // - Ukryj właścicieli
+        // - Pokaż tylko tych z aktywnymi sklepami
+        // - Dla employee: pokaż tylko jego samego
+        let filteredEmployeesData = employeesData.filter(emp => {
+          // Ukryj właścicieli/adminów
+          if (emp.role?.toLowerCase() === 'właściciel' || emp.role?.toLowerCase() === 'owner') {
+            return false;
+          }
+          
+          // Dla employee: pokaż tylko jego samego
+          if (isEmployee && emp.id !== currentUserId) {
+            return false;
+          }
+          
+          // Sprawdź czy pracownik ma przynajmniej jeden AKTYWNY sklep
+          const employeeShopNames = emp.shops?.map((s: any) => s.shop_name?.toLowerCase()) || 
+                                   (emp.shop_name ? [emp.shop_name.toLowerCase()] : []);
+          
+          console.log(`🔍 Pracownik ${emp.first_name} ${emp.last_name}: sklepy=${employeeShopNames}, aktywne=${activeShopNames}`);
+          
+          const hasActiveShop = employeeShopNames.some((shopName: string) => 
+            activeShopNames.some(activeName => 
+              activeName.includes(shopName) || shopName.includes(activeName)
+            )
+          );
+          
+          if (!hasActiveShop) {
+            console.log(`❌ Pomijam pracownika ${emp.first_name} ${emp.last_name} - brak aktywnego sklepu`);
+          }
+          
+          return hasActiveShop;
+        });
+        
+        const activeEmployees = filteredEmployeesData.map(emp => ({
+          id: emp.id,
+          name: `${emp.first_name} ${emp.last_name}`,
+          initials: emp.initials || `${emp.first_name?.[0]}${emp.last_name?.[0]}`,
+          role: emp.role === 'employee' ? 'Pracownik' : emp.role,
+          shops: emp.shops?.map((s: any) => s.shop_name) || [emp.shop_name || 'Brak danych']
+        }));
+        
+        if (activeEmployees.length === 0 && !isEmployee) {
+          setEmployees([
+            { id: "mock1", name: "Brak pracowników w aktywnych sklepach", initials: "BP", role: "Pracownik", shops: ["-"] }
+          ]);
+        } else if (activeEmployees.length > 0) {
+          setEmployees(activeEmployees);
+        } else {
+          setEmployees([]);
         }
-      ];
-      
-      inventoryData = [...inventoryData, ...mockInventory];
-    }
+        
+        console.log('👥 Pobrano i odfiltrowano pracowników:', {
+          total: employeesData.length,
+          afterFilter: activeEmployees.length,
+          currentUserId,
+          isEmployee,
+          sample: activeEmployees.slice(0, 3).map(e => ({
+            id: e.id,
+            name: e.name,
+            shops: e.shops
+          }))
+        });
+        
+        // 2. Pobierz sprzedaż dla wybranego miesiąca/roku/sklepu
+        const startDate = toISODateString(new Date(selectedYear, selectedMonth, 1));
+        const endDate = toISODateString(new Date(selectedYear, selectedMonth + 1, 0));
+        
+        // Określ efektywny sklep (dla employee: zawsze jego sklep)
+        let rawShopId = isEmployee ? currentShopId : selectedShop;
+        let shopNameForMatch = isEmployee ? currentShopName : '';
+        
+        console.log('🔍 Przed konwersją:', {
+          rawShopId,
+          shopNameForMatch,
+          isEmployee,
+          currentShopId,
+          currentShopName,
+          selectedShop
+        });
+        
+        // Konwertuj string ID/NAZWĘ na UUID - NAJPROSTSZA I NAJBARDZIEJ NIEZAWODNA METODA
+        let effectiveShopUuid: string | undefined = undefined;
+        
+        if (rawShopId && rawShopId !== 'all') {
+          // METODA 1: Jeśli to już UUID (zawiera myślniki)
+          if (rawShopId.includes('-') && rawShopId.length > 30) {
+            effectiveShopUuid = rawShopId;
+            console.log(`✅ METODA 1: Używam UUID bezpośrednio: ${effectiveShopUuid}`);
+          } 
+          // METODA 2: Znajdź po dokładnej nazwie sklepu (dla employee)
+          else if (shopNameForMatch) {
+            const foundShop = shopsFromDB.find((s: any) => 
+              s.name === shopNameForMatch || 
+              s.name?.toLowerCase() === shopNameForMatch?.toLowerCase()
+            );
+            
+            if (foundShop?.id) {
+              effectiveShopUuid = foundShop.id;
+              console.log(`✅ METODA 2: Znaleziono po nazwie "${shopNameForMatch}" -> ${effectiveShopUuid}`);
+            } else {
+              console.error(`❌ METODA 2: Nie znaleziono sklepu o nazwie: "${shopNameForMatch}"`);
+            }
+          }
+          // METODA 3: Znajdź po string ID w mapie
+          else if (shopIdToUuidMap[rawShopId]) {
+            effectiveShopUuid = shopIdToUuidMap[rawShopId];
+            console.log(`✅ METODA 3: Mapowanie po kluczu "${rawShopId}" -> ${effectiveShopUuid}`);
+          }
+          // METODA 4: Szukaj podobnego klucza (fuzzy match)
+          else {
+            const similarKey = Object.keys(shopIdToUuidMap).find(key => 
+              key.includes(rawShopId.toLowerCase()) || rawShopId.toLowerCase().includes(key)
+            );
+            
+            if (similarKey) {
+              effectiveShopUuid = shopIdToUuidMap[similarKey];
+              console.log(`✅ METODA 4: Podobny klucz "${similarKey}" -> ${effectiveShopUuid}`);
+            } else {
+              // METODA 5: OSTATNIA DESKA - szukaj w nazwach sklepów
+              const foundByName = shopsFromDB.find((s: any) => 
+                s.name?.toLowerCase()?.includes(rawShopId.toLowerCase()) ||
+                rawShopId.toLowerCase().includes(s.name?.toLowerCase() || '')
+              );
+              
+              if (foundByName?.id) {
+                effectiveShopUuid = foundByName.id;
+                console.log(`✅ METODA 5: Znaleziono w nazwie "${rawShopId}" -> ${effectiveShopUuid} (sklep: ${foundByName.name})`);
+              } else {
+                console.error(`❌ WSZYSTKIE METODY zawiodły dla: "${rawShopId}"`);
+                console.error(`   Dostępne sklepy:`, shopsFromDB.map((s: any) => ({ id: s.id, name: s.name })));
+              }
+            }
+          }
+        }
+        
+        if (!effectiveShopUuid && rawShopId && rawShopId !== 'all') {
+          console.error('🚨 KRYTYCZNY BŁĄD: Nie udało się znaleźć UUID dla sklepu! Będzie błąd 400!');
+        }
+        
+        console.log(`🎯 Efektywny sklep FINALNY: ${effectiveShopUuid || 'BRAK/ALL'} (raw: "${rawShopId}")`);
+        
+        // Pobierz sprzedaż z opcjonalnym filtrowaniem po sklepie
+        const dbSales = await salesService.getByDateRange(startDate, endDate, effectiveShopUuid);
+        
+        console.log(`📈 Pobrano ${dbSales.length} sprzedaży z bazy`);
+        
+        // Mapuj dane z bazy na format Sale interface
+        const mappedSales: Sale[] = dbSales.map(sale => {
+          // Znajdź pracownika po employee_id, żeby pobrać prawdziwe inicjały
+          const saleEmployee = employees.find(e => e.id === sale.employee_id);
+          
+          return {
+            id: sale.id,
+            ini: saleEmployee?.initials || sale.employee_id?.slice(0, 2)?.toUpperCase() || '??',
+            employeeId: sale.employee_id,
+            payment: sale.payment_method || 'gotówka',
+            date: sale.sale_date,
+            time: sale.created_at?.split('T')[1]?.slice(0, 5) || '00:00',
+          items: (sale.sale_items || []).map((item: any) => {
+            let cat = 'usluga';
+            
+            // 1. Użyj kategorii z bazy jeśli istnieje
+            if (item.category && item.category.trim() !== '') {
+              cat = item.category.toLowerCase().trim();
+            } else {
+              // 2. Zgadnij po nazwie produktu
+              const nameLower = (item.product_name || '').toLowerCase();
+              
+              if (nameLower.includes('iphone') || nameLower.includes('samsung') || 
+                  nameLower.includes('xiaomi') || nameLower.includes('telefon') ||
+                  nameLower.includes('phone') || nameLower.includes('motorola')) {
+                cat = 'telefon';
+              } else if (nameLower.includes('szkło') || nameLower.includes('etui') || 
+                        nameLower.includes('kabel') || nameLower.includes('ładowarka') ||
+                        nameLower.includes('etchui') || nameLower.includes('case') ||
+                        nameLower.includes('słuchaw') || nameLower.includes('powerbank')) {
+                cat = 'akcesoria';
+              } else if (nameLower.includes('wymiana') || nameLower.includes('naprawa') || 
+                        nameLower.includes('serwis') || nameLower.includes('wymienić')) {
+                cat = 'serwis';
+              }
+            }
+            
+            console.log(`📦 Kategoria produktu: "${item.product_name}" -> ${cat} (z bazy: "${item.category}")`);
+            
+            return {
+              cat,
+              name: item.product_name || 'Produkt',
+              price: Number(item.total_price) || Number(item.price) || 0,
+              profit: Number(item.profit) || Math.round(Number(item.total_price || item.price || 0) * 0.15),
+              imei: item.imei || undefined
+            };
+          }),
+          shop: sale.shop_name || shops.find(s => s.id === sale.shop_id)?.label || 'Nieznany sklep'
+          };
+        });
+        
+        console.log('📦 Zmapowano sprzedaż:', {
+          total: mappedSales.length,
+          sample: mappedSales.slice(0, 2).map(s => ({
+            id: s.id,
+            ini: s.ini,
+            employeeId: s.employeeId,
+            shop: s.shop
+          }))
+        });
+        
+        setSales(mappedSales);
+        
+        // 3. Pobierz magazyn/inventory
+        let inventoryQuery = inventoryService.getAll();
+        if (effectiveShopUuid) {
+          const allInventory = await inventoryQuery;
+          const filteredInventory = allInventory.filter(item => item.shop_id === effectiveShopUuid);
+          setInventory(filteredInventory);
+        } else {
+          const invData = await inventoryQuery;
+          setInventory(invData);
+        }
+        
+        // 4. Pobierz koszty dla wybranego miesiąca/roku/sklepu
+        const costsStartDate = toISODateString(new Date(selectedYear, selectedMonth, 1));
+        const costsEndDate = toISODateString(new Date(selectedYear, selectedMonth + 1, 0));
+        
+        // Pobierz koszty z opcjonalnym filtrowaniem po sklepie
+        const dbCosts = await costsService.getByDateRange(costsStartDate, costsEndDate, effectiveShopUuid);
+        
+        console.log(`💰 Pobrano ${dbCosts.length} kosztów z bazy`);
+        setCosts(dbCosts);
+        
+        console.log('📦 Pobrano magazyn:', inventory.length > 0 ? inventory.length : 0, 'pozycji');
+        
+        setIsMounted(true);
+        console.log('✅ Dane raportu załadowane pomyślnie');
+        
+      } catch (error) {
+        console.error('❌ Błąd ładowania danych raportu:', error);
+        console.error('=== SZCZEGÓŁY BŁĘDU RAPORT ===');
+        console.error('Type:', typeof error);
+        console.error('Is null:', error === null);
+        console.error('Is undefined:', error === undefined);
+        console.error('Constructor:', error?.constructor?.name);
+        if (error && typeof error === 'object') {
+          console.error('Keys:', Object.keys(error));
+          console.error('Properties:', Object.getOwnPropertyNames(error));
+          console.error('Message:', error.message || 'brak');
+          console.error('Code:', (error as any).code || 'brak');
+          console.error('Details:', (error as any).details || 'brak');
+          console.error('Hint:', (error as any).hint || 'brak');
+          try {
+            console.error('Full serialized:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+          } catch(e) {
+            console.error('Cannot serialize error');
+          }
+        }
+        setIsMounted(true);
+      }
+    };
     
-    setInventory(inventoryData);
-    setIsMounted(true);
-  }, []);
+    loadReportData();
+  }, [selectedMonth, selectedYear, selectedShop]);
 
   // Filter sales by selected month and year, and optionally by shop
   const filteredSales = useMemo(() => {
@@ -316,24 +468,23 @@ export default function RaportyPage() {
       const saleYear = saleDate.getFullYear();
       
       let shopMatch = true;
-      if (selectedShop !== 'all') {
-        const shopName = selectedShop === 'kaufland-wloclawek' ? 'Kaufland Włocławek' : 
-                         selectedShop === 'riviera-gdynia' ? 'Riviera Gdynia' : 
-                         selectedShop === 'dominikanska-wroclaw' ? 'Dominikańska Wrocław' : '';
-        shopMatch = sale.shop === shopName;
+      if (shopIdForUI && shopIdForUI !== 'all' && shopIdForUI !== '') {
+        const shopName = shopIdForUI === 'kaufland-wloclawek' ? 'Kaufland Włocławek' : 
+                         shopIdForUI === 'riviera-gdynia' ? 'Riviera Gdynia' : 
+                         shopIdForUI === 'dominikanska-wroclaw' ? 'Dominikańska Wrocław' : 
+                         shopIdForUI; // Dla employee: użyj bezpośrednio nazwy
+        shopMatch = sale.shop === shopName || sale.shop?.includes(shopName);
       }
       
       return saleMonth === selectedMonth && saleYear === selectedYear && shopMatch;
     });
-  }, [sales, selectedMonth, selectedYear, selectedShop]);
+  }, [sales, selectedMonth, selectedYear, shopIdForUI]);
 
   // Generate report data for shops tab
   const reportData = useMemo(() => {
     const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
     
-    // Simulating profit from previous months (e.g., 5000 zł per month)
-    const previousMonthsProfit = selectedMonth * 5000;
-    let cumulativeSum = previousMonthsProfit;
+    let cumulativeSum = 0;
     
     return Array.from({ length: daysInMonth }, (_, i) => {
       const day = i + 1;
@@ -348,7 +499,13 @@ export default function RaportyPage() {
       
       const profit = daySales.reduce((sum: number, sale: Sale) => sum + sale.items.reduce((s: number, item: SaleItem) => s + item.profit, 0), 0);
       const revenue = daySales.reduce((sum: number, sale: Sale) => sum + sale.items.reduce((s: number, item: SaleItem) => s + item.price, 0), 0);
-      const costs = Math.random() > 0.7 ? -Math.floor(Math.random() * 2000) : 0;
+      
+      // Pobierz koszty dla tego konkretnego dnia
+      const dayCosts = costs.filter(cost => {
+        const costDate = new Date(cost.cost_date);
+        return costDate.getDate() === day;
+      });
+      const dailyCosts = dayCosts.reduce((sum: number, cost: any) => sum + (Number(cost.amount) || 0), 0);
       
       cumulativeSum += profit;
       
@@ -359,12 +516,12 @@ export default function RaportyPage() {
         fullDate: `${day}.${(selectedMonth + 1).toString().padStart(2, '0')}.${selectedYear}`,
         profit,
         revenue,
-        costs,
+        costs: dailyCosts,
         cumulative: cumulativeSum,
         isWeekend
       };
     });
-  }, [filteredSales, selectedMonth, selectedYear]);
+  }, [filteredSales, selectedMonth, selectedYear, costs]);
 
   // Helper function to get week number
   const getWeekNumber = (date: Date) => {
@@ -379,9 +536,22 @@ export default function RaportyPage() {
   const employeeData = useMemo(() => {
     const employeeMap = new Map();
     
+    console.log('👥 Generowanie raportu pracowników:', {
+      isEmployee,
+      currentUserId,
+      shopIdForUI,
+      totalEmployees: employees.length,
+      totalSales: filteredSales.length
+    });
+    
     // First, initialize with all employees from employees list
     employees.forEach(emp => {
       if (emp.role.toLowerCase() !== 'właściciel') {
+        // Dla employee: pokaż tylko jego własny raport
+        if (isEmployee && emp.id !== currentUserId) {
+          return;
+        }
+        
         let employeeShops = emp.shops || emp.shop;
         if (!employeeShops) {
           employeeShops = ['Brak danych'];
@@ -390,11 +560,12 @@ export default function RaportyPage() {
         }
         
         let shopMatch = true;
-        if (selectedShop !== 'all') {
-          const shopName = selectedShop === 'kaufland-wloclawek' ? 'Kaufland Włocławek' : 
-                           selectedShop === 'riviera-gdynia' ? 'Riviera Gdynia' : 
-                           selectedShop === 'dominikanska-wroclaw' ? 'Dominikańska Wrocław' : '';
-          shopMatch = employeeShops.includes(shopName);
+        if (shopIdForUI && shopIdForUI !== 'all' && shopIdForUI !== '') {
+          const shopName = shopIdForUI === 'kaufland-wloclawek' ? 'Kaufland Włocławek' : 
+                           shopIdForUI === 'riviera-gdynia' ? 'Riviera Gdynia' : 
+                           shopIdForUI === 'dominikanska-wroclaw' ? 'Dominikańska Wrocław' : 
+                           shopIdForUI;
+          shopMatch = employeeShops.includes(shopName) || employeeShops.some((s: string) => s.includes(shopName));
         }
         
         if (shopMatch) {
@@ -438,8 +609,18 @@ export default function RaportyPage() {
     
     // Now calculate sales for each employee
     filteredSales.forEach(sale => {
-      const employee = employees.find(e => e.initials === sale.ini);
-      if (!employee) return;
+      const employee = employees.find(e => e.initials === sale.ini || e.id === sale.employeeId);
+      
+      if (!employee) {
+        if (filteredSales.indexOf(sale) < 3) {
+          console.log('⚠️ Nie znaleziono pracownika dla sprzedaży:', {
+            saleIni: sale.ini,
+            saleEmployeeId: sale.employeeId,
+            availableEmployees: employees.map(e => ({ id: e.id, initials: e.initials }))
+          });
+        }
+        return;
+      }
       
       const empData = employeeMap.get(employee.id);
       if (!empData) return;
@@ -453,8 +634,13 @@ export default function RaportyPage() {
       
       // Category breakdown
       sale.items.forEach(item => {
+        console.log(`📊 Sumowanie kategorii: ${item.name} (${item.cat}) - cena: ${item.price}`);
+        
         if (empData.categoriesBreakdown[item.cat] !== undefined) {
           empData.categoriesBreakdown[item.cat] += item.price;
+          console.log(`   ✅ Dodano do ${item.cat}: teraz = ${empData.categoriesBreakdown[item.cat]}`);
+        } else {
+          console.log(`   ⚠️ Nieznana kategoria: "${item.cat}" (dostępne: ${Object.keys(empData.categoriesBreakdown).join(', ')})`);
         }
         
         // Category stats - count and total for each category
@@ -544,8 +730,11 @@ export default function RaportyPage() {
       });
     }
     
-    return Array.from(employeeMap.values());
-  }, [employees, filteredSales, selectedShop, inventory]);
+    const result = Array.from(employeeMap.values());
+    console.log('✅ Wygenerowano raport dla', result.length, 'pracowników:', result.map(e => ({ name: e.name, salesTotal: e.salesTotal })));
+    
+    return result;
+  }, [employees, filteredSales, shopIdForUI, inventory, isEmployee, currentUserId]);
 
   const totals = useMemo(() => {
     return reportData.reduce((acc, curr) => ({
@@ -554,6 +743,31 @@ export default function RaportyPage() {
       costs: acc.costs + curr.costs
     }), { profit: 0, revenue: 0, costs: 0 });
   }, [reportData]);
+
+  // Oblicz statystyki roczne
+  const yearlyStats = useMemo(() => {
+    const currentYearProfit = totals.profit;
+    const yearProgress = ((selectedMonth + 1) / 12) * 100;
+    
+    return {
+      currentYearProfit,
+      yearProgress: Math.min(yearProgress, 100)
+    };
+  }, [totals.profit, selectedMonth]);
+
+  if (!isMounted) {
+    return (
+      <div className="flex flex-col min-h-screen bg-accent/20">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="text-primary/70 font-medium">Ładowanie danych raportu...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-accent/20">
@@ -588,34 +802,43 @@ export default function RaportyPage() {
                 <Store className="h-3 w-3 mr-2" />
                 Sklepy
               </Button>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className={cn(
-                  "rounded-xl text-[10px] font-black uppercase px-4 h-9 transition-all",
-                  activeTab === 'pracownicy' ? "bg-secondary text-white" : "text-muted-foreground hover:text-primary"
-                )}
-                onClick={() => setActiveTab('pracownicy')}
-              >
-                <Users className="h-3 w-3 mr-2" />
-                Pracownicy
-              </Button>
+              {!isEmployee && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className={cn(
+                    "rounded-xl text-[10px] font-black uppercase px-4 h-9 transition-all",
+                    activeTab === 'pracownicy' ? "bg-secondary text-white" : "text-muted-foreground hover:text-primary"
+                  )}
+                  onClick={() => setActiveTab('pracownicy')}
+                >
+                  <Users className="h-3 w-3 mr-2" />
+                  Pracownicy
+                </Button>
+              )}
             </div>
 
             <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-primary/10">
               <MapPin className="h-4 w-4 text-primary ml-2" />
-              <Select value={selectedShop} onValueChange={(val) => setSelectedShop(val || selectedShop)} items={shops.map(shop => ({ value: shop.id, label: shop.label }))}>
-                <SelectTrigger className="h-9 w-[180px] rounded-xl border-none shadow-none text-[10px] font-black uppercase">
-                  <SelectValue placeholder="Wybierz sklep" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl">
-                  {shops.map(shop => (
-                    <SelectItem key={shop.id} value={shop.id} className="text-[10px] font-bold uppercase">
-                      {shop.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isEmployee ? (
+                <div className="flex items-center gap-2 px-3 h-9">
+                  <span className="text-[10px] font-black uppercase text-primary">{currentShopName || 'Twój sklep'}</span>
+                  <Badge variant="secondary" className="text-[8px] px-1.5">Tylko Twój sklep</Badge>
+                </div>
+              ) : (
+                <Select value={selectedShop} onValueChange={(val) => setSelectedShop(val || selectedShop)} items={shops.map(shop => ({ value: shop.id, label: shop.label }))}>
+                  <SelectTrigger className="h-9 w-[180px] rounded-xl border-none shadow-none text-[10px] font-black uppercase">
+                    <SelectValue placeholder="Wybierz sklep" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    {shops.map(shop => (
+                      <SelectItem key={shop.id} value={shop.id} className="text-[10px] font-bold uppercase">
+                        {shop.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-primary/10">
@@ -796,6 +1019,7 @@ export default function RaportyPage() {
                   <Card className="border-none shadow-sm rounded-2xl overflow-hidden border border-primary/10">
                     <CardContent className="p-5">
                       <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-widest mb-4">Sprzedaż wg kategorii</h4>
+                      {console.log('🎨 Kategorie w modalu:', selectedEmployee?.categoriesBreakdown, 'salesTotal:', selectedEmployee?.salesTotal)}
                       <div className="space-y-3">
                         <div className="flex items-center gap-3">
                           <Smartphone className="h-4 w-4 text-purple-500" />
@@ -1131,11 +1355,7 @@ export default function RaportyPage() {
                                           <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
                                             <Calendar className="h-3 w-3" />
                                             {(phone.addedDate || phone.purchaseDate) 
-                                              ? new Date(phone.addedDate || phone.purchaseDate).toLocaleDateString('pl-PL', {
-                                                  day: 'numeric',
-                                                  month: 'short',
-                                                  year: 'numeric'
-                                                })
+                                              ? formatDatePL(phone.addedDate || phone.purchaseDate)
                                               : 'Brak daty'
                                             }
                                           </p>
@@ -1459,11 +1679,12 @@ export default function RaportyPage() {
         {/* Footer Stats Summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="border-none shadow-md bg-white rounded-3xl p-6 border-l-4 border-primary">
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-2">Progres roczny</p>
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-2">Progres roczny 2026</p>
             <div className="flex items-end justify-between">
-              <h3 className="text-3xl font-black text-foreground">254,4%</h3>
+              <h3 className="text-3xl font-black text-foreground">{yearlyStats.yearProgress.toFixed(1)}%</h3>
               <TrendingUp className="h-8 w-8 text-emerald-500 mb-1" />
             </div>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">{yearlyStats.currentYearProfit.toLocaleString('pl-PL')} zł</p>
           </Card>
 
           <Card className="border-none shadow-md bg-secondary rounded-3xl p-6 md:col-span-2 overflow-hidden relative">

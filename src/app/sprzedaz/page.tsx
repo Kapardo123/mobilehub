@@ -64,15 +64,23 @@ import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/components/ui/toast";
 import { getLocalStorageSafe, useLocalStorage, getSessionStorageSafe, useSessionStorage } from "@/lib/storage";
 import { addAction } from "@/app/akcje/page";
+import { shopsService } from "@/lib/supabase/shops";
+import { salesService } from "@/lib/supabase/sales";
+import { invoicesService, invoiceItemsService } from "@/lib/supabase/invoices";
+import { customersService } from "@/lib/supabase/customers";
+import { formatDatePL, getCurrentDatePL, getCurrentTimePL, toISODateString } from "@/lib/dateFormat";
 
 export default function SprzedazPage() {
   const router = useRouter();
   const { addToast } = useToast();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [userShop, setUserShop] = useState("Kaufland Włocławek");
-  const [selectedShop, setSelectedShop] = useState("Kaufland Włocławek");
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [userShop, setUserShop] = useState<string>("");
+  const [selectedShop, setSelectedShop] = useState<string>("");
+  const [selectedShopUuid, setSelectedShopUuid] = useState<string>("");  // UUID sklepu dla API
+  const [shopsWithUuid, setShopsWithUuid] = useState<any[]>([]);  // Sklepy z UUID do mapowania
+  const [selectedDate, setSelectedDate] = useState(toISODateString());
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [filterEmployee, setFilterEmployee] = useState<string | null>(null);
@@ -97,6 +105,10 @@ export default function SprzedazPage() {
     date: string;
     time: string;
     items: SaleItem[];
+    employeeName?: string;
+    employeeId?: string;
+    shopName?: string;
+    shopId?: string;
   }
   
   interface Cost {
@@ -315,26 +327,69 @@ export default function SprzedazPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    setIsMounted(true);
+    const today = toISODateString();
+    console.log('📅 Ustawiam dzisiejszą datę:', today, '(lokalny czas Polski)');
+    setSelectedDate(today);
+
     const role = getSessionStorageSafe("userRole", "");
     if (!role) {
       router.push("/login");
       return;
     }
     const userName = getSessionStorageSafe("userName", "Piotr Zakrzewski");
-    setUserRole(role);
-    
-    if (role === "employee") {
-      setSelectedShop("Kaufland Włocławek");
-    } else {
-      setSelectedShop("Dominikańska Wrocław");
+    const shopName = getSessionStorageSafe("shopName", "");
+    const shopId = getSessionStorageSafe("shopId", "");
+
+    console.log('=== SPRZEDAŻ - Ładowanie danych z sesji ===');
+    console.log('RAW sessionStorage (przed czyszczeniem):');
+    console.log('  - userRole:', sessionStorage.getItem("userRole"));
+    console.log('  - userName:', sessionStorage.getItem("userName"));
+    console.log('  - shopName (RAW):', sessionStorage.getItem("shopName"));
+    console.log('  - shopId (RAW):', sessionStorage.getItem("shopId"));
+    console.log('');
+    console.log('Po getSessionStorageSafe:');
+    console.log('  - User Role:', role, '(type:', typeof role + ')');
+    console.log('  - User Name:', userName, '(type:', typeof userName + ')');
+    console.log('  - Shop Name:', shopName, '(type:', typeof shopName + ')');
+    console.log('  - Shop ID:', shopId, '(type:', typeof shopId + ')');
+
+    // Sprawdź podwójne cudzysłowy
+    if (shopName && (shopName.startsWith('"') || shopName.startsWith("'"))) {
+      console.error('❌ BŁĄD: shopName ma podwójne cudzysłowy!', shopName);
     }
-    
+    if (shopId && (shopId.startsWith('"') || shopId.startsWith("'"))) {
+      console.error('❌ BŁĄD: shopId ma podwójne cudzysłowy!', shopId);
+    }
+
+    setUserRole(role);
+
+    if (shopName) {
+      setUserShop(shopName);
+      setSelectedShop(shopName);
+      console.log('✅ Ustawiono sklep z sesji:', shopName);
+      
+      // Zapisz UUID sklepu (jeśli to UUID, w przeciwnym razie nazwa)
+      if (shopId && shopId.includes('-')) {
+        setSelectedShopUuid(shopId);
+        console.log('✅ Ustawiono UUID sklepu:', shopId);
+      } else {
+        console.log('⚠️ shopId nie jest UUID:', shopId, '- użyję nazwę jako fallback');
+        setSelectedShopUuid(shopName);  // Fallback na nazwę
+      }
+    } else {
+      console.warn('⚠️ Brak nazwy sklepu w sesji!');
+      setUserShop("Nieznany sklep");
+      setSelectedShop("Nieznany sklep");
+      setSelectedShopUuid("");
+    }
+
     const initials = userName
       .split(" ")
       .map((n: string) => n[0])
       .join("")
       .toUpperCase();
-    
+
     setNewEntry(prev => ({ ...prev, ini: initials }));
   }, [router]);
 
@@ -397,6 +452,21 @@ export default function SprzedazPage() {
     loadSavedCustomers();
   }, []);
 
+  // Load sales from localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedSales = getLocalStorageSafe('sprzedaz_sales', []);
+    console.log('=== ŁADOWANIE SPRZEDAŻY Z LOCALSTORAGE ===');
+    console.log('Znaleziono sprzedaży:', savedSales.length);
+
+    if (savedSales.length > 0) {
+      setSales(savedSales);
+      console.log('✅ Załadowano sprzedaże z localStorage');
+    } else {
+      console.log('ℹ️ Brak zapisanych sprzedaży w localStorage - używam domyślnych danych demo');
+    }
+  }, []);
+
   useEffect(() => {
     if (editingId && selectedSaleForEdit) {
       setCartItems(selectedSaleForEdit.items);
@@ -415,11 +485,54 @@ export default function SprzedazPage() {
     }
   }, [editingId, selectedSaleForEdit]);
 
-  const shops = [
-    "Kaufland Włocławek",
-    "Riviera Gdynia",
-    "Dominikańska Wrocław"
-  ];
+  const [shops, setShops] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadShops();
+  }, []);
+
+  const loadShops = async () => {
+    try {
+      const shopsData = await shopsService.getAll();
+      setShops(shopsData.map(shop => shop.name));
+      
+      // Zapisz pełne dane sklepów z UUID do mapowania
+      setShopsWithUuid(shopsData);
+      console.log('=== SPRZEDAŻ - Pobrano listę sklepów ===');
+      console.log('Liczba sklepów:', shopsData.length);
+      console.log('Sklepy:', shopsData.map(s => ({ name: s.name, id: s.id })));
+
+      // ✅ Sprawdź BEZPOŚREDNIO z sessionStorage (nie polegaj na state!)
+      const shopFromSession = sessionStorage.getItem('shopName');
+      console.log('Sklep z sessionStorage:', shopFromSession);
+      console.log('Aktualny userShop (state):', userShop);
+
+      if (shopsData.length > 0) {
+        // Użyj sklepu z sesji jeśli istnieje, inaczej pierwszy z bazy
+        const correctShop = shopFromSession || shopsData[0].name;
+
+        if (shopFromSession) {
+          console.log('✅ Używam sklepu z SESJI:', correctShop);
+        } else {
+          console.log('⚠️ Używam DOMYŚLNEGO sklepu (brak w sesji):', correctShop);
+        }
+
+        setUserShop(correctShop);
+        setSelectedShop(correctShop);
+        
+        // Znajdź UUID dla tego sklepu
+        const shopWithUuid = shopsData.find((s: any) => s.name === correctShop);
+        if (shopWithUuid?.id) {
+          setSelectedShopUuid(shopWithUuid.id);
+          console.log('✅ Ustawiono UUID sklepu z listy:', shopWithUuid.id);
+        } else {
+          console.warn('⚠️ Nie znaleziono UUID dla sklepu:', correctShop);
+        }
+      }
+    } catch (error) {
+      console.error('Błąd podczas pobierania sklepów:', error);
+    }
+  };
 
   const categoryGroups = [
     {
@@ -451,8 +564,32 @@ export default function SprzedazPage() {
   }, [sales]);
 
   // Filter sales based on filters
+  const currentShopId = getSessionStorageSafe("shopId", "");
+  const currentUserRole = getSessionStorageSafe("userRole", "");
+
+  console.log('=== FILTROWANIE SPRZEDAŻY ===');
+  console.log('Current Shop ID:', currentShopId);
+  console.log('Current User Role:', currentUserRole);
+  console.log('Total sales before filter:', flattenedSales.length);
+
   const filteredSales = useMemo(() => {
     return flattenedSales.filter(sale => {
+      // Filter by shop - employee can only see their own shop's sales
+      if (currentUserRole === 'employee' && currentShopId) {
+        if (sale.shopId && sale.shopId !== currentShopId) {
+          return false;
+        }
+        // Also check by shopName for backward compatibility
+        if (!sale.shopId && sale.shopName && sale.shopName !== userShop) {
+          return false;
+        }
+      }
+
+      // Owner/Admin can see all shops
+      if (currentUserRole === 'owner' || currentUserRole === 'admin') {
+        // No shop filtering for owners
+      }
+
       // Filter by category (if any item matches)
       if (filterCategory && !sale.items.some(item => item.cat === filterCategory)) return false;
 
@@ -483,7 +620,9 @@ export default function SprzedazPage() {
 
       return true;
     });
-  }, [flattenedSales, filterCategory, filterEmployee, dateRange, customDateFrom, customDateTo]);
+  }, [flattenedSales, filterCategory, filterEmployee, dateRange, customDateFrom, customDateTo, currentShopId, currentUserRole, userShop]);
+
+  console.log('Filtered sales count:', filteredSales.length);
 
   const totalAmount = filteredSales.reduce((sum, sale) => sum + sale.totalPrice, 0);
   const totalProfit = filteredSales.reduce((sum, sale) => sum + sale.totalProfit, 0);
@@ -510,7 +649,7 @@ export default function SprzedazPage() {
       window.dispatchEvent(new CustomEvent('phone_sold', { 
         detail: { 
           imei: newEntry.imei, 
-          dataSprzedazy: new Date().toISOString().split('T')[0] 
+          dataSprzedazy: getCurrentDatePL() 
         } 
       }));
     }
@@ -529,7 +668,7 @@ export default function SprzedazPage() {
     });
   };
 
-  const addCartToSales = () => {
+  const addCartToSales = async () => {
     if (cartItems.length === 0) return;
     
     if (editingId) {
@@ -551,39 +690,178 @@ export default function SprzedazPage() {
         id: Math.random().toString(36).substr(2, 9),
         ini: newEntry.ini || "PZ",
         payment: newEntry.payment,
-        date: new Date().toISOString().split('T')[0],
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: toISODateString(),
+        time: getCurrentTimePL(),
         items: cartItems
       };
       
       setSales(prev => [newSale, ...prev]);
       
-      const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForSale);
+      const employees = activeEmployees || [];
+      const selectedEmp = employees.find((e: any) => e.id === selectedEmployeeForSale);
       const employeeName = selectedEmp?.name || getSessionStorageSafe("userName", "Pracownik");
       const employeeId = selectedEmp?.id || getSessionStorageSafe("userId", "unknown");
-      const shopName = selectedEmp?.shop || getSessionStorageSafe("shopName", "Sklep");
-      const shopId = selectedEmp?.shopId || getSessionStorageSafe("shopId", "unknown");
+      const shopName = getSessionStorageSafe("shopName", "Sklep");
+      const shopId = getSessionStorageSafe("shopId", "unknown");
       
       const saleWithEmployee = {
         ...newSale,
         ini: selectedEmp?.initials || newEntry.ini || "PZ",
         employeeName,
-        employeeId
+        employeeId,
+        shopName,
+        shopId
       };
       
       const existingSales = getLocalStorageSafe('sprzedaz_sales', []);
       localStorage.setItem('sprzedaz_sales', JSON.stringify([saleWithEmployee, ...existingSales]));
       
+      let dbSaleId: string | null = null;
+      
+      // Zapisz sprzedaż do bazy danych Supabase (tylko jeśli mamy poprawne UUID)
+      const isValidUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const hasValidShopId = shopId && shopId !== 'unknown' && shopId !== '' && isValidUUID(shopId);
+      const hasValidEmployeeId = employeeId && employeeId !== 'unknown' && employeeId !== '' && isValidUUID(employeeId);
+      
+      if (hasValidShopId && hasValidEmployeeId) {
+        try {
+          const totalAmount = cartItems.reduce((sum, item) => sum + item.price, 0);
+          const totalProfit = cartItems.reduce((sum, item) => sum + item.profit, 0);
+          const now = new Date();
+          
+          const paymentMethodMap: { [key: string]: string } = {
+            'gotówka': 'gotowka',
+            'gotowka': 'gotowka',
+            'karta': 'karta',
+            'przelew': 'karta'
+          };
+          
+          const dbPaymentMethod = paymentMethodMap[newEntry.payment] || 'gotowka';
+          
+          const saleData = {
+            sale_date: toISODateString(now),
+            sale_time: getCurrentTimePL(),
+            payment_method: dbPaymentMethod,
+            total_amount: totalAmount,
+            total_profit: totalProfit,
+            status: 'completed',
+            shop_id: shopId,
+            employee_id: employeeId
+          };
+          
+          console.log('📦 Dane sprzedaży:', JSON.stringify(saleData, null, 2));
+          
+          const itemsData = cartItems.map((item, index) => ({
+            product_name: item.name,
+            category: item.cat,
+            unit_price: item.price,
+            quantity: 1,
+            purchase_cost: item.price - item.profit,
+            imei: item.imei || null,
+            tax_type: item.taxType || 'zwolniony',
+            comment: item.comment || null,
+            sort_order: index
+          }));
+          
+          console.log('📦 Pozycje sprzedaży:', JSON.stringify(itemsData, null, 2));
+          
+          const savedSale = await salesService.create(saleData, itemsData);
+          console.log('✅ Sprzedaż zapisana do bazy:', savedSale.id);
+          dbSaleId = savedSale.id;
+          
+          const updatedSales = getLocalStorageSafe('sprzedaz_sales', []);
+          const saleIndex = updatedSales.findIndex((s: any) => s.id === newSale.id);
+          if (saleIndex >= 0) {
+            updatedSales[saleIndex].id = savedSale.id;
+            updatedSales[saleIndex].dbId = savedSale.id;
+            localStorage.setItem('sprzedaz_sales', JSON.stringify(updatedSales));
+          }
+        } catch (dbError: any) {
+          console.error('❌ Błąd zapisu do bazy:', dbError);
+          console.error('=== SZCZEGÓŁY BŁĘDU ===');
+          console.error('Type:', typeof dbError);
+          console.error('Is null:', dbError === null);
+          console.error('Is undefined:', dbError === undefined);
+          console.error('Constructor:', dbError?.constructor?.name);
+          
+          if (dbError) {
+            console.error('Keys:', Object.keys(dbError));
+            console.error('Properties:', Object.getOwnPropertyNames(dbError));
+            
+            if (dbError.message) console.error('Message:', dbError.message);
+            if (dbError.code) console.error('Code:', dbError.code);
+            if (dbError.details) console.error('Details:', dbError.details);
+            if (dbError.hint) console.error('Hint:', dbError.hint);
+            if (dbError.status) console.error('Status:', dbError.status);
+            if (dbError.statusText) console.error('StatusText:', dbError.statusText);
+            if (dbError.error) console.error('Inner error:', dbError.error);
+            if (dbError.error_description) console.error('Error desc:', dbError.error_description);
+            
+            // Sprawdź czy to odpowiedź HTTP
+            if (dbError.response) {
+              console.error('Response status:', dbError.response.status);
+              console.error('Response data:', dbError.response.data);
+              console.error('Response headers:', dbError.response.headers);
+            }
+            
+            // Sprawdź czy to błąd sieciowy
+            if (dbError instanceof TypeError) {
+              console.error('Network Error - brak połączenia?');
+            }
+            
+            // Pełny JSON błędu
+            try {
+              const errorStr = JSON.stringify(dbError, Object.getOwnPropertyNames(dbError), 2);
+              console.error('Full serialized:', errorStr.substring(0, 1000));
+            } catch(e) {
+              console.error('Cannot serialize error');
+            }
+          }
+          console.error('=========================');
+          
+          let errorMessage = 'Nieznany błąd';
+          if (dbError?.code === '42501') errorMessage = 'Brak uprawnień (RLS)';
+          else if (dbError?.code === '23505') errorMessage = 'Duplikat danych';
+          else if (dbError?.code === '23502') errorMessage = 'Brak wymaganych pól';
+          else if (dbError?.code === '22P02') errorMessage = 'Nieprawidłowy format ID';
+          else if (dbError?.code === '428C9') errorMessage = 'Błąd kolumny generowanej';
+          else if (dbError?.message && typeof dbError.message === 'string') errorMessage = dbError.message;
+          else if (typeof dbError === 'string') errorMessage = dbError;
+          else if (Object.keys(dbError || {}).length === 0) errorMessage = 'Pusty błąd - sprawdź konsolę po szczegóły';
+          
+          addToast({ 
+            message: `⚠️ Sprzedaż zapisana lokalnie (błąd: ${errorMessage})`, 
+            variant: "warning" 
+          });
+        }
+      } else {
+        console.log('⏭️ Pomijam zapis do bazy - brak poprawnych UUID:', { shopId, employeeId });
+        addToast({ 
+          message: '✅ Sprzedaż dodana (lokalnie - skonfiguruj sklep/pracownika)', 
+          variant: "info" 
+        });
+      }
+      
+      // Powiadom inne zakładki o aktualizacji danych
+      window.dispatchEvent(new Event('sales_data_updated'));
+      console.log('📡 Wysłano sygnał: sales_data_updated');
+      
       addToast({ message: `Sprzedaż dodana (${newSale.items.length} pozycji)`, variant: "success" });
       
+      const validActorId = hasValidEmployeeId ? employeeId : null;
+      const validShopId = hasValidShopId ? shopId : null;
+      
       addAction({
-        type: "sprzedaz",
+        action_type: "sprzedaz",
         description: `Sprzedaż: ${cartItems.map(item => item.name).join(", ")}`,
-        employeeName,
-        employeeId,
-        shopName,
-        shopId,
-        details: `${cartItems.length} pozycji | ${newEntry.payment} | Suma: ${newSale.items.reduce((sum, item) => sum + item.price, 0).toFixed(2)} zł`
+        actor_id: validActorId,
+        actor_name: employeeName,
+        shop_id: validShopId,
+        shop_name: shopName,
+        details: `${cartItems.length} pozycji | ${newEntry.payment} | Suma: ${newSale.items.reduce((sum, item) => sum + item.price, 0).toFixed(2)} zł`,
+        target_table: 'sales',
+        target_id: dbSaleId || newSale.id,
+        target_type: 'sale'
       });
     }
     
@@ -626,14 +904,15 @@ export default function SprzedazPage() {
       return;
     }
     
-    const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForSale);
+    const employees = activeEmployees || [];
+    const selectedEmp = employees.find((e: any) => e.id === selectedEmployeeForSale);
     const employeeName = selectedEmp?.name || getSessionStorageSafe("userName", "Pracownik");
     const employeeId = selectedEmp?.id || getSessionStorageSafe("userId", "unknown");
     
     const cost: Cost = {
       id: Math.random().toString(36).substr(2, 9),
-      date: new Date().toISOString().split('T')[0],
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      date: toISODateString(),
+      time: getCurrentTimePL(),
       category: newCost.category,
       amount: parseFloat(newCost.amount),
       description: newCost.description,
@@ -646,14 +925,28 @@ export default function SprzedazPage() {
     setCosts(prev => [cost, ...prev]);
     localStorage.setItem('sprzedaz_costs', JSON.stringify([cost, ...costs]));
     
+    // Powiadom inne zakładki o aktualizacji danych
+    window.dispatchEvent(new Event('costs_data_updated'));
+    console.log('📡 Wysłano sygnał: costs_data_updated');
+    
     addAction({
-      type: 'koszt',
+      action_type: 'koszt',
       description: `Koszt (${newCost.category}): ${newCost.description}`,
-      employeeName,
-      employeeId,
-      shopName: selectedShop,
-      shopId: selectedShop,
-      details: `${newCost.amount} zł | ${newCost.paymentMethod}`
+      actor_id: employeeId,
+      actor_name: employeeName,
+      shop_id: selectedShopUuid || selectedShop,  // UUID jeśli dostępne, inaczej nazwa
+      shop_name: selectedShop,
+      details: `${newCost.amount} zł | ${newCost.paymentMethod}`,
+      target_table: 'costs',
+      target_type: 'cost'
+    });
+    
+    console.log('💰 Dodano koszt z danymi:', {
+      category: newCost.category,
+      amount: newCost.amount,
+      shop_id: selectedShopUuid || selectedShop,
+      shop_name: selectedShop,
+      isUUID: !!(selectedShopUuid && selectedShopUuid.includes('-'))
     });
     
     addToast({ message: `Koszt dodany: ${newCost.amount} zł`, variant: "success" });
@@ -740,7 +1033,7 @@ export default function SprzedazPage() {
             </tr>
             ${data.map(sale => `
               <tr>
-                <td>${sale.date}</td>
+                <td>${formatDatePL(sale.date)}</td>
                 <td>${sale.time}</td>
                 <td>${sale.ini}</td>
                 <td>${sale.items.map(i => i.name).join(", ")}</td>
@@ -775,7 +1068,7 @@ export default function SprzedazPage() {
         {/* Header with Title and Summary Boxes */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="flex items-center gap-4">
-            <Link href={userRole === "employee" ? "/pracownik" : "/"}>
+            <Link href="/">
               <Button variant="ghost" size="icon" className="rounded-full bg-white shadow-sm border border-primary/10 text-primary hover:bg-accent">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -832,7 +1125,7 @@ export default function SprzedazPage() {
               
               <div className="flex items-center gap-3">
                 <div className="flex gap-1 bg-white p-1 rounded-xl shadow-sm border border-primary/10">
-                  {['all', 'skup', 'zaliczka', 'paczki', 'gotowka'].map(cat => (
+                  {['all', 'zaliczka', 'paczki', 'gotowka'].map(cat => (
                     <button
                       key={cat}
                       onClick={() => setCostFilterCategory(cat)}
@@ -912,7 +1205,7 @@ export default function SprzedazPage() {
                         .map(cost => (
                           <TableRow key={cost.id} className="hover:bg-accent/20 transition-colors">
                             <TableCell className="font-medium text-sm">
-                              <div>{new Date(cost.date).toLocaleDateString('pl-PL')}</div>
+                              <div>{formatDatePL(cost.date)}</div>
                               <div className="text-[10px] text-muted-foreground">{cost.time}</div>
                             </TableCell>
                             <TableCell>
@@ -1033,26 +1326,34 @@ export default function SprzedazPage() {
                     </UISelect>
                   </div>
 
-                  {activeEmployees.length > 1 && (
+                  {/* ✅ Pracownik - Owner widzi select, Employee widzi statyczny tekst */}
+                  {isMounted && userRole === "owner" && activeEmployees.length >= 1 && (
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-1.5">
                         <Users className="h-3.5 w-3.5" />
                         Pracownik
                       </Label>
                       <UISelect value={selectedEmployeeForSale} onValueChange={(value) => setSelectedEmployeeForSale(value || "")}>
-                        <UISelectTrigger className="h-12 rounded-xl bg-accent/30 border-none font-bold text-sm">
+                        <UISelectTrigger className="h-12 rounded-xl bg-accent/30 border-none font-bold text-sm capitalize">
                           <UISelectValue placeholder="Wybierz pracownika...">
                             {selectedEmployeeForSale ? String(activeEmployees.find((e: any) => e.id === selectedEmployeeForSale)?.name || selectedEmployeeForSale) : "Wybierz pracownika..."}
                           </UISelectValue>
                         </UISelectTrigger>
                         <UISelectContent>
                           {activeEmployees.map((emp: any) => (
-                            <UISelectItem key={emp.id} value={emp.id} className="font-semibold">
+                            <UISelectItem key={emp.id} value={emp.id} className="font-semibold capitalize">
                               {String(emp.name || emp.id)}
                             </UISelectItem>
                           ))}
                         </UISelectContent>
                       </UISelect>
+                    </div>
+                  )}
+
+                  {isMounted && userRole === 'employee' && (
+                    <div className="bg-primary/5 border border-primary/10 rounded-xl px-3 py-2.5 flex items-center gap-2">
+                      <Users className="h-4 w-4 text-primary" />
+                      <span className="font-bold text-sm text-primary capitalize">{getSessionStorageSafe("userName", "Pracownik")}</span>
                     </div>
                   )}
                 </div>
@@ -1091,14 +1392,14 @@ export default function SprzedazPage() {
                     onClick={() => {
                       const date = new Date(selectedDate);
                       date.setDate(date.getDate() - 1);
-                      setSelectedDate(date.toISOString().split('T')[0]);
+                      setSelectedDate(toISODateString(date));
                     }}
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <div className="px-4 py-1 text-center min-w-[140px]">
                     <p className="text-xs font-black uppercase tracking-tighter text-foreground">
-                      {new Date(selectedDate).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' })}
+                      {formatDatePL(selectedDate, false)}
                     </p>
                     <p className="text-[10px] font-bold text-primary/60">{new Date(selectedDate).getFullYear()}</p>
                   </div>
@@ -1109,7 +1410,7 @@ export default function SprzedazPage() {
                     onClick={() => {
                       const date = new Date(selectedDate);
                       date.setDate(date.getDate() + 1);
-                      setSelectedDate(date.toISOString().split('T')[0]);
+                      setSelectedDate(toISODateString(date));
                     }}
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -1118,21 +1419,46 @@ export default function SprzedazPage() {
 
                 <div className="h-12 w-px bg-primary/10 hidden md:block" />
 
-                <div className="w-[200px]">
-                  <UISelect value="Kaufland Włocławek" onValueChange={(val) => setSelectedShop(val || "Kaufland Włocławek")} items={shops.map(shop => ({ value: shop, label: shop }))}>
-                    <UISelectTrigger className="h-12 rounded-2xl bg-white border-primary/10 font-bold text-xs">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-primary" />
-                        <span>{selectedShop}</span>
-                      </div>
-                    </UISelectTrigger>
-                    <UISelectContent className="rounded-2xl">
-                      {shops.map(shop => (
-                        <UISelectItem key={shop} value={shop} className="font-bold text-xs">{shop}</UISelectItem>
-                      ))}
-                    </UISelectContent>
-                  </UISelect>
-                </div>
+                {/* ✅ Select sklepów TYLKO dla Owner/Admin */}
+                {isMounted && (userRole === 'owner' || userRole === 'admin') && (
+                  <div className="w-[200px]">
+                    <UISelect 
+                      value={selectedShop || ""} 
+                      onValueChange={(val) => {
+                        setSelectedShop(val || selectedShop || "");
+                        // Znajdź i ustaw UUID dla wybranego sklepu
+                        const shopWithId = shopsWithUuid.find((s: any) => s.name === val);
+                        if (shopWithId?.id) {
+                          setSelectedShopUuid(shopWithId.id);
+                          console.log('🔄 Zmieniono sklep na:', val, '(UUID:', shopWithId.id + ')');
+                        }
+                      }} 
+                      items={shops.map(shop => ({ value: shop, label: shop }))}
+                    >
+                      <UISelectTrigger className="h-12 rounded-2xl bg-white border-primary/10 font-bold text-xs">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-primary" />
+                          <span>{selectedShop}</span>
+                        </div>
+                      </UISelectTrigger>
+                      <UISelectContent className="rounded-2xl">
+                        {shops.map(shop => (
+                          <UISelectItem key={shop} value={shop} className="font-bold text-xs">{shop}</UISelectItem>
+                        ))}
+                      </UISelectContent>
+                    </UISelect>
+                  </div>
+                )}
+
+                {/* ℹ️ Dla employee - statyczny tekst sklepu (bez selecta) */}
+                {isMounted && userRole === 'employee' && userShop && (
+                  <div className="px-4 py-3 rounded-2xl bg-primary/5 border border-primary/10">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      <span className="font-bold text-xs text-primary uppercase tracking-wider">{userShop}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-3">
@@ -1285,6 +1611,7 @@ export default function SprzedazPage() {
                   <TableHeader>
                     <TableRow className="bg-secondary hover:bg-secondary border-none">
                       <TableHead className="w-[60px] text-white font-black text-[10px] uppercase tracking-widest text-center h-14">Ini</TableHead>
+                      <TableHead className="w-[120px] text-white font-black text-[10px] uppercase tracking-widest">Sklep</TableHead>
                       <TableHead className="text-white font-black text-[10px] uppercase tracking-widest">Sprzedaż</TableHead>
                       <TableHead className="text-white font-black text-[10px] uppercase tracking-widest text-right">Suma</TableHead>
                       <TableHead className="text-white font-black text-[10px] uppercase tracking-widest text-right">Zysk</TableHead>
@@ -1304,6 +1631,14 @@ export default function SprzedazPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <MapPin className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase truncate max-w-[100px]">
+                              {sale.shopName || userShop || "-"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded-lg bg-accent flex items-center justify-center">
                               <ShoppingBag className="h-4 w-4 text-primary" />
@@ -1313,7 +1648,7 @@ export default function SprzedazPage() {
                                 {mostExpensive.name}
                                 {itemCount > 1 && <span className="text-primary ml-1">+{itemCount - 1}</span>}
                               </p>
-                              <p className="text-[9px] text-muted-foreground">{sale.date} {sale.time}</p>
+                              <p className="text-[9px] text-muted-foreground">{formatDatePL(sale.date)} {sale.time}</p>
                             </div>
                           </div>
                         </TableCell>
@@ -1544,7 +1879,7 @@ export default function SprzedazPage() {
               </Button>
               <Button
                 className="bg-primary hover:bg-primary/90 text-white rounded-xl font-black text-xs uppercase tracking-widest h-12"
-                onClick={() => {
+                onClick={async () => {
                   if (!selectedSale) return;
                   const totalPrice = selectedSale.items.reduce((s, i) => s + i.price, 0);
                   const invoiceItems = selectedSale.items.map(item => ({
@@ -1553,8 +1888,163 @@ export default function SprzedazPage() {
                     price: item.price
                   }));
 
-                  // Save invoice to localStorage
-                  const newInvoice = {
+                  try {
+                    console.log('🧾 Rozpoczynam generowanie faktury...');
+                    
+                    const userId = getSessionStorageSafe("userId", "");
+                    const shopId = getSessionStorageSafe("shopId", "");
+                    console.log('👤 Użytkownik:', userId, '| 🏪 Sklep:', shopId);
+                    
+                    let customerId = null;
+                    
+                    if (invoiceCustomer.name && invoiceCustomer.name.trim() !== '') {
+                      console.log('🔍 Szukam klienta:', invoiceCustomer.name);
+                      const existingCustomers = await customersService.search(invoiceCustomer.name);
+                      console.log('📋 Znalezieni klienci:', existingCustomers.length);
+                      
+                      const matchingCustomer = existingCustomers.find(c => 
+                        c.first_name?.toLowerCase() === invoiceCustomer.name.split(' ')[0]?.toLowerCase() ||
+                        c.company_name?.toLowerCase() === invoiceCustomer.name.toLowerCase()
+                      );
+                      
+                      if (matchingCustomer) {
+                        customerId = matchingCustomer.id;
+                        console.log('✅ Znaleziono klienta:', matchingCustomer.id);
+                      } else {
+                        console.log('➕ Tworzę nowego klienta...');
+                        const nameParts = invoiceCustomer.name.trim().split(' ');
+                        const customerData = {
+                          first_name: nameParts[0] || "",
+                          last_name: nameParts.length > 1 ? nameParts.slice(1).join(" ") : "",
+                          company_name: invoiceCustomer.nip ? invoiceCustomer.name : null,
+                          nip: invoiceCustomer.nip || null,
+                          address: invoiceCustomer.address || null,
+                          email: invoiceCustomer.email || null,
+                          phone: ''
+                        };
+                        console.log('📝 Dane klienta:', customerData);
+                        
+                        const newCustomer = await customersService.create(customerData);
+                        customerId = newCustomer.id;
+                        console.log('✅ Klient utworzony:', newCustomer.id);
+                      }
+                    } else {
+                      console.log('⚠️ Brak nazwy klienta - szukam/ tworzę domyślnego klienta...');
+                      
+                      const defaultCustomers = await customersService.search('Klient indywidualny');
+                      let defaultCustomer = defaultCustomers.find(c => 
+                        c.first_name?.toLowerCase() === 'klient' && 
+                        c.last_name?.toLowerCase() === 'indywidualny'
+                      );
+                      
+                      if (defaultCustomer) {
+                        customerId = defaultCustomer.id;
+                        console.log('✅ Znaleziono domyślnego klienta:', defaultCustomer.id);
+                      } else {
+                        console.log('➕ Tworzę domyślnego klienta...');
+                        const newDefaultCustomer = await customersService.create({
+                          first_name: 'Klient',
+                          last_name: 'Indywidualny',
+                          company_name: null,
+                          nip: null,
+                          address: null,
+                          email: null,
+                          phone: ''
+                        });
+                        customerId = newDefaultCustomer.id;
+                        console.log('✅ Domyślny klient utworzony:', newDefaultCustomer.id);
+                      }
+                    }
+
+                    const today = new Date();
+                    const invoiceItemsForDB = selectedSale.items.map((item, idx) => ({
+                      item_name: item.name,
+                      category: allCategories.find(c => c.id === item.cat)?.label || item.cat,
+                      description: `${item.name} - ${item.category || 'Produkt'}`,
+                      unit_price: item.price,
+                      quantity: 1,
+                      unit_net_price: Math.round(item.price / 1.23 * 100) / 100,
+                      vat_rate: 23.00,
+                      sort_order: idx
+                    }));
+                    
+                    console.log('📦 Pozycje faktury:', invoiceItemsForDB.length);
+
+                    const invoiceData = {
+                      issue_date: toISODateString(today),
+                      due_date: toISODateString(new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000)),
+                      sale_date: selectedSale.date,
+                      sale_time: selectedSale.time || getCurrentTimePL(),
+                      status: 'wydana',
+                      total_amount: totalPrice,
+                      net_amount: Math.round(totalPrice / 1.23 * 100) / 100,
+                      vat_amount: Math.round(totalPrice - (totalPrice / 1.23) * 100) / 100,
+                      customer_id: customerId,
+                      shop_id: shopId || null,
+                      employee_id: userId || null,
+                      notes: `Faktura VAT - Sprzedaż #${selectedSale.id}`
+                    };
+                    
+                    console.log('📄 Dane faktury:', invoiceData);
+                    console.log('⬆️ Wysyłam do bazy...');
+
+                    const newInvoice = await invoicesService.create(invoiceData, invoiceItemsForDB);
+
+                    console.log('✅ Faktura zapisana do bazy:', newInvoice.invoice_number);
+                    console.log('📊 Pełny obiekt faktury:', newInvoice);
+
+                    addToast({
+                      title: "Faktura wygenerowana",
+                      description: `Faktura ${newInvoice.invoice_number} została zapisana`,
+                      variant: "success"
+                    });
+                  } catch (error) {
+                    console.error('❌ Błąd zapisywania faktury:');
+                    console.error('=== SZCZEGÓŁY BŁĘDU ===');
+                    console.error('Error object:', error);
+                    console.error('Error type:', typeof error);
+                    console.error('Is null:', error === null);
+                    console.error('Is undefined:', error === undefined);
+                    console.error('Is empty object:', error && Object.keys(error).length === 0);
+                    
+                    if (error) {
+                      console.error('Keys:', Object.keys(error));
+                      console.error('Properties:', Object.getOwnPropertyNames(error));
+                      
+                      const errorStr = JSON.stringify(error, null, 2);
+                      console.error('JSON:', errorStr);
+                      
+                      if (error.message) console.error('Message:', error.message);
+                      if (error.code) console.error('Code:', error.code);
+                      if (error.details) console.error('Details:', error.details);
+                      if (error.hint) console.error('Hint:', error.hint);
+                      if (error.stack) console.error('Stack:', error.stack);
+                    } else {
+                      console.error('⚠️ Error is null or undefined!');
+                    }
+                    console.error('=======================');
+                    
+                    let errorMessage = 'Nieznany błąd (error jest pusty)';
+                    
+                    if (error?.message) {
+                      errorMessage = error.message;
+                    } else if (error?.code) {
+                      errorMessage = `Kod błędu: ${error.code}`;
+                    } else if (!error) {
+                      errorMessage = 'Błąd bez szczegółów - sprawdź RLS policies w Supabase!';
+                    } else if (typeof error === 'object') {
+                      errorMessage = `Obiekt błędu: ${JSON.stringify(error).substring(0, 100)}`;
+                    }
+                    
+                    addToast({
+                      title: "Błąd faktury",
+                      description: `${errorMessage}\n\n📋 Otwórz F12 → Console po pełne logi`,
+                      variant: "warning"
+                    });
+                  }
+
+                  const savedInvoices = typeof window !== "undefined" ? JSON.parse(localStorage.getItem('invoices') || '[]') : [];
+                  const newInvoiceLocal = {
                     id: selectedSale.id,
                     customerName: invoiceCustomer.name,
                     customerNip: invoiceCustomer.nip,
@@ -1566,8 +2056,7 @@ export default function SprzedazPage() {
                     items: invoiceItems,
                     createdAt: new Date().toISOString()
                   };
-                  const savedInvoices = typeof window !== "undefined" ? JSON.parse(localStorage.getItem('invoices') || '[]') : [];
-                  const updatedInvoices = [...savedInvoices, newInvoice];
+                  const updatedInvoices = [...savedInvoices, newInvoiceLocal];
                   if (typeof window !== "undefined") {
                     localStorage.setItem('invoices', JSON.stringify(updatedInvoices));
                   }
@@ -1629,7 +2118,54 @@ export default function SprzedazPage() {
 
           <div className="p-8 space-y-6 bg-white overflow-y-auto flex-1">
             <div className="grid grid-cols-2 gap-4">
+              {isMounted && (
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5" />
+                    Pracownik
+                  </Label>
+                  {(activeEmployees || []).length > 0 ? (
+                    <select
+                      value={selectedEmployeeForSale}
+                      onChange={(e) => {
+                        const selectedId = e.target.value;
+                        console.log('🔄 Wybrano pracownika:', selectedId);
+                        setSelectedEmployeeForSale(selectedId);
+                        
+                        const employee = (activeEmployees || []).find((emp: any) => emp.id === selectedId);
+                        if (employee) {
+                          const initials = employee.initials || 
+                            `${(employee.name || '').split(' ').map((n: string) => n[0]).join('').toUpperCase()}`;
+                          console.log('✅ Ustawiono inicjały:', initials);
+                          setNewEntry(prev => ({ ...prev, ini: initials }));
+                        }
+                      }}
+                      className="w-full bg-white border-2 border-primary/20 h-12 rounded-xl font-bold capitalize px-3 shadow-sm text-foreground"
+                    >
+                      <option value="">-- Wybierz --</option>
+                      {(activeEmployees || []).map((emp: any) => (
+                        <option key={emp.id} value={emp.id}>
+                          {String(emp.name || emp.id)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl h-12 flex items-center px-3 text-yellow-800 text-xs font-bold">
+                      ⚠️ Brak pracowników
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-2">
+                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Inicjały</Label>
+                <div className="bg-accent/30 border-none h-12 rounded-xl flex items-center px-4 font-black text-primary">
+                  {newEntry.ini || "--"}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
                 <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Kategoria</Label>
                 <UISelect 
                   value={newEntry.category} 
@@ -1662,14 +2198,6 @@ export default function SprzedazPage() {
                   </UISelectContent>
                 </UISelect>
               </div>
-
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Inicjały</Label>
-                <div className="bg-accent/30 border-none h-12 rounded-xl flex items-center px-4 font-black text-primary">
-                  {newEntry.ini || "--"}
-                </div>
-              </div>
-            </div>
 
             {newEntry.category === "telefon" && (
               <>
@@ -1905,29 +2433,6 @@ export default function SprzedazPage() {
                 onChange={(e) => setNewEntry({...newEntry, comment: e.target.value})}
               />
             </div>
-
-            {activeEmployees.length > 1 && (
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5" />
-                  Pracownik
-                </Label>
-                <UISelect value={selectedEmployeeForSale} onValueChange={(value) => setSelectedEmployeeForSale(value || "")}>
-                  <UISelectTrigger className="bg-accent/30 border-none h-12 rounded-xl font-bold">
-                    <UISelectValue placeholder="Wybierz pracownika...">
-                      {selectedEmployeeForSale ? String(activeEmployees.find((e: any) => e.id === selectedEmployeeForSale)?.name || selectedEmployeeForSale) : "Wybierz pracownika..."}
-                    </UISelectValue>
-                  </UISelectTrigger>
-                  <UISelectContent>
-                    {activeEmployees.map((emp: any) => (
-                      <UISelectItem key={emp.id} value={emp.id} className="font-semibold">
-                        {String(emp.name || emp.id)}
-                      </UISelectItem>
-                    ))}
-                  </UISelectContent>
-                </UISelect>
-              </div>
-            )}
 
             <div className="space-y-3">
               <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Metoda Płatności</Label>
@@ -2372,7 +2877,7 @@ export default function SprzedazPage() {
 
       {/* Side Sidebar Content */}
       <div className={cn(
-        "fixed top-0 right-0 h-full w-[320px] bg-secondary text-white z-[101] shadow-2xl transform transition-transform duration-300 ease-in-out p-6 flex flex-col gap-6",
+        "fixed top-0 right-0 h-full w-[320px] bg-secondary text-white z-[101] shadow-2xl transform transition-transform duration-300 ease-in-out p-6 flex flex-col gap-6 overflow-y-auto",
         isSidebarOpen ? "translate-x-0" : "translate-x-full"
       )}>
         <div className="flex items-center justify-between mb-2">
@@ -2392,12 +2897,70 @@ export default function SprzedazPage() {
           </div>
         </div>
 
+        {/* ✅ Pracownik Selection - WSZYCI WIDZĄ SELECT! */}
+        {(() => {
+          console.log('=== PRACOWNIK SIDEBAR ===');
+          console.log('isMounted:', isMounted);
+          console.log('userRole:', userRole);
+          console.log('activeEmployees:', activeEmployees?.length || 0, 'osób');
+          
+          if (!isMounted) {
+            return null;
+          }
+          
+          const employees = activeEmployees || [];
+          console.log('📋 Lista pracowników:', employees.map((e: any) => e.name));
+          
+          return (
+            <div className="space-y-2 border-2 border-primary/30 bg-primary/5 p-3 rounded-xl">
+              <Label className="text-[10px] font-black text-primary uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5" />
+                Pracownik
+              </Label>
+              
+              {employees.length > 0 ? (
+                <select
+                  value={selectedEmployeeForSale}
+                  onChange={(e) => {
+                    console.log('🔄 Wybrano pracownika (NATIVE SELECT):', e.target.value);
+                    setSelectedEmployeeForSale(e.target.value);
+                  }}
+                  className="w-full bg-white border-2 border-primary/20 h-12 rounded-xl font-bold capitalize px-3 shadow-sm text-foreground"
+                >
+                  <option value="">-- Wybierz pracownika --</option>
+                  {employees.map((emp: any) => (
+                    <option key={emp.id} value={emp.id}>
+                      {String(emp.name || emp.id)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl h-12 flex items-center px-4 text-yellow-800 font-bold">
+                  ⚠️ Brak aktywnych pracowników
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Punkt Selection */}
         <div className="space-y-4 bg-white/5 p-4 rounded-2xl border border-white/5">
           <div className="space-y-2">
             <Label className="text-primary text-xs font-black uppercase tracking-widest">punkt</Label>
-            {userRole === "owner" ? (
-              <UISelect value={selectedShop} onValueChange={(val) => setSelectedShop(val || "Kaufland Włocławek")} items={shops.map(shop => ({ value: shop, label: shop }))}>
+            {isMounted && userRole === "owner" ? (
+              <UISelect 
+                value={selectedShop || ""} 
+                onValueChange={(val) => {
+                  setSelectedShop(val || selectedShop || "");
+                  // Znajdź i ustaw UUID dla wybranego sklepu
+                  const shopWithId = shopsWithUuid.find((s: any) => s.name === val);
+                  if (shopWithId?.id) {
+                    setSelectedShopUuid(shopWithId.id);
+                    console.log('🔄 Zmieniono sklep na:', val, '(UUID:', shopWithId.id + ')');
+                  }
+                }} 
+                items={shops.map(shop => ({ value: shop, label: shop }))}
+              >
                 <UISelectTrigger className="bg-white/5 border-white/10 h-12 text-white font-bold rounded-xl focus:ring-primary">
                   <span>{selectedShop}</span>
                 </UISelectTrigger>
@@ -2407,29 +2970,54 @@ export default function SprzedazPage() {
                   ))}
                 </UISelectContent>
               </UISelect>
-            ) : (
+            ) : isMounted && userRole === 'employee' ? (
               <div className="bg-white/5 border border-white/10 rounded-xl h-12 flex items-center px-3 text-white font-bold">
-                {selectedShop}
+                📍 {userShop || selectedShop}
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="space-y-2">
             <Label className="text-primary text-xs font-black uppercase tracking-widest">dzień</Label>
-            <div className="relative">
-              <Input 
-                type="date" 
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-white/5 border-white/10 h-12 text-white font-bold pr-10 rounded-xl focus:ring-primary"
+            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl p-3">
+              <Button 
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-primary hover:bg-accent"
+                onClick={() => {
+                  const date = new Date(selectedDate);
+                  date.setDate(date.getDate() - 1);
+                  setSelectedDate(toISODateString(date));
+                }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <input 
+                type="text"
+                readOnly
+                value={formatDatePL(selectedDate)}
+                className="flex-1 bg-transparent text-white text-center font-black text-sm outline-none cursor-default"
               />
-              <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+              
+              <Button 
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-primary hover:bg-accent"
+                onClick={() => {
+                  const date = new Date(selectedDate);
+                  date.setDate(date.getDate() + 1);
+                  setSelectedDate(toISODateString(date));
+                }}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Results Button - Only for owner */}
-        {userRole === "owner" && (
+        {isMounted && userRole === "owner" && (
           <Button className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-black uppercase text-xs tracking-widest rounded-xl shadow-lg shadow-primary/20 border-none">
             WSZYSTKIE WYNIKI DZISIAJ
           </Button>

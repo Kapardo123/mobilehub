@@ -7,69 +7,132 @@ import { Label } from "@/components/ui/label";
 import { Smartphone, Lock, Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { addAction } from "@/app/akcje/page";
+import { usersService } from "@/lib/supabase/users";
+import { auditService } from "@/lib/supabase/actions";
+import { shopAccessService } from "@/lib/supabase/shopAccess";
 
 export default function LoginPage() {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (login.toLowerCase() === "wlasciciel" && password === "admin") {
-      sessionStorage.setItem("userRole", JSON.stringify("owner"));
-      sessionStorage.setItem("userName", JSON.stringify("Piotr Zakrzewski"));
-      sessionStorage.setItem("userId", JSON.stringify("0"));
-      sessionStorage.setItem("shopName", JSON.stringify("Dominikańska Wrocław"));
-      sessionStorage.setItem("shopId", JSON.stringify("3"));
-      
-      addAction({
-        type: "logowanie",
-        description: "Logowanie do systemu (Właściciel)",
-        employeeName: "Piotr Zakrzewski",
-        employeeId: "0",
-        shopName: "Dominikańska Wrocław",
-        shopId: "3"
+    setIsLoading(true);
+
+    try {
+      console.log('=== ROZPOCZĘCIE LOGOWANIA ===');
+      console.log('Przed czyszczeniem sesji:', {
+        userRole: sessionStorage.getItem("userRole"),
+        userName: sessionStorage.getItem("userName"),
+        userId: sessionStorage.getItem("userId")
       });
+
+      sessionStorage.clear();
+
+      console.log('Po czyszczeniu sesji:', {
+        userRole: sessionStorage.getItem("userRole"),
+        userName: sessionStorage.getItem("userName")
+      });
+
+      const user = await usersService.login(login, password);
       
-      router.push("/");
-    } else if (login.toLowerCase() === "pracownik" && password === "mobilehub") {
-      sessionStorage.setItem("userRole", JSON.stringify("employee"));
-      sessionStorage.setItem("userName", JSON.stringify("Jan Kowalski"));
-      sessionStorage.setItem("userId", JSON.stringify("1"));
-      sessionStorage.setItem("userInitials", JSON.stringify("JK"));
-      sessionStorage.setItem("shopName", JSON.stringify("Kaufland Włocławek"));
-      sessionStorage.setItem("shopId", JSON.stringify("1"));
-      
-      const firstEmployee = {
-        id: "1",
-        name: "Jan Kowalski",
-        initials: "JK",
-        shop: "Kaufland Włocławek",
-        shopId: "1"
-      };
-      
-      const existingActive = sessionStorage.getItem('activeEmployees');
-      if (!existingActive) {
-        sessionStorage.setItem('activeEmployees', JSON.stringify([firstEmployee]));
+      if (user) {
+        console.log('Zalogowano użytkownika:', user);
+
+        sessionStorage.setItem("userRole", user.role);
+        sessionStorage.setItem("userName", `${user.first_name} ${user.last_name}`);
+        sessionStorage.setItem("userId", user.id);
+        sessionStorage.setItem("userInitials", user.initials);
+
+        console.log('=== ZAPISANO DANE DO SESJI ===');
+        console.log('Dane po zapisie:', {
+          userRole: sessionStorage.getItem("userRole"),
+          userName: sessionStorage.getItem("userName"),
+          userId: sessionStorage.getItem("userId"),
+          userInitials: sessionStorage.getItem("userInitials")
+        });
+        
+        const userShops = await usersService.getUserShops(user.id);
+        console.log('Sklepy użytkownika:', userShops);
+        
+        if (userShops && userShops.length > 0) {
+          const primaryShop = userShops.find(s => s.is_primary) || userShops[0];
+          sessionStorage.setItem("shopId", primaryShop.shop_id);
+          sessionStorage.setItem("shopName", primaryShop.shop_name);
+          console.log('Ustawiono sklep:', primaryShop.shop_name);
+
+          const employeeData = {
+            id: user.id,
+            name: `${user.first_name} ${user.last_name}`,
+            initials: user.initials || `${user.first_name[0]}${user.last_name[0]}`,
+            shop: primaryShop.shop_name,
+            shopId: primaryShop.shop_id,
+            role: user.role
+          };
+
+          sessionStorage.setItem('activeEmployees', JSON.stringify([employeeData]));
+          sessionStorage.setItem('selectedEmployeeId', user.id);
+          console.log('Dodano użytkownika do activeEmployees:', employeeData);
+
+          try {
+            console.log('=== INICJALIZACJA ZARZĄDZANIA DOSTEPEM DO SKLEPÓW ===');
+            const accessStatus = await shopAccessService.initializeShopAccess(
+              user.id,
+              `${user.first_name} ${user.last_name}`,
+              user.role as 'owner' | 'employee' | 'admin',
+              primaryShop.shop_id,
+              primaryShop.shop_name
+            );
+            console.log('Status dostępu do sklepów:', accessStatus);
+            sessionStorage.setItem('shopAccessStatus', JSON.stringify(accessStatus));
+          } catch (accessError: any) {
+            console.error('Błąd inicjalizacji dostępu do sklepów:', accessError);
+            console.error('Typ błędu:', typeof accessError);
+            console.error('Szczegóły:', accessError?.message || accessError?.toString() || JSON.stringify(accessError));
+
+            const errorMessage = accessError?.message || (typeof accessError === 'string' ? accessError : 'Nieznany błąd dostępu do sklepu');
+
+            if (errorMessage.includes('jest obecnie zajęty') || errorMessage.includes('occupied')) {
+              alert(errorMessage);
+              setIsLoading(false);
+              return;
+            }
+
+            console.warn('Kontynuowanie mimo błędu dostępu do sklepu (non-critical):', errorMessage);
+          }
+
+          localStorage.setItem('justLoggedIn', JSON.stringify({
+            employeeCount: 1,
+            employeeData: employeeData,
+            timestamp: Date.now()
+          }));
+          console.log('Zapisano do localStorage justLoggedIn');
+        }
+        
+        await auditService.logLogin({
+          userId: user.id,
+          userName: `${user.first_name} ${user.last_name}`
+        });
+        
+        console.log('Przekierowanie dla roli:', user.role);
+        
+        if (user.role === 'owner' || user.role === 'admin' || user.role === 'employee') {
+          window.location.href = "/";
+        } else {
+          window.location.href = "/pracownik";
+        }
+      } else {
+        alert("Błędny login lub hasło!");
       }
-      sessionStorage.setItem('selectedEmployeeId', "1");
-      
-      addAction({
-        type: "logowanie",
-        description: "Logowanie do systemu (Pracownik)",
-        employeeName: "Jan Kowalski",
-        employeeId: "1",
-        shopName: "Kaufland Włocławek",
-        shopId: "1"
-      });
-      
-      router.push("/pracownik");
-    } else {
-      alert("Błędny login lub hasło!");
+    } catch (error) {
+      console.error('Login error:', error);
+      alert("Błąd logowania! Spróbuj ponownie.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -103,6 +166,7 @@ export default function LoginPage() {
                   placeholder="Wprowadź login"
                   value={login}
                   onChange={(e) => setLogin(e.target.value)}
+                  disabled={isLoading}
                   className={`h-12 bg-gray-50 border-2 rounded-xl text-sm font-medium placeholder:text-gray-400 transition-all duration-200 ${
                     isFocused ? 'border-primary shadow-md shadow-primary/10' : 'border-transparent hover:border-gray-200'
                   }`}
@@ -123,9 +187,10 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
+                    disabled={isLoading}
                     className={`h-12 bg-gray-50 border-2 rounded-xl text-sm font-medium placeholder:text-gray-400 pr-12 transition-all duration-200 ${
-                      isFocused ? 'border-primary shadow-md shadow-primary/10' : 'border-transparent hover:border-gray-200'
-                    }`}
+                    isFocused ? 'border-primary shadow-md shadow-primary/10' : 'border-transparent hover:border-gray-200'
+                  }`}
                   />
                   <button
                     type="button"
@@ -143,43 +208,25 @@ export default function LoginPage() {
 
               <Button 
                 type="submit" 
+                disabled={isLoading}
                 className="h-12 w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-xl font-semibold text-sm uppercase tracking-wide shadow-lg shadow-primary/15 transition-all duration-200 active:scale-[0.98]"
               >
-                <Lock className="h-4 w-4 mr-2" />
-                Zaloguj się
+                {isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    Logowanie...
+                  </span>
+                ) : (
+                  <>
+                    <Lock className="h-4 w-4 mr-2" />
+                    Zaloguj się
+                  </>
+                )}
               </Button>
             </form>
-
-            <div className="mt-6 pt-6 border-t border-gray-100">
-              <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Dane testowe:</p>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="bg-white rounded-lg p-2 border border-gray-200">
-                    <p className="font-bold text-primary">Właściciel</p>
-                    <p className="text-muted-foreground text-[10px] mt-1">
-                      Login: <span className="font-mono font-semibold">wlasciciel</span>
-                    </p>
-                    <p className="text-muted-foreground text-[10px]">
-                      Hasło: <span className="font-mono font-semibold">admin</span>
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-lg p-2 border border-gray-200">
-                    <p className="font-bold text-emerald-600">Pracownicy</p>
-                    <div className="mt-1 space-y-0.5">
-                      <p className="text-muted-foreground text-[9px]">
-                        <span className="font-mono font-semibold">pracownik</span> / <span className="font-mono font-semibold">mobilehub</span> (JK)
-                      </p>
-                      <p className="text-muted-foreground text-[9px]">
-                        <span className="font-mono font-semibold">kamil</span> / <span className="font-mono font-semibold">nowicki</span> (KN)
-                      </p>
-                      <p className="text-muted-foreground text-[9px]">
-                        <span className="font-mono font-semibold">anna</span> / <span className="font-mono font-semibold">nowak</span> (AN)
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
 

@@ -27,11 +27,8 @@ import { useEffect, useState } from "react";
 import { getSessionStorageSafe } from "@/lib/storage";
 import { addAction } from "@/app/akcje/page";
 import { useToast } from "@/components/ui/toast";
-
-const AVAILABLE_EMPLOYEES = [
-  { id: "3", name: "Kamil Nowicki", initials: "KN", shop: "Kaufland Włocławek", shopId: "1" },
-  { id: "4", name: "Anna Nowak", initials: "AN", shop: "Kaufland Włocławek", shopId: "1" }
-];
+import { usersService } from "@/lib/supabase/users";
+import { shopAccessService, type ShopAccessStatus } from "@/lib/supabase/shopAccess";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -44,6 +41,9 @@ export function Navbar() {
   const [activeEmployeesCount, setActiveEmployeesCount] = useState(0);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [employeeToRemove, setEmployeeToRemove] = useState<any>(null);
+  const [isAddingEmployee, setIsAddingEmployee] = useState(false);
+  const [shopAccessStatus, setShopAccessStatus] = useState<ShopAccessStatus[]>([]);
+  const [showShopAccess, setShowShopAccess] = useState(false);
   const { addToast } = useToast();
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export function Navbar() {
       if (active) {
         setActiveEmployeesCount(JSON.parse(active).length);
       }
-      
+
       const selectedId = sessionStorage.getItem('selectedEmployeeId');
       if (selectedId && active) {
         const employees = JSON.parse(active);
@@ -66,7 +66,14 @@ export function Navbar() {
         if (selectedEmp) {
           setUserName(selectedEmp.name);
           setShopName(selectedEmp.shop);
+          const isOwner = selectedEmp.role === 'owner' || selectedEmp.role === 'admin';
+          setUserRole(isOwner ? 'owner' : 'employee');
         }
+      } else {
+        const currentName = getSessionStorageSafe("userName", null);
+        const currentRole = getSessionStorageSafe("userRole", null);
+        setUserName(currentName);
+        setUserRole(currentRole);
       }
     };
 
@@ -77,24 +84,121 @@ export function Navbar() {
     };
 
     window.addEventListener('storage', handleStorageChange);
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [isAddEmployeeOpen]);
+  }, []);
+
+  useEffect(() => {
+    const updateActiveEmployeesCount = () => {
+      const active = sessionStorage.getItem('activeEmployees');
+      if (active) {
+        setActiveEmployeesCount(JSON.parse(active).length);
+      }
+    };
+
+    updateActiveEmployeesCount();
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        updateActiveEmployeesCount();
+      }
+    };
+
+    const handleFocus = () => {
+      updateActiveEmployeesCount();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    const intervalId = setInterval(updateActiveEmployeesCount, 2000);
+
+    const cleanup = () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(intervalId);
+    };
+
+    return cleanup;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const justLoggedIn = localStorage.getItem('justLoggedIn');
+      if (!justLoggedIn) return;
+
+      const loginData = JSON.parse(justLoggedIn);
+
+      if (loginData.employeeData) {
+        setUserName(loginData.employeeData.name);
+        setShopName(loginData.employeeData.shop);
+        const isOwner = loginData.employeeData.role === 'owner' || loginData.employeeData.role === 'admin';
+        setUserRole(isOwner ? 'owner' : 'employee');
+        setActiveEmployeesCount(loginData.employeeCount || 1);
+      }
+
+      localStorage.removeItem('justLoggedIn');
+    } catch (e) {
+      console.error(e);
+    }
+
+    return;
+  }, []);
 
   const isEmployee = userRole === "employee" || pathname === "/pracownik";
-  const displayName = userName || (isEmployee ? "Jan Kowalski" : "Piotr Zakrzewski");
+  const displayName = userName || "Ładowanie...";
   const displayRole = userRole === "employee" ? "Pracownik" : (userRole === "owner" ? "Właściciel" : (isEmployee ? "Pracownik" : "Właściciel"));
 
   const getActiveEmployees = () => {
     if (typeof window === 'undefined') return [];
     const active = sessionStorage.getItem('activeEmployees');
-    return active ? JSON.parse(active) : [];
+    if (!active) return [];
+
+    const parsed = JSON.parse(active);
+
+    const cleanString = (val: string | null | undefined) => {
+      if (!val) return val;
+      let cleaned = val;
+      if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+        cleaned = cleaned.slice(1, -1);
+      }
+      return cleaned;
+    };
+
+    const cleaned = parsed.map((emp: any) => ({
+      ...emp,
+      id: cleanString(emp.id),
+      name: cleanString(emp.name),
+      initials: cleanString(emp.initials),
+      shop: cleanString(emp.shop),
+      shopId: cleanString(emp.shopId),
+      role: cleanString(emp.role)
+    }));
+
+    sessionStorage.setItem('activeEmployees', JSON.stringify(cleaned));
+    return cleaned;
   };
 
-  const addEmployeeToSession = (employee: typeof AVAILABLE_EMPLOYEES[0]) => {
+  interface EmployeeData {
+    id: string;
+    name: string;
+    initials: string;
+    shop: string;
+    shopId: string;
+    role?: string;
+  }
+
+  const addEmployeeToSession = (employee: EmployeeData) => {
+    console.log('=== addEmployeeToSession START ===');
+    console.log('Dodawany employee:', employee);
+
     const active = getActiveEmployees();
+    console.log('Aktualni pracownicy PRZED dodaniem:', active);
+
     const exists = active.find((e: any) => e.id === employee.id);
     if (!exists) {
       if (active.length >= 3) {
@@ -103,12 +207,46 @@ export function Navbar() {
       }
       
       if (active.length > 0) {
-        const firstShopId = active[0].shopId;
-        if (employee.shopId !== firstShopId) {
-          addToast({ 
-            type: "error", 
-            title: "Błąd logowania", 
-            message: `Nie można zalogować pracownika z innego punktu! Wszyscy pracownicy muszą być z tego samego sklepu (${active[0].shop}).` 
+        console.log('=== 🔍🔍🔍 SUPER DEBUG SPRAWDZANIE SKLEPU ===');
+        console.log('📦 PIERWSZY PRACOWNIK (active[0]):');
+        console.log('   - FULL OBJECT:', JSON.stringify(active[0], null, 2));
+        console.log('   - shop:', active[0].shop);
+        console.log('   - shop TYPE:', typeof active[0].shop);
+        console.log('   - shop LENGTH:', active[0].shop?.length);
+        console.log('   - shop CHARCODES:', [...(active[0].shop || '')].map(c => c.charCodeAt(0)));
+        console.log('   - shop TRIMMED:', active[0].shop?.trim());
+        console.log('   - shop LOWERCASE:', active[0].shop?.toLowerCase());
+        console.log('   - shopId:', active[0].shopId);
+        console.log('   - shopId TYPE:', typeof active[0].shopId);
+        console.log('');
+        console.log('📦 DODAWANY PRACOWNIK (employee):');
+        console.log('   - FULL OBJECT:', JSON.stringify(employee, null, 2));
+        console.log('   - shop:', employee.shop);
+        console.log('   - shop TYPE:', typeof employee.shop);
+        console.log('   - shop LENGTH:', employee.shop?.length);
+        console.log('   - shop CHARCODES:', [...(employee.shop || '')].map(c => c.charCodeAt(0)));
+        console.log('   - shop TRIMMED:', employee.shop?.trim());
+        console.log('   - shop LOWERCASE:', employee.shop?.toLowerCase());
+        console.log('   - shopId:', employee.shopId);
+        console.log('   - shopId TYPE:', typeof employee.shopId);
+        console.log('');
+
+        const shopMatch = employee.shop === active[0].shop;
+        const shopTrimmedMatch = employee.shop?.trim() === active[0].shop?.trim();
+        const shopLowercaseMatch = employee.shop?.toLowerCase() === active[0].shop?.toLowerCase();
+        const shopIdMatch = employee.shopId === active[0].shopId;
+
+        console.log('⚖️ PORÓWNANIA:');
+        console.log('   - shop EXACT match:', shopMatch);
+        console.log('   - shop TRIMMED match:', shopTrimmedMatch);
+        console.log('   - shop LOWERCASE match:', shopLowercaseMatch);
+        console.log('   - shopId match:', shopIdMatch);
+
+        if (!shopMatch && !shopIdMatch) {
+          addToast({
+            type: "error",
+            title: "Błąd logowania",
+            message: `Nie można zalogować pracownika z innego punktu! Wszyscy pracownicy muszą być z tego samego sklepu (${active[0].shop}).`
           });
           return false;
         }
@@ -117,16 +255,29 @@ export function Navbar() {
       active.push(employee);
       sessionStorage.setItem('activeEmployees', JSON.stringify(active));
       setActiveEmployeesCount(active.length);
+      console.log('Aktualni pracownicy PO dodaniu:', active);
+      console.log('Zapisano do sessionStorage activeEmployees:', JSON.parse(sessionStorage.getItem('activeEmployees') || '[]'));
     }
-    sessionStorage.setItem('selectedEmployeeId', employee.id);
     
+    sessionStorage.setItem('selectedEmployeeId', employee.id);
+    sessionStorage.setItem('userId', employee.id);
+    sessionStorage.setItem('userName', employee.name);
+    sessionStorage.setItem('userInitials', employee.initials);
+    sessionStorage.setItem('shopName', employee.shop);
+    sessionStorage.setItem('shopId', employee.shopId);
+    
+    const isOwner = employee.role === 'owner' || employee.role === 'admin';
+    sessionStorage.setItem('userRole', isOwner ? 'owner' : 'employee');
+
+    window.dispatchEvent(new Event('storage'));
+
     addAction({
-      type: "logowanie",
+      action_type: "logowanie",
       description: `Dodanie pracownika do sesji - ${employee.name}`,
-      employeeName: employee.name,
-      employeeId: employee.id,
-      shopName: employee.shop,
-      shopId: employee.shopId
+      actor_id: employee.id,
+      actor_name: employee.name,
+      shop_id: employee.shopId,
+      shop_name: employee.shop
     });
     
     return true;
@@ -147,21 +298,65 @@ export function Navbar() {
     
     const currentSelectedId = sessionStorage.getItem('selectedEmployeeId');
     if (currentSelectedId === employeeId && updatedEmployees.length > 0) {
-      sessionStorage.setItem('selectedEmployeeId', updatedEmployees[0].id);
+      const nextEmployee = updatedEmployees[0];
+      sessionStorage.setItem('selectedEmployeeId', nextEmployee.id);
+      sessionStorage.setItem('userId', nextEmployee.id);
+      sessionStorage.setItem('userName', nextEmployee.name);
+      sessionStorage.setItem('userInitials', nextEmployee.initials);
+      sessionStorage.setItem('shopName', nextEmployee.shop);
+      sessionStorage.setItem('shopId', nextEmployee.shopId);
+
+      const isOwner = (nextEmployee as any).role === 'owner' || (nextEmployee as any).role === 'admin';
+      sessionStorage.setItem('userRole', isOwner ? 'owner' : 'employee');
+
+      setUserName(nextEmployee.name);
+      setShopName(nextEmployee.shop);
+      setUserRole(isOwner ? 'owner' : 'employee');
     }
 
     setActiveEmployeesCount(updatedEmployees.length);
 
+    window.dispatchEvent(new Event('storage'));
+
     addAction({
-      type: "inna",
+      action_type: "inna",
       description: `Wylogowano pracownika z sesji - ${employeeToRemove.name}`,
-      employeeName: employeeToRemove.name,
-      employeeId: employeeToRemove.id,
-      shopName: employeeToRemove.shop,
-      shopId: employeeToRemove.shopId
+      actor_id: employeeToRemove.id,
+      actor_name: employeeToRemove.name,
+      shop_id: employeeToRemove.shopId,
+      shop_name: employeeToRemove.shop
     });
 
     addToast({ type: "success", title: "Wylogowano", message: `${employeeToRemove.name} został wylogowany z sesji! (Pozostało: ${updatedEmployees.length}/3)` });
+  };
+
+  const switchToEmployee = (employeeId: string) => {
+    const active = getActiveEmployees();
+    const employee = active.find((e: any) => e.id === employeeId);
+    
+    if (!employee) {
+      addToast({ type: "error", title: "Błąd", message: "Pracownik nie znaleziony w aktywnych!" });
+      return;
+    }
+    
+    sessionStorage.setItem('selectedEmployeeId', employee.id);
+    sessionStorage.setItem('userId', employee.id);
+    sessionStorage.setItem('userName', employee.name);
+    sessionStorage.setItem('userInitials', employee.initials);
+    sessionStorage.setItem('shopName', employee.shop);
+    sessionStorage.setItem('shopId', employee.shopId);
+
+    const isOwner = (employee as any).role === 'owner' || (employee as any).role === 'admin';
+    sessionStorage.setItem('userRole', isOwner ? 'owner' : 'employee');
+    
+    addToast({ 
+      type: "success", 
+      title: "Przełączono ✓", 
+      message: `Teraz pracujesz jako: ${employee.name}`,
+      duration: 3000
+    });
+    
+    window.location.reload();
   };
 
   const handleSwitchEmployee = (employeeId: string) => {
@@ -171,20 +366,37 @@ export function Navbar() {
     if (!employeeToSwitch) return;
 
     sessionStorage.setItem('selectedEmployeeId', employeeId);
+    sessionStorage.setItem('userId', employeeToSwitch.id);
+    sessionStorage.setItem('userName', employeeToSwitch.name);
+    sessionStorage.setItem('userInitials', employeeToSwitch.initials);
+    sessionStorage.setItem('shopName', employeeToSwitch.shop);
+    sessionStorage.setItem('shopId', employeeToSwitch.shopId);
+    
+    const isOwner = employeeToSwitch.id.includes('owner') || employeeToSwitch.id === '1' || employeeToSwitch.name.toLowerCase().includes('właściciel');
+    sessionStorage.setItem('userRole', isOwner ? 'owner' : 'employee');
 
     addAction({
-      type: "inna",
+      action_type: "inna",
       description: `Przełączono profil na - ${employeeToSwitch.name}`,
-      employeeName: employeeToSwitch.name,
-      employeeId: employeeToSwitch.id,
-      shopName: employeeToSwitch.shop,
-      shopId: employeeToSwitch.shopId
+      actor_id: employeeToSwitch.id,
+      actor_name: employeeToSwitch.name,
+      shop_id: employeeToSwitch.shopId,
+      shop_name: employeeToSwitch.shop
     });
 
     setUserName(employeeToSwitch.name);
     setShopName(employeeToSwitch.shop);
     
     addToast({ type: "info", title: "Przełączono profil", message: `Aktualnie pracujesz jako: ${employeeToSwitch.name}` });
+    
+    window.dispatchEvent(new CustomEvent('employee_switched', { 
+      detail: { 
+        employeeId: employeeToSwitch.id,
+        employeeName: employeeToSwitch.name,
+        shopId: employeeToSwitch.shopId,
+        shopName: employeeToSwitch.shop
+      } 
+    }));
   };
 
   const [shopName, setShopName] = useState<string | null>(null);
@@ -195,45 +407,113 @@ export function Navbar() {
     setShopName(shop);
   }, []);
 
-  const handleAddEmployee = () => {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const loadShopAccessStatus = async () => {
+      try {
+        console.log('=== ŁADOWANIE STATUSU DOSTĘPU DO SKLEPÓW ===');
+        const status = await shopAccessService.getAllShopsStatus();
+        console.log('Status sklepów:', status);
+        setShopAccessStatus(status);
+
+        const blockedCount = shopAccessService.getBlockedShopsCount();
+        if (blockedCount > 0) {
+          const blockedInfo = shopAccessService.getBlockedShopsInfo();
+          console.log('Zablokowane sklepy:', blockedInfo);
+        }
+      } catch (error) {
+        console.error('Błąd ładowania statusu dostępu do sklepów:', error);
+      }
+    };
+
+    loadShopAccessStatus();
+
+    const intervalId = setInterval(loadShopAccessStatus, 10000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  const handleAddEmployee = async () => {
+    console.log('=== handleAddEmployee START ===');
+    console.log('Login:', login);
+    console.log('Password:', password);
+    console.log('activeEmployeesCount:', activeEmployeesCount);
+
     if (!login || !password) {
+      console.log('BRAK LOGINU LUB HASŁA!');
       addToast({ type: "error", title: "Błąd", message: "Wprowadź login i hasło!" });
       return;
     }
 
-    let employeeData: typeof AVAILABLE_EMPLOYEES[0] | null = null;
-
-    if (login.toLowerCase() === "pracownik" && password === "mobilehub") {
-      employeeData = {
-        id: "1",
-        name: "Jan Kowalski",
-        initials: "JK",
-        shop: "Kaufland Włocławek",
-        shopId: "1"
-      };
-    } else if (login.toLowerCase() === "kamil" && password === "nowicki") {
-      employeeData = AVAILABLE_EMPLOYEES[0];
-    } else if (login.toLowerCase() === "anna" && password === "nowak") {
-      employeeData = AVAILABLE_EMPLOYEES[1];
-    }
-
-    if (!employeeData) {
-      addToast({ type: "error", title: "Błąd logowania", message: "Błędny login lub hasło!" });
+    if (activeEmployeesCount >= 3) {
+      addToast({ type: "error", title: "Błąd", message: "Maksymalnie 3 pracowników może być zalogowanych jednocześnie!" });
       return;
     }
 
-    const success = addEmployeeToSession(employeeData);
-    if (success) {
-      setIsAddEmployeeOpen(false);
-      setLogin("");
-      setPassword("");
-      setShowPassword(false);
-      addToast({ 
-        type: "success", 
-        title: "Zalogowano ✓", 
-        message: `${employeeData.name} zalogowany do systemu! (Aktywni pracownicy: ${activeEmployeesCount + 1}/3)`,
-        duration: 4000
-      });
+    setIsAddingEmployee(true);
+
+    try {
+      const user = await usersService.login(login, password);
+      console.log('Wynik logowania z bazy:', user);
+
+      if (!user) {
+        console.log('BŁĘDNE DANE LOGOWANIA! Nie znaleziono użytkownika w bazie');
+        addToast({ type: "error", title: "Błąd logowania", message: "Błędny login lub hasło!" });
+        setIsAddingEmployee(false);
+        return;
+      }
+
+      const userShops = await usersService.getUserShops(user.id);
+      console.log('Sklepy użytkownika:', userShops);
+
+      if (!userShops || userShops.length === 0) {
+        addToast({ type: "error", title: "Błąd", message: "Użytkownik nie ma przypisanego sklepu!" });
+        setIsAddingEmployee(false);
+        return;
+      }
+
+      const primaryShop = userShops.find(s => s.is_primary) || userShops[0];
+
+      const employeeData: EmployeeData = {
+        id: user.id,
+        name: `${user.first_name} ${user.last_name}`,
+        initials: user.initials || `${user.first_name[0]}${user.last_name[0]}`,
+        shop: primaryShop.shop_name,
+        shopId: primaryShop.shop_id,
+        role: user.role
+      };
+
+      console.log('Przygotowano employeeData:', employeeData);
+
+      const success = addEmployeeToSession(employeeData);
+      console.log('addEmployeeToSession returned:', success);
+      console.log('employeeData.name:', employeeData.name);
+
+      if (success) {
+        setIsAddEmployeeOpen(false);
+        setLogin("");
+        setPassword("");
+        setShowPassword(false);
+
+        console.log('=== Ustawiam stan Reacta na ===', employeeData.name);
+        setUserName(employeeData.name);
+        setShopName(employeeData.shop);
+        const isOwner = user.role === 'owner' || user.role === 'admin';
+        setUserRole(isOwner ? 'owner' : 'employee');
+
+        addToast({
+          type: "success",
+          title: "Zalogowano ✓",
+          message: `${employeeData.name} zalogowany do systemu! (Aktywni pracownicy: ${activeEmployeesCount + 1}/3)`,
+          duration: 4000
+        });
+      }
+    } catch (error) {
+      console.error('Błąd podczas logowania pracownika:', error);
+      addToast({ type: "error", title: "Błąd", message: "Wystąpił błąd podczas logowania!" });
+    } finally {
+      setIsAddingEmployee(false);
     }
   };
 
@@ -319,20 +599,11 @@ export function Navbar() {
               </DropdownMenuItem>
 
               <DropdownMenuItem variant="default" className="p-0">
-                <Link href="/dokumenty" className="flex items-center w-full px-2 py-2 font-bold text-xs uppercase tracking-tight hover:bg-accent rounded-xl transition-colors">
-                  <BookOpen className="mr-2 h-4 w-4 text-primary" />
-                  <span>Dokumenty</span>
+                <Link href="/faktury" className="flex items-center w-full px-2 py-2 font-bold text-xs uppercase tracking-tight hover:bg-accent rounded-xl transition-colors">
+                  <FileText className="mr-2 h-4 w-4 text-primary" />
+                  <span>Faktury</span>
                 </Link>
               </DropdownMenuItem>
-
-              {!isEmployee && (
-                <DropdownMenuItem variant="default" className="p-0">
-                  <Link href="/faktury" className="flex items-center w-full px-2 py-2 font-bold text-xs uppercase tracking-tight hover:bg-accent rounded-xl transition-colors">
-                    <FileText className="mr-2 h-4 w-4 text-primary" />
-                    <span>Faktury</span>
-                  </Link>
-                </DropdownMenuItem>
-              )}
 
               <DropdownMenuItem variant="default" className="p-0">
                 <Link href="/grafik" className="flex items-center w-full px-2 py-2 font-bold text-xs uppercase tracking-tight hover:bg-accent rounded-xl transition-colors">
@@ -356,11 +627,21 @@ export function Navbar() {
               <DropdownMenuItem variant="destructive" className="p-0">
                 <Link href="/login" className="flex items-center w-full px-2 py-2 font-bold text-xs uppercase tracking-tight hover:bg-red-50 rounded-xl transition-colors" onClick={() => {
                   if (typeof window !== "undefined") {
+                    const userId = sessionStorage.getItem('userId');
+                    if (userId) {
+                      shopAccessService.unblockAllShopsForUser(userId).catch(console.error);
+                    }
                     sessionStorage.removeItem("userRole");
                     sessionStorage.removeItem("userName");
+                    sessionStorage.removeItem("userId");
+                    sessionStorage.removeItem("userInitials");
+                    sessionStorage.removeItem("shopId");
+                    sessionStorage.removeItem("shopName");
                     sessionStorage.removeItem("userShop");
                     sessionStorage.removeItem("activeEmployees");
                     sessionStorage.removeItem("selectedEmployeeId");
+                    sessionStorage.removeItem("shopAccessStatus");
+                    shopAccessService.clearSession();
                   }
                 }}>
                   <LogOut className="mr-2 h-4 w-4" />
@@ -452,6 +733,7 @@ export function Navbar() {
                     
                     {getActiveEmployees().map((emp: any) => {
                       const isCurrent = sessionStorage.getItem('selectedEmployeeId') === emp.id;
+                      console.log('Rendering employee:', emp, 'isCurrent:', isCurrent);
                       return (
                         <div 
                           key={emp.id} 
@@ -531,13 +813,25 @@ export function Navbar() {
               >
                 Anuluj
               </Button>
-              <Button 
+              <Button
                 onClick={handleAddEmployee}
-                disabled={!login || !password || activeEmployeesCount >= 3}
+                disabled={!login || !password || activeEmployeesCount >= 3 || isAddingEmployee}
                 className="bg-emerald-600 hover:bg-emerald-700 rounded-xl"
               >
-                <LogIn className="h-4 w-4 mr-2" />
-                Zaloguj Pracownika
+                {isAddingEmployee ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    Logowanie...
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Zaloguj Pracownika
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -8,7 +8,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
-import { getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
+import { getSessionStorageSafe } from "@/lib/storage";
+import { usersService } from "@/lib/supabase/users";
+import { shopsService } from "@/lib/supabase/shops";
+import { supabase } from "@/lib/supabase";
+import { auditService } from "@/lib/supabase/actions";
 import { 
   Dialog, 
   DialogContent, 
@@ -51,39 +55,82 @@ export default function PracownicyPage() {
     password: ""
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [employees, setEmployees] = useState([
-    { id: "1", name: "Piotr Zakrzewski", role: "Właściciel", initials: "PZ", shops: ["Kaufland Włocławek", "Riviera Gdynia", "Dominikańska Wrocław"], status: "Online", login: "piotr.z", password: "PIN 123456" },
+    { id: "550e8400-e29b-41d4-a716-446655440002", name: "Piotr Zakrzewski", role: "Właściciel", initials: "PZ", shops: ["Kaufland Włocławek", "Riviera Gdynia", "Dominikańska Wrocław"], status: "Online", login: "piotr.z", password: "PIN 123456" },
     // Kaufland Włocławek
-    { id: "2", name: "Tomasz Lewandowski", role: "Pracownik", initials: "TL", shops: ["Kaufland Włocławek"], status: "W pracy", login: "tomasz.l", password: "PIN 654321" },
+    { id: "550e8400-e29b-41d4-a716-446655440001", name: "Jan Kowalski", role: "Pracownik", initials: "JK", shops: ["Kaufland Włocławek"], status: "W pracy", login: "pracownik", password: "mobilehub" },
     // Riviera Gdynia
-    { id: "3", name: "Marta Kowalczyk", role: "Pracownik", initials: "MK", shops: ["Riviera Gdynia"], status: "W pracy", login: "marta.k", password: "PIN 223344" },
+    { id: "550e8400-e29b-41d4-a716-446655440004", name: "Anna Nowak", role: "Pracownik", initials: "AN", shops: ["Kaufland Włocławek"], status: "W pracy", login: "anna", password: "nowak" },
     // Dominikańska Wrocław
-    { id: "4", name: "Kamil Nowicki", role: "Pracownik", initials: "KN", shops: ["Dominikańska Wrocław"], status: "Offline", login: "kamil.n", password: "PIN 556677" },
+    { id: "550e8400-e29b-41d4-a716-446655440003", name: "Kamil Nowicki", role: "Pracownik", initials: "KN", shops: ["Kaufland Włocławek"], status: "Offline", login: "kamil", password: "nowicki" },
   ]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const saved = localStorage.getItem('pracownicy_employees');
-    if (saved) {
-      try {
-        setEmployees(JSON.parse(saved));
-      } catch { }
-    }
+    loadEmployees();
   }, []);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem('pracownicy_employees', JSON.stringify(employees));
-  }, [employees]);
+  const loadEmployees = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      let data;
+      try {
+        data = await usersService.getAllWithShops();
+        console.log('Pobrano pracowników ze sklepami z bazy:', data?.length || 0);
+      } catch (dbError) {
+        console.error('Błąd pobierania z bazy, używam domyślnych:', dbError);
+        data = null;
+      }
+      
+      if (data && data.length > 0) {
+        const formattedEmployees = data.map(user => {
+          const shopNames = user.shops && Array.isArray(user.shops) && user.shops.length > 0 
+            ? user.shops.map((s: any) => s.shop_name)
+            : ["Brak przypisanego sklepu"];
+          
+          console.log(`Pracownik: ${user.first_name} ${user.last_name}, sklepy:`, shopNames);
+          
+          return {
+            id: user.id,
+            name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Pracownik',
+            role: user.role === 'owner' ? 'Właściciel' : 
+                  user.role === 'admin' ? 'Administrator' : 
+                  user.role === 'employee' ? 'Pracownik' : user.role,
+            initials: user.initials || '??',
+            shops: shopNames,
+            status: user.is_active ? "Online" : "Offline",
+            login: user.login || '',
+            password: `PIN ${user.password_hash?.substring(0, 6) || '******'}`
+          };
+        });
+        
+        setEmployees(formattedEmployees);
+        console.log('Ustawiono pracowników:', formattedEmployees.length);
+      } else {
+        console.log('Brak danych z bazy, pozostawiono domyślnych');
+      }
+    } catch (err) {
+      console.error('Error loading employees:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load employees');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const [showCredentialsFor, setShowCredentialsFor] = useState<any | null>(null);
 
   const generateCredentials = () => {
     if (!newEmployee.name) return;
     
-    const nameParts = newEmployee.name.trim().split(" ");
-    const login = nameParts.length > 1 
+    const nameParts = newEmployee.name.trim().split(" ").filter(part => part.length > 0);
+    
+    if (nameParts.length === 0) return;
+    
+    const login = nameParts.length > 1 && nameParts[1]
       ? `${nameParts[0].toLowerCase()}.${nameParts[1][0].toLowerCase()}${Math.floor(Math.random() * 99)}`
       : `${nameParts[0].toLowerCase()}${Math.floor(Math.random() * 99)}`;
 
@@ -94,49 +141,161 @@ export default function PracownicyPage() {
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
-  const handleAddEmployee = () => {
+  const handleAddEmployee = async () => {
     if (!newEmployee.name || !newEmployee.login || !newEmployee.password) return;
     
-    const shopLabel = shops.find(s => s.id === selectedShop)?.label || "";
-    
-    const employee = {
-      id: Math.random().toString(36).substring(2, 11),
-      name: newEmployee.name,
-      role: newEmployee.role.charAt(0).toUpperCase() + newEmployee.role.slice(1),
-      initials: newEmployee.name.split(" ").map(n => n[0]).join("").toUpperCase(),
-      shops: [shopLabel],
-      status: "Offline",
-      login: newEmployee.login,
-      password: `PIN ${newEmployee.password}`
+    try {
+      const nameParts = newEmployee.name.trim().split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
+      const initials = nameParts.map(n => n[0]).join("").toUpperCase();
+      
+      const createdUser = await usersService.create({
+        first_name: firstName,
+        last_name: lastName,
+        initials: initials,
+        login: newEmployee.login,
+        password_hash: newEmployee.password,
+        email: `${newEmployee.login.toLowerCase()}@test.com`,
+        role: (newEmployee.role === 'pracownik' ? 'employee' :
+              newEmployee.role === 'wlasciciel' ? 'owner' :
+              newEmployee.role) as 'owner' | 'employee' | 'admin',
+        is_active: true,
+        deleted_at: null
+      });
+      
+      console.log('Utworzono użytkownika:', createdUser);
+      console.log('Wybrany sklep (selectedShop):', selectedShop);
+      console.log('Typ selectedShop:', typeof selectedShop);
+      
+      if (selectedShop && selectedShop !== '' && selectedShop !== 'undefined') {
+        try {
+          console.log('Próba przypisania do sklepu:', {
+            user_id: createdUser.id,
+            shop_id: selectedShop,
+            is_primary: true
+          });
+          
+          const { data: shopData, error: shopError } = await supabase
+            .from('user_shops')
+            .insert({
+              user_id: createdUser.id,
+              shop_id: selectedShop,
+              is_primary: true
+            })
+            .select();
+          
+          console.log('Wynik insertu do user_shops:', { shopData, shopError });
+          
+          if (shopError) {
+            console.error('Błąd przypisywania do sklepu:', JSON.stringify(shopError));
+            console.error('Error code:', shopError.code);
+            console.error('Error message:', shopError.message);
+            console.error('Error details:', shopError.details);
+            console.error('Error hint:', shopError.hint);
+          } else {
+            console.log('Przypisano do sklepu:', selectedShop);
+          }
+        } catch (shopErr) {
+          console.error('Wyjątek przy przypisywaniu do sklepu:', shopErr);
+        }
+      } else {
+        console.log('Pominięto przypisanie do sklepu - brak wybranego sklepu');
+      }
+      
+      const shopLabel = shops.find(s => s.id === selectedShop)?.label || selectedShop || "Brak przypisanego sklepu";
+      
+      const employee = {
+        id: createdUser.id,
+        name: newEmployee.name,
+        role: newEmployee.role.charAt(0).toUpperCase() + newEmployee.role.slice(1),
+        initials: initials,
+        shops: [shopLabel],
+        status: "Offline",
+        login: newEmployee.login,
+        password: `PIN ${newEmployee.password}`
+      };
+
+      setEmployees([...employees, employee]);
+      window.dispatchEvent(new CustomEvent('pracownicy_updated'));
+      addToast({ message: `Dodano pracownika ${employee.name}`, variant: "success" });
+      setShowCredentialsFor(employee);
+      setNewEmployee({ name: "", role: "pracownik", login: "", password: "" });
+      setIsAddDialogOpen(false);
+    } catch (error) {
+      console.error('Error adding employee:', error);
+      addToast({ message: "Błąd dodawania pracownika", variant: "error" });
+    }
+  };
+
+  const removeEmployee = async (id: string) => {
+    try {
+      await usersService.softDelete(id);
+      
+      const emp = employees.find(e => e.id === id);
+      setEmployees(employees.filter(emp => emp.id !== id));
+      window.dispatchEvent(new CustomEvent('pracownicy_updated'));
+      if (emp) addToast({ message: `Usunięto pracownika ${emp.name}`, variant: "info" });
+    } catch (error) {
+      console.error('Error removing employee:', error);
+      addToast({ message: "Błąd usuwania pracownika", variant: "error" });
+    }
+  };
+
+  const [shops, setShops] = useState<{id: string; label: string; count: number}[]>([]);
+  const [isLoadingShops, setIsLoadingShops] = useState(true);
+
+  useEffect(() => {
+    loadShops();
+  }, []);
+
+  const loadShops = async () => {
+    try {
+      setIsLoadingShops(true);
+      console.log('Pobieranie sklepów z bazy...');
+      
+      const shopsData = await shopsService.getAll();
+      console.log('Pobrano sklepy:', shopsData);
+      
+      const shopList = shopsData.map(shop => ({
+        id: shop.id,
+        label: shop.name,
+        count: employees.filter(e => e.shops.includes(shop.name)).length
+      }));
+      
+      setShops(shopList);
+      console.log('Ustawiono listę sklepów:', shopList);
+    } catch (error) {
+      console.error('Błąd podczas pobierania sklepów:', error);
+      setShops([]);
+    } finally {
+      setIsLoadingShops(false);
+    }
+  };
+
+  useEffect(() => {
+    if (employees.length > 0 && !isLoadingShops) {
+      loadShops();
+    }
+  }, [employees]);
+
+  useEffect(() => {
+    const handleShopsUpdated = () => {
+      console.log('Zdarzenie shops_updated - odświeżanie sklepów');
+      loadShops();
     };
-
-    setEmployees([...employees, employee]);
-    window.dispatchEvent(new CustomEvent('pracownicy_updated'));
-    addToast({ message: `Dodano pracownika ${employee.name}`, variant: "success" });
-    setShowCredentialsFor(employee);
-    setNewEmployee({ name: "", role: "pracownik", login: "", password: "" });
-    setIsAddDialogOpen(false);
-  };
-
-  const removeEmployee = (id: string) => {
-    const emp = employees.find(e => e.id === id);
-    setEmployees(employees.filter(emp => emp.id !== id));
-    window.dispatchEvent(new CustomEvent('pracownicy_updated'));
-    if (emp) addToast({ message: `Usunięto pracownika ${emp.name}`, variant: "info" });
-  };
-
-  const shops = [
-    { id: "kaufland-wloclawek", label: "Kaufland Włocławek", count: employees.filter(e => e.shops.includes("Kaufland Włocławek")).length },
-    { id: "riviera-gdynia", label: "Riviera Gdynia", count: employees.filter(e => e.shops.includes("Riviera Gdynia")).length },
-    { id: "dominikanska-wroclaw", label: "Dominikańska Wrocław", count: employees.filter(e => e.shops.includes("Dominikańska Wrocław")).length },
-  ];
+    
+    window.addEventListener('shops_updated', handleShopsUpdated);
+    return () => window.removeEventListener('shops_updated', handleShopsUpdated);
+  }, []);
 
   const filteredEmployees = selectedShop 
-    ? employees.filter(emp => 
-        emp.shops.some(s => s.toLowerCase().includes(selectedShop.split('-')[0])) && 
+    ? employees.filter(emp => {
+        const selectedShopLabel = shops.find(s => s.id === selectedShop)?.label;
+        return emp.shops.some(s => s.toLowerCase().includes(selectedShopLabel?.toLowerCase() || '')) && 
         emp.role.toLowerCase() !== "właściciel" && 
-        emp.role.toLowerCase() !== "wlasciciel"
-      )
+        emp.role.toLowerCase() !== "wlasciciel";
+      })
     : [];
 
   return (
@@ -144,6 +303,32 @@ export default function PracownicyPage() {
       <Navbar />
       
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full space-y-6">
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center space-y-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="text-sm text-muted-foreground">Ładowanie pracowników...</p>
+            </div>
+          </div>
+        )}
+        
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+            <p className="text-red-700 text-sm font-medium">Błąd ładowania danych</p>
+            <p className="text-red-600 text-xs mt-1">{error}</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={loadEmployees}
+              className="mt-3 border-red-300 text-red-700 hover:bg-red-50"
+            >
+              Spróbuj ponownie
+            </Button>
+          </div>
+        )}
+        
+        {!isLoading && !error && (
+        <>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Button 
@@ -238,7 +423,6 @@ export default function PracownicyPage() {
                         onValueChange={(val) => val && setNewEmployee({ ...newEmployee, role: val })}
                         items={[
                           { value: "pracownik", label: "Pracownik" },
-                          { value: "kierownik", label: "Kierownik" },
                           { value: "wlasciciel", label: "Właściciel" }
                         ]}
                       >
@@ -247,7 +431,6 @@ export default function PracownicyPage() {
                         </UISelectTrigger>
                         <UISelectContent className="rounded-2xl">
                           <UISelectItem value="pracownik">Pracownik</UISelectItem>
-                          <UISelectItem value="kierownik">Kierownik</UISelectItem>
                           <UISelectItem value="wlasciciel">Właściciel</UISelectItem>
                         </UISelectContent>
                       </UISelect>
@@ -308,9 +491,80 @@ export default function PracownicyPage() {
 
                     <Button 
                       onClick={() => setShowCredentialsFor(null)}
-                      className="w-full h-12 bg-secondary hover:bg-secondary/90 text-white rounded-xl font-black text-sm uppercase tracking-widest"
+                      className="w-full h-12 bg-secondary hover:bg-secondary/90 text-white rounded-xl font-black text-sm uppercase tracking-widest mb-3"
                     >
                       Rozumiem
+                    </Button>
+
+                    <Button 
+                      onClick={async () => {
+                        if (showCredentialsFor?.login && showCredentialsFor?.password) {
+                          try {
+                            sessionStorage.clear();
+                            
+                            console.log('Próba logowania na konto:', showCredentialsFor.login);
+                            
+                            const user = await usersService.login(showCredentialsFor.login, showCredentialsFor.password.replace('PIN ', ''));
+                            
+                            if (user) {
+                              console.log('Zalogowano pomyślnie:', user);
+                              console.log('Rola użytkownika:', user.role);
+                              console.log('ID użytkownika:', user.id);
+                              
+                              sessionStorage.setItem("userRole", user.role);
+                              sessionStorage.setItem("userName", `${user.first_name} ${user.last_name}`);
+                              sessionStorage.setItem("userId", user.id);
+                              sessionStorage.setItem("userInitials", user.initials || `${user.first_name[0]}${user.last_name[0]}`);
+
+                              const userShops = await usersService.getUserShops(user.id);
+                              console.log('=== PRACOWNICY - Sklepy użytkownika ===');
+                              console.log('User:', `${user.first_name} ${user.last_name}`);
+                              console.log('Sklepy:', userShops);
+
+                              if (userShops && userShops.length > 0) {
+                                const primaryShop = userShops.find(s => s.is_primary) || userShops[0];
+                                console.log('Primary shop:', primaryShop);
+                                console.log('Shop ID:', primaryShop.shop_id, '(type:', typeof primaryShop.shop_id + ')');
+                                console.log('Shop Name:', primaryShop.shop_name, '(type:', typeof primaryShop.shop_name + ')');
+
+                                sessionStorage.setItem("shopId", primaryShop.shop_id);
+                                sessionStorage.setItem("shopName", primaryShop.shop_name);
+
+                                console.log('✅ Ustawiono sklep w sesji:');
+                                console.log('  - shopId:', sessionStorage.getItem("shopId"));
+                                console.log('  - shopName:', sessionStorage.getItem("shopName"));
+                              } else {
+                                console.warn('⚠️ Użytkownik nie ma przypisanych sklepów!');
+                              }
+                              
+                              await auditService.logLogin({
+                                userId: user.id,
+                                userName: `${user.first_name} ${user.last_name}`
+                              });
+                              
+                              setShowCredentialsFor(null);
+                              
+                              console.log('Przekierowanie dla roli:', user.role);
+                              
+                              if (user.role === 'owner' || user.role === 'admin' || user.role === 'employee') {
+                                window.location.href = "/";
+                              } else {
+                                window.location.href = "/pracownik";
+                              }
+                            } else {
+                              alert('Błąd logowania: Nieprawidłowy login lub PIN');
+                              console.error('Błąd login dla:', showCredentialsFor.login);
+                            }
+                          } catch (error) {
+                            console.error('Błąd podczas logowania:', error);
+                            alert('Błąd podczas logowania: ' + (error instanceof Error ? error.message : 'Nieznany błąd'));
+                          }
+                        }
+                      }}
+                      className="w-full h-12 bg-primary hover:bg-primary/90 text-white rounded-xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2"
+                    >
+                      <Key className="h-4 w-4" />
+                      Zaloguj na to konto
                     </Button>
                   </div>
                 </DialogContent>
@@ -402,6 +656,8 @@ export default function PracownicyPage() {
               </div>
             )}
           </div>
+        )}
+        </>
         )}
       </main>
     </div>

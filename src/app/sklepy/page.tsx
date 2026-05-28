@@ -20,6 +20,17 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getSessionStorageSafe } from "@/lib/storage";
+import { usersService } from "@/lib/supabase/users";
+import { shopsService } from "@/lib/supabase/shops";
+import { salesService } from "@/lib/supabase/sales";
+import { costsService } from "@/lib/supabase/costs";
+import { cashRegisterService } from "@/lib/supabase/cashRegister";
+import { shiftsService } from "@/lib/supabase/shifts";
+import { documentsService } from "@/lib/supabase/documents";
+import { inventoryService } from "@/lib/supabase/inventory";
+import { invoicesService } from "@/lib/supabase/invoices";
+import { auditService } from "@/lib/supabase/actions";
+import { supabase } from "@/lib/supabase";
 import { 
   Dialog, 
   DialogContent, 
@@ -34,6 +45,7 @@ interface Shop {
   name: string;
   address: string;
   employees: number;
+  is_active?: boolean;
 }
 
 export default function SklepyPage() {
@@ -49,11 +61,42 @@ export default function SklepyPage() {
     setUserRole(role);
   }, [router]);
 
-  const [shops, setShops] = useState<Shop[]>([
-    { id: "1", name: "Kaufland Włocławek", address: "ul. Bauera 1, 87-800 Włocławek", employees: 1 },
-    { id: "2", name: "Riviera Gdynia", address: "ul. Kazimierza Górskiego 2, 81-304 Gdynia", employees: 1 },
-    { id: "3", name: "Dominikańska Wrocław", address: "pl. Dominikański 3, 50-159 Wrocław", employees: 1 },
-  ]);
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadShops();
+  }, []);
+
+  const loadShops = async () => {
+    try {
+      setIsLoading(true);
+      const shopsData = await shopsService.getAll();
+      console.log('Pobrano sklepy z bazy:', shopsData);
+      
+      const shopsWithEmployees = await Promise.all(shopsData.map(async (shop) => {
+        const { count } = await supabase
+          .from('user_shops')
+          .select('*', { count: 'exact', head: true })
+          .eq('shop_id', shop.id)
+          .is('unassigned_at', null);
+        
+        return {
+          id: shop.id,
+          name: shop.name,
+          address: shop.address || 'Brak adresu',
+          employees: count || 0,
+          is_active: shop.is_active
+        };
+      }));
+      
+      setShops(shopsWithEmployees);
+    } catch (error) {
+      console.error('Błąd podczas ładowania sklepów:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const [newShop, setNewShop] = useState({
     name: "",
@@ -64,18 +107,91 @@ export default function SklepyPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
 
-  const handleAddShop = () => {
+  const handleAddShop = async () => {
     if (!newShop.name || !newShop.address) return;
     
-    const shop: Shop = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...newShop,
-      employees: 0
-    };
+    try {
+      console.log('Dodawanie nowego sklepu:', newShop);
+      
+      const createdShop = await shopsService.create({
+        code: newShop.name.toLowerCase().replace(/\s+/g, '_').substring(0, 20),
+        name: newShop.name,
+        address: newShop.address,
+        is_active: true
+      });
+      
+      console.log('Utworzono sklep w bazie:', createdShop);
+      
+      const { data: owners } = await supabase
+        .from('users')
+        .select('id')
+        .in('role', ['owner', 'admin'])
+        .eq('is_active', true)
+        .is('deleted_at', null);
+      
+      console.log('Znaleziono właścicieli:', owners?.length || 0);
+      
+      if (owners && owners.length > 0) {
+        const ownerAssignments = owners.map((owner, index) => ({
+          user_id: owner.id,
+          shop_id: createdShop.id,
+          is_primary: index === 0
+        }));
+        
+        const { error: assignError } = await supabase
+          .from('user_shops')
+          .insert(ownerAssignments);
+        
+        if (assignError) {
+          console.error('Błąd przypisywania właścicieli do sklepu:', assignError);
+        } else {
+          console.log(`Przypisano ${owners.length} właścicieli do sklepu ${createdShop.name}`);
+          
+          const shopWithEmployees: Shop = {
+            id: createdShop.id,
+            name: createdShop.name,
+            address: createdShop.address || newShop.address,
+            employees: owners.length,
+            is_active: createdShop.is_active
+          };
 
-    setShops([...shops, shop]);
-    setNewShop({ name: "", address: "" });
-    setIsDialogOpen(false);
+          setShops([...shops, shopWithEmployees]);
+          setNewShop({ name: "", address: "" });
+          setIsDialogOpen(false);
+          
+          window.dispatchEvent(new CustomEvent('shops_updated'));
+          alert(`✅ Dodano sklep: ${createdShop.name}\n👤 Automatycznie przypisano ${owners.length} właścicieli`);
+          return;
+        }
+      }
+      
+      const shop: Shop = {
+        id: createdShop.id,
+        name: createdShop.name,
+        address: createdShop.address || newShop.address,
+        employees: 0,
+        is_active: createdShop.is_active
+      };
+
+      setShops([...shops, shop]);
+      setNewShop({ name: "", address: "" });
+      setIsDialogOpen(false);
+      
+      window.dispatchEvent(new CustomEvent('shops_updated'));
+      alert(`✅ Dodano sklep: ${createdShop.name}`);
+    } catch (error: any) {
+      console.error('Błąd podczas dodawania sklepu:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      console.error('Error message:', error?.message);
+      console.error('Error code:', error?.code);
+      console.error('Error details (supabase):', error?.details);
+      console.error('Error hint:', error?.hint);
+      
+      alert('Błąd podczas dodawania sklepu:\n\n' + 
+        (error?.message || 'Nieznany błąd') + 
+        '\n\nCode: ' + (error?.code || 'brak') +
+        '\nDetails: ' + (error?.details || 'brak'));
+    }
   };
 
   const handleEditClick = (shop: Shop) => {
@@ -83,17 +199,110 @@ export default function SklepyPage() {
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateShop = () => {
+  const handleUpdateShop = async () => {
     if (!editingShop || !editingShop.name || !editingShop.address) return;
     
-    setShops(prev => prev.map(s => s.id === editingShop.id ? editingShop : s));
-    setEditingShop(null);
-    setIsEditDialogOpen(false);
+    try {
+      console.log('Aktualizacja sklepu:', editingShop);
+      
+      const updatedShop = await shopsService.update(editingShop.id, {
+        name: editingShop.name,
+        address: editingShop.address
+      });
+      
+      console.log('Zaktualizowano sklep w bazie:', updatedShop);
+      
+      setShops(prev => prev.map(s => s.id === editingShop.id ? {
+        ...s,
+        name: updatedShop.name,
+        address: updatedShop.address || editingShop.address
+      } : s));
+      setEditingShop(null);
+      setIsEditDialogOpen(false);
+      
+      window.dispatchEvent(new CustomEvent('shops_updated'));
+      alert(`✅ Zaktualizowano sklep: ${updatedShop.name}`);
+    } catch (error) {
+      console.error('Błąd podczas aktualizacji sklepu:', error);
+      alert('Błąd podczas aktualizacji sklepu: ' + (error instanceof Error ? error.message : 'Nieznany błąd'));
+    }
   };
 
-  const handleDeleteShop = (id: string, name: string) => {
-    if (typeof window !== 'undefined' && window.confirm(`CZY NA PEWNO CHCESZ USUNĄĆ SKLEP: ${name.toUpperCase()}?\n\nUsunięcie sklepu spowoduje utratę powiązanych danych. Tej operacji nie można cofnąć.`)) {
-      setShops(prev => prev.filter(s => s.id !== id));
+  const handleDeleteShop = async (id: string, name: string) => {
+    if (typeof window !== 'undefined' && window.confirm(`CZY NA PEWNO CHCESZ USUNĄĆ SKLEP: ${name.toUpperCase()}?\n\n⚠️ UWAGA: Usunięcie sklepu spowoduje TRWAŁE usunięcie wszystkich powiązanych danych:\n\n• 📊 Sprzedaże i pozycje sprzedaży\n• 💰 Koszty i doładowania\n• 📄 Faktury i ich pozycje\n• 📋 Dokumenty\n• 📦 Magazyn/towar\n• 🕐 Zmiany pracowników\n• 💵 Zamknięcia kasy\n• 📝 Logi audytowe\n• 👥 Powiązania pracowników\n\nTej operacji nie można cofnąć!`)) {
+      try {
+        console.log('🗑️ Rozpoczynam kaskadowe usuwanie sklepu:', id, name);
+        
+        // 1. Usuń powiązania użytkowników ze sklepem (tabela user_shops)
+        console.log('1️⃣ Usuwanie powiązań użytkowników...');
+        await supabase
+          .from('user_shops')
+          .delete()
+          .eq('shop_id', id);
+        
+        // 2. Usuń audyt log (najpierw bo może mieć foreign keys)
+        console.log('2️⃣ Usuwanie logów audytowych...');
+        await auditService.deleteByShopId(id);
+        
+        // 3. Usuń zamknięcia kasy
+        console.log('3️⃣ Usuwanie zamknięć kasy...');
+        await cashRegisterService.deleteByShopId(id);
+        
+        // 4. Usuń zmiany pracowników
+        console.log('4️⃣ Usuwanie zmian pracowników...');
+        await shiftsService.deleteByShopId(id);
+        
+        // 5. Usuń dokumenty (również z storage!)
+        console.log('5️⃣ Usuwanie dokumentów...');
+        const { data: docs } = await supabase
+          .from('documents')
+          .select('id, file_path')
+          .eq('shop_id', id);
+        
+        if (docs && docs.length > 0) {
+          // Usuń pliki z Storage
+          for (const doc of docs) {
+            if (doc.file_path) {
+              try {
+                await supabase.storage.from('documents').remove([doc.file_path]);
+              } catch (storageError) {
+                console.warn('⚠️ Błąd usuwania pliku z storage:', storageError);
+              }
+            }
+          }
+        }
+        await documentsService.deleteByShopId(id);
+        
+        // 6. Usuń faktury i ich pozycje
+        console.log('6️⃣ Usuwanie faktur...');
+        await invoicesService.deleteByShopId(id); // invoice_items usunie się przez CASCADE
+        
+        // 7. Usuń koszty
+        console.log('7️⃣ Usuwanie kosztów...');
+        await costsService.deleteByShopId(id);
+        
+        // 8. Usuń sprzedaż i pozycje sprzedaży
+        console.log('8️⃣ Usuwania sprzedaży...');
+        await salesService.deleteByShopId(id); // sale_items usunie się przez CASCADE
+        
+        // 9. Usuń magazyn/towar
+        console.log('9️⃣ Usuwanie magazynu...');
+        await inventoryService.deleteByShopId(id);
+        
+        // 10. Na końcu soft-delete samego sklepu
+        console.log('🔟 Soft-deleting sklepu...');
+        await shopsService.softDelete(id);
+        
+        console.log('✅ Pomyślnie usunięto sklep i wszystkie powiązane dane:', name);
+        
+        setShops(prev => prev.filter(s => s.id !== id));
+        
+        window.dispatchEvent(new CustomEvent('shops_updated'));
+        alert(`✅ Usunięto sklep: ${name}\n\nWszystkie powiązane dane zostały trwale usunięte.`);
+      } catch (error) {
+        console.error('❌ Błąd podczas kaskadowego usuwania sklepu:', error);
+        alert('Błąd podczas usuwania sklepu: ' + (error instanceof Error ? error.message : 'Nieznany błąd') + '\n\nSklep mógł zostać częściowo usunięty. Skontaktuj się z administratorem.');
+      }
     }
   };
 
@@ -105,7 +314,7 @@ export default function SklepyPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Link href={userRole === "employee" ? "/pracownik" : "/"}>
+            <Link href="/">
               <Button variant="ghost" size="icon" className="rounded-full hover:bg-accent text-primary">
                 <ArrowLeft className="h-5 w-5" />
               </Button>

@@ -1,5 +1,14 @@
 import { useState, useEffect } from "react";
 
+// Clean string - remove double quotes and extra whitespace
+export function cleanString(str: string): string {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/^["']|["']$/g, '')  // Remove surrounding quotes
+    .trim()
+    .replace(/\s+/g, ' ');        // Normalize whitespace
+}
+
 // Safe localStorage access (client-side only)
 export function useLocalStorage<T>(key: string, defaultValue: T) {
   const [value, setValue] = useState<T>(() => {
@@ -63,9 +72,15 @@ export function getSessionStorageSafe<T>(key: string, defaultValue: T) {
     const stored = sessionStorage.getItem(key);
     if (!stored) return defaultValue;
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // If parsed result is a string with quotes, clean it
+      if (typeof parsed === 'string') {
+        return cleanString(parsed) as any;
+      }
+      return parsed;
     } catch {
-      return stored as any;
+      // If JSON.parse fails, clean the raw string
+      return cleanString(stored) as any;
     }
   } catch {
     return defaultValue;

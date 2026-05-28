@@ -23,7 +23,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
+import { getSessionStorageSafe } from "@/lib/storage";
+import { useShiftsData } from "@/hooks/useShiftsData";
+import { shopsService } from "@/lib/supabase/shops";
+import { toISODateString } from "@/lib/dateFormat";
 
 // Employee colors for visual distinction
 const employeeColors = [
@@ -55,12 +58,36 @@ export default function GrafikPage() {
   }, [router]);
 
   const isOwner = userRole === "Właściciel";
-  const [selectedShop, setSelectedShop] = useState("kaufland-wloclawek");
+  const [selectedShop, setSelectedShop] = useState<string>("all");
+  const [shops, setShops] = useState<{id: string; name: string}[]>([]);
+  const [shopLabels, setShopLabels] = useState<Record<string, string>>({});
 
-  const shopLabels: Record<string, string> = {
-    "kaufland-wloclawek": "Kaufland Włocławek",
-    "riviera-gdynia": "Riviera Gdynia",
-    "dominikanska-wroclaw": "Dominikańska Wrocław"
+  useEffect(() => {
+    loadShops();
+  }, []);
+
+  const loadShops = async () => {
+    try {
+      const shopsData = await shopsService.getAll();
+      setShops(shopsData.map(shop => ({
+        id: shop.id,
+        name: shop.name
+      })));
+      
+      const labels: Record<string, string> = {};
+      shopsData.forEach(shop => {
+        labels[shop.id] = shop.name;
+      });
+      setShopLabels(labels);
+      
+      if (shopsData.length > 0 && selectedShop === "all") {
+        setSelectedShop(shopsData[0].id);
+      }
+      
+      console.log('Pobrano sklepy w grafiku:', shopsData.length);
+    } catch (error) {
+      console.error('Błąd podczas pobierania sklepów:', error);
+    }
   };
 
   useEffect(() => {
@@ -181,26 +208,46 @@ export default function GrafikPage() {
   }, []);
 
   const [shifts, setShifts] = useState([
-    { name: "Tomasz Lewandowski", initials: "TL", shift: "09:00 - 17:00", start: 9, end: 17, shop: "kaufland-wloclawek", status: "W pracy", date: 12 },
-    { name: "Marta Kowalczyk", initials: "MK", shift: "10:00 - 18:00", start: 10, end: 18, shop: "riviera-gdynia", status: "Zaplanowane", date: 12 },
-    { name: "Piotr Zakrzewski", initials: "PZ", shift: "12:00 - 20:00", start: 12, end: 20, shop: "dominikanska-wroclaw", status: "Zaplanowane", date: 12 },
-    { name: "Kamil Nowicki", initials: "KN", shift: "09:00 - 17:00", start: 9, end: 17, shop: "kaufland-wloclawek", status: "Zaplanowane", date: 15 },
+    { name: "Tomasz Lewandowski", initials: "TL", shift: "09:00 - 17:00", start: 9, end: 17, shop: "kaufland-wloclawek", status: "W pracy", date: 12, shiftId: "" },
+    { name: "Marta Kowalczyk", initials: "MK", shift: "10:00 - 18:00", start: 10, end: 18, shop: "riviera-gdynia", status: "Zaplanowane", date: 12, shiftId: "" },
+    { name: "Piotr Zakrzewski", initials: "PZ", shift: "12:00 - 20:00", start: 12, end: 20, shop: "dominikanska-wroclaw", status: "Zaplanowane", date: 12, shiftId: "" },
+    { name: "Kamil Nowicki", initials: "KN", shift: "09:00 - 17:00", start: 9, end: 17, shop: "kaufland-wloclawek", status: "Zaplanowane", date: 15, shiftId: "" },
   ]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const savedShifts = localStorage.getItem('grafik_shifts');
-    if (savedShifts) {
-      try {
-        setShifts(JSON.parse(savedShifts));
-      } catch { }
-    }
-  }, []);
+  const {
+    shifts: shiftsData,
+    isLoading,
+    error,
+    addShift,
+    deleteShift,
+    refresh
+  } = useShiftsData({ 
+    shopId: getSessionStorageSafe("shopId", ""),
+    startDate: toISODateString(new Date(selectedYear, selectedMonth, 1)),
+    endDate: toISODateString(new Date(selectedYear, selectedMonth + 1, 0))
+  });
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem('grafik_shifts', JSON.stringify(shifts));
-  }, [shifts]);
+    if (shiftsData.length > 0) {
+      const formattedShifts = shiftsData.map(shift => ({
+        id: shift.id,
+        name: `${shift.employee?.first_name || ''} ${shift.employee?.last_name || ''}`.trim() || 'Pracownik',
+        initials: shift.employee?.initials || '??',
+        shift: `${shift.start_time || '08:00'} - ${shift.end_time || '16:00'}`,
+        start: parseInt((shift.start_time || '08:00').split(':')[0]),
+        end: parseInt((shift.end_time || '16:00').split(':')[0]),
+        shop: shift.shop?.code || selectedShop,
+        status: shift.status === 'planowany' ? 'Zaplanowane' : 
+               shift.status === 'potwierdzony' ? 'Potwierdzony' :
+               shift.status === 'zrealizowany' ? 'W pracy' :
+               shift.status === 'anulowany' ? 'Anulowany' : 'Zaplanowane',
+        date: new Date(shift.shift_date).getDate(),
+        shiftId: shift.id
+      }));
+      
+      setShifts(formattedShifts);
+    }
+  }, [shiftsData]);
 
   const shiftPresets = [
     { label: "Otwarcie", range: "09:00 - 17:00", start: 9, end: 17 },
@@ -215,20 +262,44 @@ export default function GrafikPage() {
     return employeeColors[index % employeeColors.length];
   };
 
-  const toggleShift = (empId: string, dayDate: number) => {
+  const toggleShift = async (empId: string, dayDate: number) => {
     const emp = employees.find(e => e.id === empId);
     if (!emp) return;
 
-    setShifts(prev => {
-      const existingIndex = prev.findIndex(s => s.date === dayDate && s.initials === emp.initials && s.shop === selectedShop);
-      
-      if (existingIndex >= 0) {
-        // Remove shift
-        return prev.filter((_, i) => i !== existingIndex);
+    const existingIndex = shifts.findIndex(s => s.date === dayDate && s.initials === emp.initials && s.shop === selectedShop);
+    
+    if (existingIndex >= 0) {
+      // Remove shift
+      const existingShift = shifts[existingIndex];
+      if (existingShift.shiftId) {
+        try {
+          await deleteShift(existingShift.shiftId);
+          setShifts(prev => prev.filter((_, i) => i !== existingIndex));
+        } catch (error) {
+          console.error('Error deleting shift:', error);
+        }
       } else {
-        // Add shift using active preset
-        const preset = shiftPresets.find(p => p.label === activePreset) || shiftPresets[0];
-        return [...prev, {
+        setShifts(prev => prev.filter((_, i) => i !== existingIndex));
+      }
+    } else {
+      // Add shift using active preset
+      const preset = shiftPresets.find(p => p.label === activePreset) || shiftPresets[0];
+      
+      try {
+        const shopId = getSessionStorageSafe("shopId", "");
+        
+        const newShift = await addShift({
+          shift_date: toISODateString(new Date(selectedYear, selectedMonth, dayDate)),
+          start_time: `${preset.start.toString().padStart(2, '0')}:00`,
+          end_time: `${preset.end.toString().padStart(2, '0')}:00`,
+          shop_id: shopId,
+          employee_id: emp.id,
+          status: 'planowany',
+          preset_name: activePreset
+        });
+        
+        setShifts(prev => [...prev, {
+          id: newShift.id,
           name: emp.name,
           initials: emp.initials,
           shift: preset.range,
@@ -236,10 +307,13 @@ export default function GrafikPage() {
           end: preset.end,
           shop: selectedShop,
           status: "Zaplanowane",
-          date: dayDate
-        }];
+          date: dayDate,
+          shiftId: newShift.id
+        }]);
+      } catch (error) {
+        console.error('Error adding shift:', error);
       }
-    });
+    }
   };
 
   const showShiftDetails = (dayDate: number) => {
@@ -255,14 +329,39 @@ export default function GrafikPage() {
     }
   };
 
-  const clearMonth = (empId: string) => {
+  const clearMonth = async (empId: string) => {
     const emp = employees.find(e => e.id === empId);
     if (!emp) return;
+    
+    const employeeShifts = shifts.filter(s => s.initials === emp.initials && s.shop === selectedShop);
+    
+    for (const shift of employeeShifts) {
+      if (shift.shiftId) {
+        try {
+          await deleteShift(shift.shiftId);
+        } catch (error) {
+          console.error('Error deleting shift:', error);
+        }
+      }
+    }
+    
     setShifts(prev => prev.filter(s => !(s.initials === emp.initials && s.shop === selectedShop)));
   };
 
   const clearAll = () => {
     if (typeof window !== 'undefined' && window.confirm(`Czy na pewno chcesz wyczyścić CAŁY grafik dla tego sklepu?`)) {
+      const shopShifts = shifts.filter(s => s.shop === selectedShop);
+      
+      shopShifts.forEach(async (shift) => {
+        if (shift.shiftId) {
+          try {
+            await deleteShift(shift.shiftId);
+          } catch (error) {
+            console.error('Error deleting shift:', error);
+          }
+        }
+      });
+      
       setShifts(prev => prev.filter(s => s.shop !== selectedShop));
     }
   };
@@ -311,7 +410,7 @@ export default function GrafikPage() {
         {/* Header with Navigation */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Link href={userRole === "Pracownik" ? "/pracownik" : "/"}>
+            <Link href="/">
               <Button variant="ghost" size="icon" className="rounded-full hover:bg-accent text-primary">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -374,11 +473,7 @@ export default function GrafikPage() {
             value={selectedShop} 
             onValueChange={(val) => isOwner && val && setSelectedShop(val)}
             disabled={!isOwner}
-            items={[
-              { value: "kaufland-wloclawek", label: "Kaufland Włocławek" },
-              { value: "riviera-gdynia", label: "Riviera Gdynia" },
-              { value: "dominikanska-wroclaw", label: "Dominikańska Wrocław" }
-            ]}
+            items={shops.map(shop => ({ value: shop.id, label: shop.name }))}
           >
             <SelectTrigger className="border-none bg-transparent h-12 focus:ring-0 font-bold text-foreground">
               <div className="flex items-center gap-2 pl-2">
@@ -387,9 +482,9 @@ export default function GrafikPage() {
               </div>
             </SelectTrigger>
             <SelectContent className="rounded-2xl border-primary/5">
-              <SelectItem value="kaufland-wloclawek">Kaufland Włocławek</SelectItem>
-              <SelectItem value="riviera-gdynia">Riviera Gdynia</SelectItem>
-              <SelectItem value="dominikanska-wroclaw">Dominikańska Wrocław</SelectItem>
+              {shops.map(shop => (
+                <SelectItem key={shop.id} value={shop.id}>{shop.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

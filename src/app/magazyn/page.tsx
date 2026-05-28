@@ -45,6 +45,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useLocalStorage, useSessionStorage, getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
+import { formatDatePL, getCurrentDatePL, getCurrentTimePL, toISODateString } from "@/lib/dateFormat";
 import {
   Select,
   SelectContent,
@@ -235,18 +236,28 @@ export default function MagazynPage() {
     { id: "serwis", label: "Serwis", count: inventory.filter((i: typeof inventory[0]) => i.category === "serwis").length, icon: Wrench, color: "text-primary", bg: "bg-accent/50", isLink: false, href: undefined },
   ], [inventory]);
 
-  const [userRole] = useSessionStorage<string | null>("userRole", null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [isSessionChecked, setIsSessionChecked] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
+    
+    setTimeout(() => {
+      if (typeof window !== "undefined") {
+        const role = sessionStorage.getItem("userRole");
+        console.log('Magazyn: Pobrano rolę z sessionStorage:', role);
+        setUserRole(role);
+        setIsSessionChecked(true);
+      }
+    }, 200);
   }, []);
 
   useEffect(() => {
     if (isMounted) {
       setNewItem(prev => ({
         ...prev,
-        purchaseDate: new Date().toISOString().split('T')[0]
+        purchaseDate: toISODateString()
       }));
     }
   }, [isMounted]);
@@ -280,11 +291,17 @@ export default function MagazynPage() {
   }, [isMounted, inventory]);
 
   useEffect(() => {
-    if (!isMounted || typeof window === "undefined") return;
+    if (!isMounted || !isSessionChecked || typeof window === "undefined") return;
+    
+    console.log('Magazyn: Sprawdzanie autentykacji - isMounted:', isMounted, 'isSessionChecked:', isSessionChecked, 'userRole:', userRole);
+    
     if (!userRole) {
+      console.log('Magazyn: Brak roli użytkownika, przekierowanie do login');
       router.push("/login");
+    } else {
+      console.log('Magazyn: ✅ Użytkownik zalogowany, rola:', userRole);
     }
-  }, [userRole, router, isMounted]);
+  }, [userRole, router, isMounted, isSessionChecked]);
 
   const filteredItems = useMemo(() => {
     let items = [...inventory];
@@ -386,7 +403,7 @@ export default function MagazynPage() {
         const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForItem);
         return selectedEmp?.name || (userRole === "owner" ? "Właściciel" : (getSessionStorageSafe("userName", "") || "Pracownik"));
       })(),
-      addedDate: new Date().toISOString().split('T')[0],
+      addedDate: toISODateString(),
       shop: (() => {
         const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForItem);
         return selectedEmp?.shop || getSessionStorageSafe("shopName", "Kaufland Włocławek");
@@ -421,8 +438,8 @@ export default function MagazynPage() {
       
       const cost: Cost = {
         id: Math.random().toString(36).substr(2, 9),
-        date: new Date().toISOString().split('T')[0],
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: toISODateString(),
+        time: getCurrentTimePL(),
         category: 'skup',
         amount: parseFloat(newItem.purchasePrice),
         description: `Skup: ${phoneName}`,
@@ -455,7 +472,7 @@ export default function MagazynPage() {
       warranty: "",
       imei: "",
       taxType: "marża",
-      purchaseDate: new Date().toISOString().split('T')[0],
+      purchaseDate: toISODateString(),
       sellingDate: "",
       statusSprzedany: false,
       dataSprzedazy: "",
@@ -588,204 +605,9 @@ export default function MagazynPage() {
             </Button>
             <h1 className="text-xl font-bold tracking-tight text-foreground">Magazyn</h1>
           </div>
-          <div className="flex items-center gap-2">
-            {isMounted && userRole && (
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger render={<Button size="sm" className="h-9 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white text-xs font-semibold tracking-tight shadow-sm shadow-primary/20 transition-all duration-300">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Dodaj
-                </Button>} />
-                <DialogContent className="sm:max-w-[500px] rounded-3xl border-none p-0 overflow-hidden max-h-[80vh] flex flex-col">
-                  <DialogHeader className="p-8 bg-gradient-to-br from-primary to-primary/80 text-white relative shrink-0">
-                    <div className="space-y-1">
-                      <DialogTitle className="text-2xl font-bold tracking-tight">Dodaj do Magazynu</DialogTitle>
-                      <p className="text-white/70 text-[10px] font-semibold uppercase tracking-widest">Wprowadź dane nowego przedmiotu</p>
-                    </div>
-                    <div className="absolute right-8 top-8 h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center">
-                      <Plus className="h-6 w-6 text-white" />
-                    </div>
-                  </DialogHeader>
-                  <div className="flex-1 overflow-y-auto p-8 space-y-4">
-                    {newItem.category !== "telefon" && (
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Nazwa</Label>
-                        <Input 
-                          placeholder="Nazwa przedmiotu" 
-                          value={newItem.name}
-                          onChange={(e) => setNewItem({...newItem, name: e.target.value})}
-                          className="h-12 bg-accent/30 border-none rounded-xl"
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Kategoria</Label>
-                      <Select value={newItem.category} onValueChange={(val) => val && setNewItem({...newItem, category: val})} items={[
-                        { value: "telefon", label: "Telefon" },
-                        { value: "akcesoria", label: "Akcesoria" }
-                      ]}>
-                        <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl">
-                          <SelectValue placeholder="Wybierz..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="telefon">Telefon</SelectItem>
-                          <SelectItem value="akcesoria">Akcesoria</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {newItem.category === "telefon" && (
-                      <>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Marka</Label>
-                            <Input 
-                              placeholder="Apple" 
-                              value={newItem.brand}
-                              onChange={(e) => setNewItem({...newItem, brand: e.target.value})}
-                              className="h-12 bg-accent/30 border-none rounded-xl"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Model</Label>
-                            <Input 
-                              placeholder="iPhone 15 Pro" 
-                              value={newItem.model}
-                              onChange={(e) => setNewItem({...newItem, model: e.target.value})}
-                              className="h-12 bg-accent/30 border-none rounded-xl"
-                            />
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pamięć</Label>
-                            <Input 
-                              placeholder="256GB" 
-                              value={newItem.memory}
-                              onChange={(e) => setNewItem({...newItem, memory: e.target.value})}
-                              className="h-12 bg-accent/30 border-none rounded-xl"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Kolor</Label>
-                            <Input 
-                              placeholder="Czarny" 
-                              value={newItem.color}
-                              onChange={(e) => setNewItem({...newItem, color: e.target.value})}
-                              className="h-12 bg-accent/30 border-none rounded-xl"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Stan baterii %</Label>
-                          <Input 
-                            placeholder="95" 
-                            type="number"
-                            value={newItem.batteryHealth}
-                            onChange={(e) => setNewItem({...newItem, batteryHealth: e.target.value})}
-                            className="h-12 bg-accent/30 border-none rounded-xl"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Stan</Label>
-                          <Select value={newItem.condition} onValueChange={(val) => val && setNewItem({...newItem, condition: val})} items={[
-                            { value: "nowy", label: "Nowy" },
-                            { value: "używany", label: "Używany" }
-                          ]}>
-                            <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl">
-                              <SelectValue placeholder="Wybierz..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="nowy">Nowy</SelectItem>
-                              <SelectItem value="używany">Używany</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">IMEI</Label>
-                          <Input 
-                            placeholder="123456789012345" 
-                            value={newItem.imei}
-                            onChange={(e) => setNewItem({...newItem, imei: e.target.value})}
-                            className="h-12 bg-accent/30 border-none rounded-xl"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Gwarancja</Label>
-                          <Input 
-                            placeholder="12 miesięcy" 
-                            value={newItem.warranty}
-                            onChange={(e) => setNewItem({...newItem, warranty: e.target.value})}
-                            className="h-12 bg-accent/30 border-none rounded-xl"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cena zakupu</Label>
-                          <Input 
-                            placeholder="1499" 
-                            type="number"
-                            value={newItem.purchasePrice}
-                            onChange={(e) => setNewItem({...newItem, purchasePrice: e.target.value})}
-                            className="h-12 bg-accent/30 border-none rounded-xl"
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    {newItem.category === "telefon" && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cena sprzedaży</Label>
-                          <Input 
-                            placeholder="1999" 
-                            type="number"
-                            value={newItem.sellingPrice}
-                            onChange={(e) => setNewItem({...newItem, sellingPrice: e.target.value})}
-                            className="h-12 bg-accent/30 border-none rounded-xl"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {activeEmployees.length > 1 && (
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1.5">
-                        <Users className="h-3.5 w-3.5" />
-                        Pracownik
-                      </Label>
-                      <Select value={selectedEmployeeForItem} onValueChange={(value) => setSelectedEmployeeForItem(value || "")}>
-                        <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-sm">
-                          <SelectValue placeholder="Wybierz pracownika...">
-                            {selectedEmployeeForItem ? String(activeEmployees.find((e: any) => e.id === selectedEmployeeForItem)?.name || selectedEmployeeForItem) : "Wybierz pracownika..."}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {activeEmployees.map((emp: any) => (
-                            <SelectItem key={emp.id} value={emp.id} className="font-semibold">
-                              {String(emp.name || emp.id)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  <DialogFooter className="p-8 pt-0 shrink-0">
-                    <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="rounded-xl border-primary/10">Anuluj</Button>
-                    <Button onClick={handleAddItem} className="rounded-xl bg-primary hover:bg-primary/90 text-white">Dodaj</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )}
 
             {isMounted && userRole === "owner" && (
+              <>
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogContent className="sm:max-w-[500px] rounded-3xl border-none p-0 overflow-hidden max-h-[80vh] flex flex-col">
                   <DialogHeader className="p-8 bg-gradient-to-br from-primary to-primary/80 text-white relative shrink-0">
@@ -947,7 +769,6 @@ export default function MagazynPage() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-            )}
 
             <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
               <DialogContent className="sm:max-w-[500px] rounded-3xl border-none p-0 overflow-hidden max-h-[80vh] flex flex-col">
@@ -1129,8 +950,300 @@ export default function MagazynPage() {
                 </div>
               </DialogContent>
             </Dialog>
-          </div>
-        </div>
+          </>
+          )}
+
+        {isMounted && userRole === "owner" && (
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogContent className="sm:max-w-[550px] rounded-3xl border-none p-0 overflow-hidden max-h-[85vh] flex flex-col">
+              <DialogHeader className="p-8 bg-gradient-to-br from-primary to-primary/80 text-white relative shrink-0">
+                <div className="space-y-1">
+                  <DialogTitle className="text-2xl font-bold tracking-tight">
+                    {selectedCategory === "telefon" ? "Dodaj nowy telefon" : "Dodaj nowe akcesoria"}
+                  </DialogTitle>
+                  <p className="text-white/70 text-[10px] font-semibold uppercase tracking-widest">
+                    {selectedCategory === "telefon" ? "Wprowadź dane telefonu" : "Wprowadź nazwę akcesoriów"}
+                  </p>
+                </div>
+                <div className="absolute right-8 top-8 h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center">
+                  {selectedCategory === "telefon" ? (
+                    <Smartphone className="h-6 w-6 text-white" />
+                  ) : (
+                    <Package className="h-6 w-6 text-white" />
+                  )}
+                </div>
+              </DialogHeader>
+
+              <div className="flex-1 overflow-y-auto p-8 space-y-4">
+                {selectedCategory === "telefon" ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Marka</Label>
+                        <Input
+                          placeholder="Apple"
+                          value={newItem.brand}
+                          onChange={(e) => setNewItem({...newItem, brand: e.target.value})}
+                          className="h-12 bg-accent/30 border-none rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Model</Label>
+                        <Input
+                          placeholder="iPhone 15 Pro"
+                          value={newItem.model}
+                          onChange={(e) => setNewItem({...newItem, model: e.target.value})}
+                          className="h-12 bg-accent/30 border-none rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pamięć</Label>
+                        <Input
+                          placeholder="256GB"
+                          value={newItem.memory}
+                          onChange={(e) => setNewItem({...newItem, memory: e.target.value})}
+                          className="h-12 bg-accent/30 border-none rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Kolor</Label>
+                        <Input
+                          placeholder="Czarny"
+                          value={newItem.color}
+                          onChange={(e) => setNewItem({...newItem, color: e.target.value})}
+                          className="h-12 bg-accent/30 border-none rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Stan baterii %</Label>
+                        <Input
+                          placeholder="95"
+                          type="number"
+                          value={newItem.batteryHealth}
+                          onChange={(e) => setNewItem({...newItem, batteryHealth: e.target.value})}
+                          className="h-12 bg-accent/30 border-none rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Stan</Label>
+                        <Select value={newItem.condition} onValueChange={(val) => val && setNewItem({...newItem, condition: val})} items={[
+                          { value: "nowy", label: "Nowy" },
+                          { value: "używany", label: "Używany" }
+                        ]}>
+                          <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl">
+                            <SelectValue placeholder="Wybierz..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="nowy">Nowy</SelectItem>
+                            <SelectItem value="używany">Używany</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">IMEI</Label>
+                      <Input
+                        placeholder="123456789012345"
+                        value={newItem.imei}
+                        onChange={(e) => setNewItem({...newItem, imei: e.target.value})}
+                        className="h-12 bg-accent/30 border-none rounded-xl"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cena zakupu</Label>
+                        <Input
+                          placeholder="1499"
+                          type="number"
+                          value={newItem.purchasePrice}
+                          onChange={(e) => setNewItem({...newItem, purchasePrice: e.target.value})}
+                          className="h-12 bg-accent/30 border-none rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cena sprzedaży</Label>
+                        <Input
+                          placeholder="1999"
+                          type="number"
+                          value={newItem.sellingPrice}
+                          onChange={(e) => setNewItem({...newItem, sellingPrice: e.target.value})}
+                          className="h-12 bg-accent/30 border-none rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Gwarancja</Label>
+                        <Input
+                          placeholder="12 miesięcy"
+                          value={newItem.warranty}
+                          onChange={(e) => setNewItem({...newItem, warranty: e.target.value})}
+                          className="h-12 bg-accent/30 border-none rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Typ podatku</Label>
+                        <Select value={newItem.taxType} onValueChange={(val) => val && setNewItem({...newItem, taxType: val})} items={[
+                          { value: "marża", label: "Marża" },
+                          { value: "VAT", label: "VAT" }
+                        ]}>
+                          <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl">
+                            <SelectValue placeholder="Wybierz..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="marża">Marża</SelectItem>
+                            <SelectItem value="VAT">VAT</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Zestaw zawiera</Label>
+                      <Input
+                        placeholder="pudełko, kabel, ładowarka"
+                        value={newItem.setIncludes}
+                        onChange={(e) => setNewItem({...newItem, setIncludes: e.target.value})}
+                        className="h-12 bg-accent/30 border-none rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Notatki</Label>
+                      <Input
+                        placeholder="Dodatkowe informacje"
+                        value={newItem.notes}
+                        onChange={(e) => setNewItem({...newItem, notes: e.target.value})}
+                        className="h-12 bg-accent/30 border-none rounded-xl"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Nazwa akcesoriów</Label>
+                      <Input
+                        placeholder="np. Etui guma, Szkło, Kabel"
+                        value={newItem.name}
+                        onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                        className="h-12 bg-accent/30 border-none rounded-xl"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Ilość</Label>
+                        <Input
+                          placeholder="0"
+                          type="number"
+                          value={newItem.stock}
+                          onChange={(e) => setNewItem({...newItem, stock: e.target.value})}
+                          className="h-12 bg-accent/30 border-none rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cena sprzedaży</Label>
+                        <Input
+                          placeholder="49.99"
+                          type="number"
+                          value={newItem.sellingPrice}
+                          onChange={(e) => setNewItem({...newItem, sellingPrice: e.target.value})}
+                          className="h-12 bg-accent/30 border-none rounded-xl"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Notatki</Label>
+                      <Input
+                        placeholder="Dodatkowe informacje"
+                        value={newItem.notes}
+                        onChange={(e) => setNewItem({...newItem, notes: e.target.value})}
+                        className="h-12 bg-accent/30 border-none rounded-xl"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <DialogFooter className="p-8 pt-0 shrink-0">
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="rounded-xl border-primary/10">Anuluj</Button>
+                <Button
+                  onClick={() => {
+                    if (selectedCategory === "telefon") {
+                      if (newItem.brand && newItem.model) {
+                        handleAddItem();
+                      } else {
+                        addToast({ message: "Wprowadź markę i model telefonu", variant: "error" });
+                      }
+                    } else {
+                      if (newItem.name.trim()) {
+                        const baseItem = {
+                          name: newItem.name,
+                          category: "akcesoria",
+                          price: newItem.sellingPrice ? `${newItem.sellingPrice} zł` : "",
+                          alert: false,
+                          stock: newItem.stock ? parseInt(newItem.stock) : 0,
+                          purchasePrice: newItem.purchasePrice || "",
+                          notes: newItem.notes || "",
+                          shop: (() => {
+                            const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForItem);
+                            return selectedEmp?.shop || getSessionStorageSafe("shopName", "Kaufland Włocławek");
+                          })(),
+                        };
+
+                        setInventory([...inventory, baseItem as any]);
+                        setNewItem({
+                          name: "",
+                          category: "akcesoria",
+                          stock: "",
+                          purchasePrice: "",
+                          sellingPrice: "",
+                          brand: "",
+                          model: "",
+                          memory: "",
+                          batteryHealth: "",
+                          condition: "używany",
+                          color: "",
+                          setIncludes: "",
+                          notes: "",
+                          warranty: "",
+                          imei: "",
+                          taxType: "marża",
+                          purchaseDate: toISODateString(),
+                          sellingDate: "",
+                          statusSprzedany: false,
+                          dataSprzedazy: "",
+                        });
+                        setIsAddDialogOpen(false);
+                        addToast({
+                          title: "Dodano akcesoria",
+                          description: `${baseItem.name} został dodany do magazynu`,
+                          variant: "success"
+                        });
+                      } else {
+                        addToast({ message: "Wprowadź nazwę akcesoriów", variant: "error" });
+                      }
+                    }
+                  }}
+                  className="rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white"
+                >
+                  {selectedCategory === "telefon" ? "Dodaj telefon" : "Dodaj akcesoria"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
 
         <div className="flex items-center gap-2 px-1">
           <div className="relative flex-1">
@@ -1217,6 +1330,24 @@ export default function MagazynPage() {
             <Button size="sm" className="h-9 rounded-xl bg-gradient-to-r from-secondary to-secondary/80 hover:from-secondary/90 hover:to-secondary/70 text-white text-xs font-semibold tracking-tight shadow-sm transition-all duration-300" onClick={() => setIsAddSerwisDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Dodaj serwis
+            </Button>
+          </div>
+        )}
+
+        {isMounted && userRole === "owner" && selectedCategory === "telefon" && (
+          <div className="flex justify-end">
+            <Button size="sm" className="h-9 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white text-xs font-semibold tracking-tight shadow-sm shadow-primary/20 transition-all duration-300" onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Dodaj telefon
+            </Button>
+          </div>
+        )}
+
+        {isMounted && userRole === "owner" && selectedCategory === "akcesoria" && (
+          <div className="flex justify-end">
+            <Button size="sm" className="h-9 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white text-xs font-semibold tracking-tight shadow-sm shadow-primary/20 transition-all duration-300" onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Dodaj akcesoria
             </Button>
           </div>
         )}

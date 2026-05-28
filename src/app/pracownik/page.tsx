@@ -6,6 +6,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSessionStorageSafe, getLocalStorageSafe } from "@/lib/storage";
+import { cashRegisterService } from "@/lib/supabase/cashRegister";
+import { shopsService } from "@/lib/supabase/shops";
+import { Button } from "@/components/ui/button";
+import { formatDatePL, getCurrentDatePL, toISODateString, getCurrentTimePL } from "@/lib/dateFormat";
 
 interface Action {
   id: string;
@@ -21,31 +25,108 @@ interface Action {
 
 export default function PracownikDashboard() {
   const router = useRouter();
-  const [userName, setUserName] = useState("Jan Kowalski");
+  const [userName, setUserName] = useState<string | null>(null);
   const [userId, setUserId] = useState("");
-  const [shopName, setShopName] = useState("Kaufland Włocławek");
+  const [hasValidSession, setHasValidSession] = useState(false);
+  const [isSessionChecked, setIsSessionChecked] = useState(false);
+  const [shopName, setShopName] = useState<string>("");
   const [sales, setSales] = useState<any[]>([]);
   const [costs, setCosts] = useState<any[]>([]);
   const [actions, setActions] = useState<Action[]>([]);
   const [isMounted, setIsMounted] = useState(false);
+  const [stanKasyPoprzedniegoDnia, setStanKasyPoprzedniegoDnia] = useState<number>(0);
+
+  const loadDefaultShop = async () => {
+    try {
+      console.log('=== PRACOWNIK - Ładowanie sklepu ===');
+
+      // Najpierw sprawdź czy już mamy sklep w sesji (ustawiony przy logowaniu)
+      const existingShopName = sessionStorage.getItem('shopName');
+      const existingShopId = sessionStorage.getItem('shopId');
+
+      if (existingShopName && existingShopId) {
+        console.log('✅ Sklep już istnieje w sesji:', existingShopName);
+        setShopName(existingShopName);
+        return;
+      }
+
+      // Fallback: pobierz z bazy tylko jeśli brak w sesji
+      console.log('ℹ️ Brak sklepu w sesji, próbuję pobrać z bazy...');
+      const shopsData = await shopsService.getAll();
+
+      if (shopsData.length > 0) {
+        setShopName(shopsData[0].name);
+        sessionStorage.setItem('shopName', shopsData[0].name);
+        console.log('⚠️ Ustawiono DOMYŚLNY sklep (pierwszy z bazy):', shopsData[0].name);
+        console.warn('⚠️ To może nie być poprawny sklep dla zalogowanego użytkownika!');
+      }
+    } catch (error) {
+      console.error('Błąd podczas pobierania domyślnego sklepu:', error);
+    }
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     setIsMounted(true);
-    
-    const userRole = getSessionStorageSafe("userRole", "");
-    if (!userRole) {
-      router.push("/login");
-      return;
-    }
-    
-    const name = getSessionStorageSafe("userName", "Jan Kowalski");
+
+    console.log('=== DEBUG pracownik/page.tsx useEffect START ===');
+    console.log('sessionStorage userName:', sessionStorage.getItem('userName'));
+    console.log('sessionStorage userId:', sessionStorage.getItem('userId'));
+    console.log('sessionStorage userRole:', sessionStorage.getItem('userRole'));
+    console.log('sessionStorage activeEmployees:', sessionStorage.getItem('activeEmployees'));
+
+    const name = getSessionStorageSafe("userName", null);
     const uid = getSessionStorageSafe("userId", "");
-    const shop = getSessionStorageSafe("shopName", "Kaufland Włocławek");
-    
+    const shop = getSessionStorageSafe("shopName", "");
+
     if (name) setUserName(name);
     if (uid) setUserId(uid);
-    if (shop) setShopName(shop);
+
+    if (shop) {
+      setShopName(shop);
+    } else {
+      loadDefaultShop();
+    }
+
+    const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
+    const userName = sessionStorage.getItem('userName');
+    const userId = sessionStorage.getItem('userId');
+    const userInitials = sessionStorage.getItem('userInitials');
+    const shopName = sessionStorage.getItem('shopName');
+    const shopId = sessionStorage.getItem('shopId');
+
+    const cleanString = (val: string | null) => {
+      if (!val) return val;
+      let cleaned = val;
+      if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+        cleaned = cleaned.slice(1, -1);
+      }
+      return cleaned;
+    };
+
+    if (userName && userId && (!activeEmployees || activeEmployees.length === 0)) {
+      console.log('⚠️ Brak activeEmployees - tworzę automatycznie z danych sesji!');
+      const autoEmployee = {
+        id: cleanString(userId),
+        name: cleanString(userName),
+        initials: cleanString(userInitials) || `${(cleanString(userName) || '?')[0] || '?'}${((cleanString(userName) || '').split(' ')[1] || '')[0] || '?'}`,
+        shop: cleanString(shopName) || 'Nieznany sklep',
+        shopId: cleanString(shopId) || 'unknown',
+        role: cleanString(sessionStorage.getItem('userRole')) || 'employee'
+      };
+      sessionStorage.setItem('activeEmployees', JSON.stringify([autoEmployee]));
+      sessionStorage.setItem('selectedEmployeeId', cleanString(userId));
+      console.log('Utworzono activeEmployees:', autoEmployee);
+    }
+
+    const finalActiveEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
+    const valid = finalActiveEmployees.length > 0 && userName && userId;
+    console.log('valid:', valid, 'finalActiveEmployees.length:', finalActiveEmployees.length, 'userName:', userName, 'userId:', userId);
+
+    setHasValidSession(valid);
+    setIsSessionChecked(true);
+
+    if (!valid) return;
     
     const savedSales = getLocalStorageSafe('sprzedaz_sales', []);
     setSales(savedSales);
@@ -58,13 +139,77 @@ export default function PracownikDashboard() {
     setActions(employeeActions.slice(0, 5));
   }, [router]);
 
-  const today = new Date().toISOString().split('T')[0];
+  useEffect(() => {
+    const handleEmployeeSwitch = (e: any) => {
+      console.log('🔄 Pracownik: Otrzymano event employee_switched!', e.detail);
+      
+      const newUserId = e.detail?.employeeId || sessionStorage.getItem('userId');
+      const newUserName = e.detail?.employeeName || sessionStorage.getItem('userName');
+      const newShopId = e.detail?.shopId || sessionStorage.getItem('shopId');
+      const newShopName = e.detail?.shopName || sessionStorage.getItem('shopName');
+      
+      if (newUserName) setUserName(newUserName);
+      if (newUserId) setUserId(newUserId);
+      if (newShopName) setShopName(newShopName);
+      
+      console.log('✅ Zaktualizowano dane pracownika:', { newUserName, newUserId, newShopName });
+      
+      const savedSales = getLocalStorageSafe('sprzedaz_sales', []);
+      setSales(savedSales);
+      
+      const savedCosts = getLocalStorageSafe('sprzedaz_costs', []);
+      setCosts(savedCosts);
+    };
+
+    window.addEventListener('employee_switched', handleEmployeeSwitch);
+    
+    return () => {
+      window.removeEventListener('employee_switched', handleEmployeeSwitch);
+    };
+  }, []);
+
+  useEffect(() => {
+    const loadCashState = async () => {
+      try {
+        if (typeof window === "undefined") return;
+        const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
+        const shopId = activeEmployees[0]?.shopId || '';
+        if (shopId) {
+          const previousDayState = await cashRegisterService.getPreviousDayState(shopId);
+          setStanKasyPoprzedniegoDnia(previousDayState);
+        }
+      } catch (error) {
+        console.error('Błąd pobierania stanu kasy:', error);
+      }
+    };
+    
+    loadCashState();
+  }, []);
+
+  const today = toISODateString();
   
   // Pobierz sprzedaż tego pracownika dzisiaj
   const todaySales = sales.filter((s: any) => 
     s.date === today && 
     (s.employeeId === userId || s.employeeName === userName)
   );
+  
+  // ✅ IDENTYCZNIE JAK W page.tsx I sprzedaz/page.tsx!
+  // Flatten sales - dodaj totalPrice i totalProfit do każdej sprzedaży
+  const flattenedTodaySales = todaySales.map((sale: any) => ({
+    ...sale,
+    totalPrice: sale.items?.reduce((sum: number, item: any) => {
+      const price = typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0;
+      return sum + price;
+    }, 0) || 0,
+    totalProfit: sale.items?.reduce((sum: number, item: any) => {
+      const profit = typeof item.profit === 'number' ? item.profit : parseFloat(item.profit) || 0;
+      return sum + profit;
+    }, 0) || 0
+  }));
+  
+  // ✅ SUMA ZYSKÓW = suma wszystkich totalProfit ze sprzedaży dzisiaj (TAKO JAK W SPRZEDAŻ!)
+  const totalProfitToday = flattenedTodaySales.reduce((sum: number, sale: any) => sum + sale.totalProfit, 0);
   
   // Oblicz statystyki
   const cashSalesToday = todaySales
@@ -77,21 +222,23 @@ export default function PracownikDashboard() {
   
   const totalSalesToday = cashSalesToday + cardSalesToday;
   
-  // Koszty tego pracownika
+  // Koszty tego pracownika (BEZ doładowań gotówki!)
   const todayCosts = costs.filter((c: any) => 
     c.date === today && 
     (c.employeeId === userId || c.employeeName === userName)
   );
   
-  const totalCostsToday = todayCosts.reduce((sum: number, c: any) => sum + c.amount, 0);
+  const totalCostsToday = todayCosts
+    .filter((c: any) => c.category !== 'gotowka')  // ← Wykluczamy doładowania!
+    .reduce((sum: number, c: any) => sum + c.amount, 0);
   
-  // Doładowania
+  // Doładowania (osobno, nie wliczane do kosztów!)
   const doladowaniaToday = todayCosts
     .filter((c: any) => c.category === 'gotowka')
     .reduce((sum: number, c: any) => sum + c.amount, 0);
   
-  // Stan kasy z poprzedniego dnia (mock - można potem rozwinąć)
-  const stanKasyPoprzedniegoDnia = 2698;
+  // Stan kasy z poprzedniego dnia (pobierany z bazy danych)
+  // const stanKasyPoprzedniegoDnia = 2698; // Stara wersja - teraz z bazy
   
   // Stan kasy dzisiaj (poprzedni dzień + gotówka + doładowania)
   const kasaDzis = stanKasyPoprzedniegoDnia + cashSalesToday + doladowaniaToday;
@@ -100,8 +247,17 @@ export default function PracownikDashboard() {
   // Dzień (sprzedaż - koszty)
   const dzienTotal = totalSalesToday - totalCostsToday;
   
-  // Zysk
-  const zyskNetto = totalSalesToday - totalCostsToday + doladowaniaToday;
+  // ✅ ZYSK NETTO = Zysk ze sprzedaży (marże) - TAKO JAK W page.tsx I SPRZEDAŻ!
+  const zyskNetto = totalProfitToday;
+  
+  console.log('');
+  console.log('=== PRACOWNIK - OBLICZENIA ZYSKU ===');
+  console.log('User:', userName);
+  console.log('Today sales count:', todaySales.length);
+  console.log('Flattened sales (z totalProfit):', flattenedTodaySales.length);
+  console.log('Total Profit (suma marż):', totalProfitToday.toFixed(2));
+  console.log('Zysk Netto (wyświetlane):', zyskNetto.toFixed(2));
+  console.log('   = Total Profit (tak samo jak w Sprzedaż)');
 
   if (!isMounted) {
     return (
@@ -116,6 +272,24 @@ export default function PracownikDashboard() {
             </div>
           </div>
         </main>
+      </div>
+    );
+  }
+
+  if (isSessionChecked && !hasValidSession) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-2xl shadow-lg text-center max-w-md mx-4">
+          <div className="text-6xl mb-4">🔒</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Brak aktywnej sesji</h1>
+          <p className="text-gray-600 mb-6">Musisz się zalogować aby uzyskać dostęp do panelu pracownika.</p>
+          <a
+            href="/login"
+            className="inline-flex items-center justify-center px-6 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors"
+          >
+            Przejdź do logowania →
+          </a>
+        </div>
       </div>
     );
   }
@@ -151,7 +325,7 @@ export default function PracownikDashboard() {
               <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-xl border border-white/5 w-fit">
                 <CalendarIcon className="h-3.5 w-3.5 text-primary" />
                 <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider">
-                  {new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  {getCurrentDatePL()}
                 </span>
               </div>
               
@@ -207,20 +381,7 @@ export default function PracownikDashboard() {
                       <TrendingUp className="h-3.5 w-3.5 text-white/40 group-hover:text-white/60 transition-colors" />
                       <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-white/50">Wpływy</span>
                     </div>
-                    <p className="text-2xl font-bold text-white tabular-nums">{totalSalesToday.toFixed(0)}</p>
-                  </div>
-                </div>
-
-                {/* Doładowania - Neutral */}
-                <div className="relative overflow-hidden bg-white/[0.03] border border-white/8 rounded-xl px-5 py-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="h-6 w-6 rounded-md bg-white/8 flex items-center justify-center">
-                        <Zap className="h-3.5 w-3.5 text-white/50" />
-                      </div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">Doładowania</span>
-                    </div>
-                    <span className="text-lg font-black text-white/80 tabular-nums">{doladowaniaToday > 0 ? `+${doladowaniaToday.toFixed(0)} zł` : '0 zł'}</span>
+                    <p className="text-2xl font-bold text-white tabular-nums">{(totalSalesToday + doladowaniaToday).toFixed(0)}</p>
                   </div>
                 </div>
 
@@ -299,6 +460,84 @@ export default function PracownikDashboard() {
           </div>
         </section>
 
+        {/* Przycisk Zamknij Dzień - Pod Zyskiem Netto */}
+        <Button
+          onClick={async () => {
+            try {
+              const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
+              console.log('Active employees:', activeEmployees);
+              const shopId = activeEmployees[0]?.shopId || '';
+              console.log('Shop ID:', shopId);
+              
+              if (!shopId) {
+                alert(`Brak ID sklepu!\n\nActive Employees: ${JSON.stringify(activeEmployees, null, 2)}\n\nZaloguj się ponownie`);
+                return;
+              }
+              
+              const isClosed = await cashRegisterService.isTodayClosed(shopId);
+              if (isClosed) {
+                alert('Dzisiaj został już zamknięty!');
+                return;
+              }
+              
+              if (!confirm(`Zamknąć dzień?\n\nStan kasy: ${kasaDzis.toFixed(2)} zł\nSprzedaż gotówkowa: ${cashSalesToday.toFixed(2)} zł\nSprzedaż kartowa: ${cardSalesToday.toFixed(2)} zł\nKoszty: ${totalCostsToday.toFixed(2)} zł`)) {
+                return;
+              }
+              
+              try {
+                await cashRegisterService.closeDay({
+                  shopId,
+                  employeeId: userId,
+                  totalCashSales: cashSalesToday,
+                  totalCardSales: cardSalesToday,
+                  totalCosts: totalCostsToday,
+                  totalDoladowania: doladowaniaToday,
+                  createdBy: userId
+                });
+                
+                alert('✅ Dzień zamknięty pomyślnie! (zapisano w bazie)');
+              } catch (error) {
+                console.error('❌ Błąd zapisu do Supabase:', error);
+                
+                const closingData = {
+                  id: `local_${Date.now()}`,
+                  shopId,
+                  employeeId: userId,
+                  date: today,
+                  closedAt: new Date().toISOString(),
+                  kasaDzis,
+                  cashSalesToday,
+                  cardSalesToday,
+                  totalCostsToday,
+                  doladowaniaToday,
+                  zyskNetto,
+                  error: error instanceof Error ? error.message : 'Unknown error',
+                  syncedToServer: false
+                };
+                
+                const existingClosings = JSON.parse(localStorage.getItem('cash_register_closings_local') || '[]');
+                localStorage.setItem('cash_register_closings_local', JSON.stringify([closingData, ...existingClosings]));
+                
+                alert(`⚠️ Dzień zamknięty (lokalnie)!\n\nBłąd Supabase: ${error instanceof Error ? error.message : 'Unknown'}\n\nDane zostały zapisane lokalnie.\nZostaną zsynchronizowane później.`);
+              }
+              
+              window.location.reload();
+            } catch (error: any) {
+              console.error('Błąd zamykania dnia:', error);
+              console.error('Error details:', JSON.stringify(error, null, 2));
+              console.error('Error message:', error?.message);
+              console.error('Error code:', error?.code);
+              console.error('Error details:', error?.details);
+              console.error('Error hint:', error?.hint);
+              alert(`Błąd podczas zamykania dnia:\n\n${error?.message || 'Nieznany błąd'}\n\nCode: ${error?.code || 'brak'}\n\nDetails: ${error?.details || 'brak'}\n\nHint: ${error?.hint || 'brak'}`);
+            }
+          }}
+          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold text-sm py-4 rounded-2xl shadow-xl shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] mt-4"
+        >
+          <Clock className="h-5 w-5 mr-2" />
+          Zamknij Dzień - Zapisz Stan Kasy
+        </Button>
+
         {/* Navigation Grid - Identyczny jak u właściciela */}
         <section className="space-y-4">
           <div className="flex justify-between items-center px-1">
@@ -353,7 +592,7 @@ export default function PracownikDashboard() {
                     <div className="flex items-center gap-2 mt-1">
                       <Clock className="h-3 w-3 text-muted-foreground/50" />
                       <span className="text-xs text-muted-foreground/70">
-                        {new Date(action.timestamp).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
+                        {formatTimePL(action.timestamp)}
                       </span>
                       {action.shopName && (
                         <>

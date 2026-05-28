@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/navbar";
-import { getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
+import { getSessionStorageSafe } from "@/lib/storage";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Calendar, ArrowLeft, Download, User, Building2, Edit, Trash2, X, Save } from "lucide-react";
+import { FileText, Calendar, ArrowLeft, Download, User, Building2, Edit, Trash2, X, Save, Store } from "lucide-react";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/toast";
+import { useInvoicesData } from "@/hooks/useInvoicesData";
+import { toISODateString, getCurrentTimePL, formatDatePL } from "@/lib/dateFormat";
 
 interface Invoice {
   id: string;
@@ -26,11 +28,12 @@ interface Invoice {
     category: string;
     price: number;
   }>;
+  employeeName: string;
+  shopName: string;
   createdAt: string;
 }
 
 export default function InvoicesHistoryPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [editForm, setEditForm] = useState({
@@ -42,24 +45,68 @@ export default function InvoicesHistoryPage() {
     time: ""
   });
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [currentShopId, setCurrentShopId] = useState<string>("");
   const { addToast } = useToast();
+  
+  const {
+    invoices: invoicesData,
+    isLoading,
+    error,
+    updateInvoice,
+    deleteInvoice,
+    refresh
+  } = useInvoicesData();
+
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+
+  useEffect(() => {
+    if (invoicesData.length > 0) {
+      console.log('📊 Filtrowanie faktur dla roli:', userRole, '| Shop ID:', currentShopId);
+      console.log('  - Łączna liczba faktur w bazie:', invoicesData.length);
+      
+      let filteredInvoices = invoicesData;
+      
+      if (userRole === 'employee' && currentShopId) {
+        filteredInvoices = invoicesData.filter(inv => inv.shop_id === currentShopId);
+        console.log('  - Pracownik widzi tylko faktury ze swojego sklepu:', filteredInvoices.length);
+      } else if (userRole === 'owner') {
+        console.log('  - Owner widzi wszystkie faktury:', filteredInvoices.length);
+      }
+      
+      const formattedInvoices: Invoice[] = filteredInvoices.map(inv => ({
+        id: inv.invoice_number || inv.id,
+        customerName: inv.customer?.company_name || `${inv.customer?.first_name || ''} ${inv.customer?.last_name || ''}`.trim() || 'Klient',
+        customerNip: inv.customer?.nip || '',
+        customerAddress: inv.customer?.address || '',
+        customerEmail: inv.customer?.email || '',
+        date: inv.issue_date ? toISODateString(new Date(inv.issue_date)) : (inv.created_at ? toISODateString(new Date(inv.created_at)) : ''),
+        time: inv.created_at ? getCurrentTimePL() : '',
+        totalPrice: Number(inv.total_amount) || 0,
+        items: (inv.invoice_items || []).map((item: any) => ({
+          name: item.product_name || item.description || 'Pozycja',
+          category: item.category || 'inne',
+          price: Number(item.unit_price) || 0
+        })),
+        employeeName: inv.employee ? 
+          `${inv.employee.first_name || ''} ${inv.employee.last_name || ''}`.trim() || 
+          inv.employee.initials || 
+          'Nieznany pracownik' : 
+          'Brak danych',
+        shopName: inv.shop?.name || inv.shop?.shop_name || 'Nieznany sklep',
+        createdAt: inv.created_at
+      }));
+      
+      setInvoices(formattedInvoices);
+    }
+  }, [invoicesData, userRole, currentShopId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const savedInvoices = localStorage.getItem("invoices");
-    if (savedInvoices) {
-      setInvoices(JSON.parse(savedInvoices));
-    }
     const role = getSessionStorageSafe("userRole", null);
     setUserRole(role);
+    const shopId = getSessionStorageSafe("shopId", "");
+    setCurrentShopId(shopId);
   }, []);
-
-  const saveInvoicesToStorage = (updatedInvoices: Invoice[]) => {
-    setInvoices(updatedInvoices);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("invoices", JSON.stringify(updatedInvoices));
-    }
-  };
 
   const openInvoice = (invoice: Invoice) => {
     const queryParams = new URLSearchParams({
@@ -90,35 +137,66 @@ export default function InvoicesHistoryPage() {
     setIsEditDialogOpen(true);
   };
 
-  const handleDeleteClick = (e: React.MouseEvent, invoice: Invoice) => {
+  const handleDeleteClick = async (e: React.MouseEvent, invoice: Invoice) => {
     e.stopPropagation();
     if (confirm("Czy na pewno chcesz usunąć tę fakturę?")) {
-      const updatedInvoices = invoices.filter((inv) => inv.id !== invoice.id);
-      saveInvoicesToStorage(updatedInvoices);
-      addToast({
-        title: "Faktura usunięta",
-        description: "Faktura została pomyślnie usunięta",
-        variant: "success"
-      });
+      try {
+        const invoiceToDelete = invoicesData.find(inv => 
+          (inv.invoice_number || inv.id) === invoice.id
+        );
+        
+        if (invoiceToDelete) {
+          await deleteInvoice(invoiceToDelete.id);
+        }
+        
+        addToast({
+          title: "Faktura usunięta",
+          description: "Faktura została pomyślnie usunięta",
+          variant: "success"
+        });
+      } catch (error) {
+        console.error('Error deleting invoice:', error);
+        addToast({
+          title: "Błąd",
+          description: "Nie udało się usunąć faktury",
+          variant: "error"
+        });
+      }
     }
   };
 
-  const handleEditSubmit = () => {
+  const handleEditSubmit = async () => {
     if (!editingInvoice) return;
-    const updatedInvoices = invoices.map((inv) => {
-      if (inv.id === editingInvoice.id) {
-        return { ...inv, ...editForm };
+    
+    try {
+      const invoiceToUpdate = invoicesData.find(inv => 
+        (inv.invoice_number || inv.id) === editingInvoice.id
+      );
+      
+      if (invoiceToUpdate) {
+        await updateInvoice(invoiceToUpdate.id, {
+          notes: `Zaktualizowano: ${editForm.customerName}`
+        });
+        
+        await refresh();
       }
-      return inv;
-    });
-    saveInvoicesToStorage(updatedInvoices);
-    setIsEditDialogOpen(false);
-    setEditingInvoice(null);
-    addToast({
-      title: "Faktura zaktualizowana",
-      description: "Faktura została pomyślnie zaktualizowana",
-      variant: "success"
-    });
+      
+      setIsEditDialogOpen(false);
+      setEditingInvoice(null);
+      
+      addToast({
+        title: "Faktura zaktualizowana",
+        description: "Faktura została pomyślnie zaktualizowana",
+        variant: "success"
+      });
+    } catch (error) {
+      console.error('Error updating invoice:', error);
+      addToast({
+        title: "Błąd",
+        description: "Nie udało się zaktualizować faktury",
+        variant: "error"
+      });
+    }
   };
 
   return (
@@ -133,11 +211,39 @@ export default function InvoicesHistoryPage() {
           </Link>
           <div>
             <h1 className="text-3xl font-black text-foreground tracking-tight">Historia faktur</h1>
-            <p className="text-primary/70 font-medium">Wszystkie wygenerowane faktury</p>
+            <p className="text-primary/70 font-medium">
+              {userRole === 'employee' ? 'Faktury z Twojego sklepu' : 'Wszystkie wygenerowane faktury'}
+            </p>
+            {userRole === 'employee' && (
+              <p className="text-xs text-primary/50 mt-1 flex items-center gap-1.5">
+                <Store className="h-3 w-3" />
+                Widzisz tylko faktury wygenerowane w Twoim sklepie
+              </p>
+            )}
           </div>
         </div>
 
-        {invoices.length === 0 ? (
+        {isLoading && (
+          <Card className="border-none shadow-xl bg-white rounded-3xl p-12 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-lg font-black text-foreground tracking-tight">Ładowanie faktur...</p>
+          </Card>
+        )}
+
+        {error && (
+          <Card className="border-none shadow-xl bg-red-50 rounded-3xl p-6 text-center">
+            <p className="text-red-700 font-bold text-lg mb-2">Błąd ładowania danych</p>
+            <p className="text-red-600 text-sm mb-4">{error}</p>
+            <Button 
+              onClick={refresh}
+              className="bg-primary hover:bg-primary/90 text-white"
+            >
+              Spróbuj ponownie
+            </Button>
+          </Card>
+        )}
+
+        {!isLoading && !error && invoices.length === 0 ? (
           <Card className="border-none shadow-xl bg-white rounded-3xl p-12 text-center">
             <FileText className="h-16 w-16 text-primary/20 mx-auto mb-4" />
             <p className="text-xl font-black text-foreground tracking-tight mb-2">Brak faktur</p>
@@ -175,6 +281,13 @@ export default function InvoicesHistoryPage() {
                         <div className="flex items-center gap-2 mt-1">
                           <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                           <p className="text-xs font-bold text-muted-foreground">{invoice.date} {invoice.time}</p>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <User className="h-3.5 w-3.5 text-primary/70" />
+                          <p className="text-xs font-bold text-primary/80">{invoice.employeeName}</p>
+                          <span className="text-primary/30">•</span>
+                          <Store className="h-3.5 w-3.5 text-primary/50" />
+                          <p className="text-xs font-bold text-primary/60">{invoice.shopName}</p>
                         </div>
                       </div>
                     </div>
