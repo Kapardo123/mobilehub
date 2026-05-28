@@ -443,43 +443,73 @@ export default function SprzedazPage() {
         const shopName = getSessionStorageSafe("shopName", "Kaufland Włocławek");
         console.log('Sprzedaż: Ładowanie magazynu z Supabase, shopId:', shopId);
 
-        let supabaseData;
-        if (shopId) {
-          supabaseData = await inventoryService.getByShop(shopId);
-        } else {
-          supabaseData = await inventoryService.getAll();
-        }
+        let supabaseData: any[] = [];
+        let useFallback = false;
 
-        console.log('Sprzedaż: Pobrano', supabaseData.length, 'pozycji z Supabase');
-
-        if (supabaseData.length === 0) {
-          console.log('Sprzedaż: 🌱 Inventory puste - dodaję dane demo do Supabase...');
-
-          const defaultPhones = [
-            { name: "iPhone 15 Pro", category: "telefon" as const, brand: "Apple", model: "15 Pro", memory: "256GB", color: "Natural Titanium", condition: "nowy" as const, battery_health: "100%", imei: "351234567890123", purchase_price: 3800, selling_price: 4500, profit_margin: 700, tax_type: "marza" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "nowy" as const, warranty_months: 12, set_includes: "pudełko, kabel, ładowarka", notes: "Bez rys, like new", shop_id: shopId || "default", added_by: "system", metadata: {} },
-            { name: "Samsung S23 Ultra", category: "telefon" as const, brand: "Samsung", model: "S23 Ultra", memory: "512GB", color: "Phantom Black", condition: "uzywany" as const, battery_health: "95%", imei: "354455667788990", purchase_price: 2600, selling_price: 3200, profit_margin: 600, tax_type: "marza" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 12, set_includes: "pudełko, kabel, rysik", notes: "Perfekcyjny stan", shop_id: shopId || "default", added_by: "system", metadata: {} },
-            { name: "iPhone 14 Pro Max", category: "telefon" as const, brand: "Apple", model: "14 Pro Max", memory: "256GB", color: "Deep Purple", condition: "uzywany" as const, battery_health: "97%", imei: "356789012345678", purchase_price: 3500, selling_price: 4200, profit_margin: 700, tax_type: "marza" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 6, set_includes: "pudełko, kabel", notes: "Zadbany", shop_id: shopId || "default", added_by: "system", metadata: {} },
-            { name: "Xiaomi 13 Pro", category: "telefon" as const, brand: "Xiaomi", model: "13 Pro", memory: "256GB", color: "Ceramic Black", condition: "uzywany" as const, battery_health: "92%", imei: "357890123456789", purchase_price: 2200, selling_price: 2800, profit_margin: 600, tax_type: "VAT" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 12, set_includes: "pudełko, kabel, ładowarka", notes: "Stan idealny", shop_id: shopId || "default", added_by: "system", metadata: {} },
-            { name: "iPhone 12 Mini", category: "telefon" as const, brand: "Apple", model: "12 Mini", memory: "64GB", color: "Blue", condition: "uzywany" as const, battery_health: "85%", imei: "358901234567890", purchase_price: 1300, selling_price: 1600, profit_margin: 300, tax_type: "marza" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 3, set_includes: "pudełko", notes: "Drobne ryski", shop_id: shopId || "default", added_by: "system", metadata: {} },
-            { name: "Samsung S22", category: "telefon" as const, brand: "Samsung", model: "S22", memory: "128GB", color: "Green", condition: "uzywany" as const, battery_health: "90%", imei: "359012345678901", purchase_price: 1500, selling_price: 1900, profit_margin: 400, tax_type: "VAT" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 6, set_includes: "pudełko, kabel", notes: "Bardzo zadbany", shop_id: shopId || "default", added_by: "system", metadata: {} },
-            { name: "iPhone 11", category: "telefon" as const, brand: "Apple", model: "11", memory: "64GB", color: "Purple", condition: "uzywany" as const, battery_health: "78%", imei: "350123456789012", purchase_price: 900, selling_price: 1200, profit_margin: 300, tax_type: "marza" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 3, set_includes: "kabel", notes: "Ślady użytkowania", shop_id: shopId || "default", added_by: "system", metadata: {} },
-            { name: "iPhone 16 Pro Max", category: "telefon" as const, brand: "Apple", model: "16 Pro Max", memory: "512GB", color: "Desert Titanium", condition: "nowy" as const, battery_health: "99%", imei: "350987654321098", purchase_price: 4500, selling_price: 5200, profit_margin: 700, tax_type: "VAT" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "nowy" as const, warranty_months: 24, set_includes: "pełne pudełko", notes: "Folia na ekranie", shop_id: shopId || "default", added_by: "system", metadata: {} },
-            { name: "Samsung S24 Ultra", category: "telefon" as const, brand: "Samsung", model: "S24 Ultra", memory: "256GB", color: "Titanium Gray", condition: "uzywany" as const, battery_health: "96%", imei: "351098765432109", purchase_price: 4200, selling_price: 4800, profit_margin: 600, tax_type: "VAT" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 12, set_includes: "pudełko, kabel, ładowarka, rysik", notes: "Bardzo zadbany, folia na ekranie", shop_id: shopId || "default", added_by: "system", metadata: {} },
-            { name: "iPhone 15", category: "telefon" as const, brand: "Apple", model: "15", memory: "128GB", color: "Blue", condition: "uzywany" as const, battery_health: "94%", imei: "352109876543210", purchase_price: 3200, selling_price: 3800, profit_margin: 600, tax_type: "marza" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 9, set_includes: "pudełko, kabel", notes: "Lekkie ślady", shop_id: shopId || "default", added_by: "system", metadata: {} }
-          ];
-
-          for (const phone of defaultPhones) {
-            await inventoryService.create(phone);
+        try {
+          if (shopId) {
+            supabaseData = await inventoryService.getByShop(shopId);
+          } else {
+            supabaseData = await inventoryService.getAll();
           }
-
-          console.log('Sprzedaż: ✅ Dodano', defaultPhones.length, 'telefonów demo do Supabase');
-
-          supabaseData = await (shopId ? inventoryService.getByShop(shopId) : inventoryService.getAll());
-          console.log('Sprzedaż: Ponownie pobrano', supabaseData.length, 'pozycji');
+          console.log('Sprzedaż: Pobrano', supabaseData.length, 'pozycji z Supabase');
+        } catch (supabaseError) {
+          console.error('Sprzedaż: ❌ Błąd Supabase (prawdopodobnie brak zmiennych środowiskowych):', supabaseError);
+          console.error('Sprzedaż: Używam danych fallback (lokalnych)');
+          useFallback = true;
         }
 
-        if (supabaseData.length > 0) {
-          const mappedItems = supabaseData.map((item: any) => ({
+        if (supabaseData.length === 0 && !useFallback) {
+          console.log('Sprzedaż: 🌱 Inventory puste - próbuję dodać dane demo do Supabase...');
+
+          try {
+            const defaultPhones = [
+              { name: "iPhone 15 Pro", category: "telefon" as const, brand: "Apple", model: "15 Pro", memory: "256GB", color: "Natural Titanium", condition: "nowy" as const, battery_health: "100%", imei: "351234567890123", purchase_price: 3800, selling_price: 4500, profit_margin: 700, tax_type: "marza" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "nowy" as const, warranty_months: 12, set_includes: "pudełko, kabel, ładowarka", notes: "Bez rys, like new", shop_id: shopId || "default", added_by: "system", metadata: {} },
+              { name: "Samsung S23 Ultra", category: "telefon" as const, brand: "Samsung", model: "S23 Ultra", memory: "512GB", color: "Phantom Black", condition: "uzywany" as const, battery_health: "95%", imei: "354455667788990", purchase_price: 2600, selling_price: 3200, profit_margin: 600, tax_type: "marza" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 12, set_includes: "pudełko, kabel, rysik", notes: "Perfekcyjny stan", shop_id: shopId || "default", added_by: "system", metadata: {} },
+              { name: "iPhone 14 Pro Max", category: "telefon" as const, brand: "Apple", model: "14 Pro Max", memory: "256GB", color: "Deep Purple", condition: "uzywany" as const, battery_health: "97%", imei: "356789012345678", purchase_price: 3500, selling_price: 4200, profit_margin: 700, tax_type: "marza" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 6, set_includes: "pudełko, kabel", notes: "Zadbany", shop_id: shopId || "default", added_by: "system", metadata: {} },
+              { name: "Xiaomi 13 Pro", category: "telefon" as const, brand: "Xiaomi", model: "13 Pro", memory: "256GB", color: "Ceramic Black", condition: "uzywany" as const, battery_health: "92%", imei: "357890123456789", purchase_price: 2200, selling_price: 2800, profit_margin: 600, tax_type: "VAT" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 12, set_includes: "pudełko, kabel, ładowarka", notes: "Stan idealny", shop_id: shopId || "default", added_by: "system", metadata: {} },
+              { name: "iPhone 12 Mini", category: "telefon" as const, brand: "Apple", model: "12 Mini", memory: "64GB", color: "Blue", condition: "uzywany" as const, battery_health: "85%", imei: "358901234567890", purchase_price: 1300, selling_price: 1600, profit_margin: 300, tax_type: "marza" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 3, set_includes: "pudełko", notes: "Drobne ryski", shop_id: shopId || "default", added_by: "system", metadata: {} },
+              { name: "Samsung S22", category: "telefon" as const, brand: "Samsung", model: "S22", memory: "128GB", color: "Green", condition: "uzywany" as const, battery_health: "90%", imei: "359012345678901", purchase_price: 1500, selling_price: 1900, profit_margin: 400, tax_type: "VAT" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 6, set_includes: "pudełko, kabel", notes: "Bardzo zadbany", shop_id: shopId || "default", added_by: "system", metadata: {} },
+              { name: "iPhone 11", category: "telefon" as const, brand: "Apple", model: "11", memory: "64GB", color: "Purple", condition: "uzywany" as const, battery_health: "78%", imei: "350123456789012", purchase_price: 900, selling_price: 1200, profit_margin: 300, tax_type: "marza" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 3, set_includes: "kabel", notes: "Ślady użytkowania", shop_id: shopId || "default", added_by: "system", metadata: {} },
+              { name: "iPhone 16 Pro Max", category: "telefon" as const, brand: "Apple", model: "16 Pro Max", memory: "512GB", color: "Desert Titanium", condition: "nowy" as const, battery_health: "99%", imei: "350987654321098", purchase_price: 4500, selling_price: 5200, profit_margin: 700, tax_type: "VAT" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "nowy" as const, warranty_months: 24, set_includes: "pełne pudełko", notes: "Folia na ekranie", shop_id: shopId || "default", added_by: "system", metadata: {} },
+              { name: "Samsung S24 Ultra", category: "telefon" as const, brand: "Samsung", model: "S24 Ultra", memory: "256GB", color: "Titanium Gray", condition: "uzywany" as const, battery_health: "96%", imei: "351098765432109", purchase_price: 4200, selling_price: 4800, profit_margin: 600, tax_type: "VAT" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 12, set_includes: "pudełko, kabel, ładowarka, rysik", notes: "Bardzo zadbany, folia na ekranie", shop_id: shopId || "default", added_by: "system", metadata: {} },
+              { name: "iPhone 15", category: "telefon" as const, brand: "Apple", model: "15", memory: "128GB", color: "Blue", condition: "uzywany" as const, battery_health: "94%", imei: "352109876543210", purchase_price: 3200, selling_price: 3800, profit_margin: 600, tax_type: "marza" as const, stock_quantity: 1, is_low_stock: false, is_sold: false, status: "uzywany" as const, warranty_months: 9, set_includes: "pudełko, kabel", notes: "Lekkie ślady", shop_id: shopId || "default", added_by: "system", metadata: {} }
+            ];
+
+            for (const phone of defaultPhones) {
+              await inventoryService.create(phone);
+            }
+
+            console.log('Sprzedaż: ✅ Dodano', defaultPhones.length, 'telefonów demo do Supabase');
+
+            supabaseData = await (shopId ? inventoryService.getByShop(shopId) : inventoryService.getAll());
+            console.log('Sprzedaż: Ponownie pobrano', supabaseData.length, 'pozycji');
+          } catch (seedError) {
+            console.error('Sprzedaż: ❌ Błąd dodawania do Supabase:', seedError);
+            useFallback = true;
+          }
+        }
+
+        if ((supabaseData.length > 0) || useFallback) {
+          let mappedItems;
+
+          if (useFallback || supabaseData.length === 0) {
+            console.log('Sprzedaż: 📦 Używam DANYCH FALLBACK (domyślnych) - Supabaze niedostępny');
+
+            mappedItems = [
+              { id: "fb1", name: "iPhone 15 Pro", category: "telefon", stock: 1, price: "4500 zł", alert: false, imei: "351234567890123", battery: "100%", color: "Natural Titanium", condition: "Nowy", memory: "256GB", brand: "Apple", model: "15 Pro", purchasePrice: "3800", taxType: "marża", purchaseDate: "2024-01-15", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Bez rys, like new", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
+              { id: "fb2", name: "Samsung S23 Ultra", category: "telefon", stock: 1, price: "3200 zł", alert: false, imei: "354455667788990", battery: "95%", color: "Phantom Black", condition: "Używany", memory: "512GB", brand: "Samsung", model: "S23 Ultra", purchasePrice: "2600", taxType: "marża", purchaseDate: "2024-03-05", warranty: "12 m-cy", setIncludes: "pudełko, kabel, rysik", notes: "Perfekcyjny stan", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
+              { id: "fb3", name: "iPhone 14 Pro Max", category: "telefon", stock: 1, price: "4200 zł", alert: false, imei: "356789012345678", battery: "97%", color: "Deep Purple", condition: "Używany", memory: "256GB", brand: "Apple", model: "14 Pro Max", purchasePrice: "3500", taxType: "marża", purchaseDate: "2024-04-01", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Zadbany", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
+              { id: "fb4", name: "Xiaomi 13 Pro", category: "telefon", stock: 1, price: "2800 zł", alert: false, imei: "357890123456789", battery: "92%", color: "Ceramic Black", condition: "Używany", memory: "256GB", brand: "Xiaomi", model: "13 Pro", purchasePrice: "2200", taxType: "VAT", purchaseDate: "2024-03-20", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Stan idealny", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
+              { id: "fb5", name: "iPhone 12 Mini", category: "telefon", stock: 1, price: "1600 zł", alert: false, imei: "358901234567890", battery: "85%", color: "Blue", condition: "Używany", memory: "64GB", brand: "Apple", model: "12 Mini", purchasePrice: "1300", taxType: "marża", purchaseDate: "2024-02-25", warranty: "3 m-ce", setIncludes: "pudełko", notes: "Drobne ryski", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
+              { id: "fb6", name: "Samsung S22", category: "telefon", stock: 1, price: "1900 zł", alert: false, imei: "359012345678901", battery: "90%", color: "Green", condition: "Używany", memory: "128GB", brand: "Samsung", model: "S22", purchasePrice: "1500", taxType: "VAT", purchaseDate: "2024-03-10", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Bardzo zadbany", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
+              { id: "fb7", name: "iPhone 11", category: "telefon", stock: 1, price: "1200 zł", alert: false, imei: "350123456789012", battery: "78%", color: "Purple", condition: "Używany", memory: "64GB", brand: "Apple", model: "11", purchasePrice: "900", taxType: "marża", purchaseDate: "2024-01-20", warranty: "3 m-ce", setIncludes: "kabel", notes: "Ślady użytkowania", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
+              { id: "fb8", name: "iPhone 16 Pro Max", category: "telefon", stock: 1, price: "5200 zł", alert: false, imei: "350987654321098", battery: "99%", color: "Desert Titanium", condition: "Nowy", memory: "512GB", brand: "Apple", model: "16 Pro Max", purchasePrice: "4500", taxType: "VAT", purchaseDate: "2024-06-01", warranty: "24 m-cy", setIncludes: "pełne pudełko", notes: "Folia na ekranie", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
+              { id: "fb9", name: "Samsung S24 Ultra", category: "telefon", stock: 1, price: "4800 zł", alert: false, imei: "351098765432109", battery: "96%", color: "Titanium Gray", condition: "Używany", memory: "256GB", brand: "Samsung", model: "S24 Ultra", purchasePrice: "4200", taxType: "VAT", purchaseDate: "2024-05-20", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka, rysik", notes: "Bardzo zadbany, folia na ekranie", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
+              { id: "fb10", name: "iPhone 15", category: "telefon", stock: 1, price: "3800 zł", alert: false, imei: "352109876543210", battery: "94%", color: "Blue", condition: "Używany", memory: "128GB", brand: "Apple", model: "15", purchasePrice: "3200", taxType: "marża", purchaseDate: "2024-04-15", warranty: "9 m-cy", setIncludes: "pudełko, kabel", notes: "Lekkie ślady", statusSprzedany: false, dataSprzedazy: "", shop: shopName }
+            ];
+          } else {
+            mappedItems = supabaseData.map((item: any) => ({
             id: item.id,
             name: item.name || '',
             category: item.category || 'telefon',
@@ -503,6 +533,7 @@ export default function SprzedazPage() {
             dataSprzedazy: item.sold_at || '',
             shop: ''
           }));
+          }
 
           localStorage.setItem('magazyn_inventory', JSON.stringify(mappedItems));
 
@@ -526,7 +557,7 @@ export default function SprzedazPage() {
 
           console.log('Sprzedaż: ✅ Załadowano telefony:', availablePhones.length, '| Usługi:', availableUslugi.length, '| Serwisy:', availableSerwisy.length, '| Akcesoria:', availableAkcesoria.length);
         } else {
-          console.log('Sprzedaż: ⚠️ Brak danych w Supabase - używam localStorage');
+          console.log('Sprzedaż: ⚠️ Brak danych wszędzie - używam pustej listy');
         }
       } catch (error) {
         console.error('Sprzedaż: Błąd ładowania magazynu:', error);
