@@ -128,9 +128,21 @@ export default function LoginPage() {
       } else {
         alert("Błędny login lub hasło!");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
-      alert("Błąd logowania! Spróbuj ponownie.");
+      console.error('Error type:', typeof error);
+      console.error('Error message:', error?.message);
+      console.error('Error details:', error);
+
+      let errorMessage = 'Błąd logowania! Spróbuj ponownie.';
+
+      if (error?.message?.includes('Supabase') || error?.message?.includes('konfiguracji')) {
+        errorMessage = 'Błąd konfiguracji bazy danych! Skontaktuj się z administratorem.';
+      } else if (error?.message) {
+        errorMessage = `Błąd: ${error.message}`;
+      }
+
+      alert(errorMessage);
     } finally {
       setIsLoading(false);
     }
