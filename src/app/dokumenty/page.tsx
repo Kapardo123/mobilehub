@@ -11,10 +11,23 @@ import { useRouter } from "next/navigation";
 import { getSessionStorageSafe } from "@/lib/storage";
 import { documentsService } from "@/lib/supabase/documents";
 import { supabase } from '@/lib/supabase';
-import type { Database } from '@/lib/supabase';
 import { formatDatePL } from "@/lib/dateFormat";
 
-type Document = Database['public']['Tables']['documents']['Row'];
+interface Document {
+  id: string;
+  name?: string;
+  original_filename?: string;
+  filename?: string;
+  url?: string;
+  file_url?: string;
+  storage_path?: string;
+  document_type?: string;
+  file_type?: string;
+  file_size?: number;
+  uploaded_by?: string;
+  shop_id?: string;
+  created_at?: string;
+}
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = [
@@ -42,11 +55,15 @@ export default function DokumentyPage() {
     if (typeof window === "undefined") return;
     const role = getSessionStorageSafe("userRole", "");
     const uid = getSessionStorageSafe("userId", "");
+    const sid = getSessionStorageSafe("shopId", "");
     if (!role) {
       router.push("/login");
     }
     setUserRole(role);
     setUserId(uid);
+    if (sid) {
+      (window as any).currentShopId = sid;
+    }
   }, [router]);
 
   useEffect(() => {
@@ -179,15 +196,12 @@ export default function DokumentyPage() {
       const documentType = detectDocumentType(file.name);
       
       const docData = {
-        filename: fileName,
-        original_filename: file.name,
-        document_type: documentType as any,
+        shop_id: (window as any).currentShopId || '',
+        file_name: fileName,
+        file_url: publicUrlData?.publicUrl || '',
+        file_type: documentType as any,
         file_size: file.size,
-        mime_type: file.type,
-        storage_path: filePath,
-        url: publicUrlData?.publicUrl || '',
-        uploaded_by: userId,
-        is_public: true
+        uploaded_by: userId
       };
 
       console.log('📝 Dane dokumentu do zapisu:', docData);
@@ -398,9 +412,9 @@ export default function DokumentyPage() {
                     <div>
                       <p className="text-sm font-black text-foreground uppercase tracking-tight truncate max-w-[180px]">{doc.original_filename || doc.filename}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{formatDate(doc.created_at)} • {formatFileSize(doc.file_size)}</p>
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{formatDate(doc.created_at || '')} • {formatFileSize(doc.file_size || 0)}</p>
                         <Badge variant="secondary" className="text-[8px] h-4 px-1.5 uppercase font-black bg-secondary/20 text-secondary border-none">
-                          {getDocumentTypeLabel(doc.document_type)}
+                          {getDocumentTypeLabel(doc.document_type || '')}
                         </Badge>
                       </div>
                     </div>

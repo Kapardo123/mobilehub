@@ -341,20 +341,6 @@ export default function SprzedazPage() {
     const shopName = getSessionStorageSafe("shopName", "");
     const shopId = getSessionStorageSafe("shopId", "");
 
-    console.log('=== SPRZEDAŻ - Ładowanie danych z sesji ===');
-    console.log('RAW sessionStorage (przed czyszczeniem):');
-    console.log('  - userRole:', sessionStorage.getItem("userRole"));
-    console.log('  - userName:', sessionStorage.getItem("userName"));
-    console.log('  - shopName (RAW):', sessionStorage.getItem("shopName"));
-    console.log('  - shopId (RAW):', sessionStorage.getItem("shopId"));
-    console.log('');
-    console.log('Po getSessionStorageSafe:');
-    console.log('  - User Role:', role, '(type:', typeof role + ')');
-    console.log('  - User Name:', userName, '(type:', typeof userName + ')');
-    console.log('  - Shop Name:', shopName, '(type:', typeof shopName + ')');
-    console.log('  - Shop ID:', shopId, '(type:', typeof shopId + ')');
-
-    // Sprawdź podwójne cudzysłowy
     if (shopName && (shopName.startsWith('"') || shopName.startsWith("'"))) {
       console.error('❌ BŁĄD: shopName ma podwójne cudzysłowy!', shopName);
     }
@@ -367,18 +353,13 @@ export default function SprzedazPage() {
     if (shopName) {
       setUserShop(shopName);
       setSelectedShop(shopName);
-      console.log('✅ Ustawiono sklep z sesji:', shopName);
       
-      // Zapisz UUID sklepu (jeśli to UUID, w przeciwnym razie nazwa)
       if (shopId && shopId.includes('-')) {
         setSelectedShopUuid(shopId);
-        console.log('✅ Ustawiono UUID sklepu:', shopId);
       } else {
-        console.log('⚠️ shopId nie jest UUID:', shopId, '- użyję nazwę jako fallback');
-        setSelectedShopUuid(shopName);  // Fallback na nazwę
+        setSelectedShopUuid(shopName);
       }
     } else {
-      console.warn('⚠️ Brak nazwy sklepu w sesji!');
       setUserShop("Nieznany sklep");
       setSelectedShop("Nieznany sklep");
       setSelectedShopUuid("");
@@ -495,38 +476,19 @@ export default function SprzedazPage() {
     try {
       const shopsData = await shopsService.getAll();
       setShops(shopsData.map(shop => shop.name));
-      
-      // Zapisz pełne dane sklepów z UUID do mapowania
       setShopsWithUuid(shopsData);
-      console.log('=== SPRZEDAŻ - Pobrano listę sklepów ===');
-      console.log('Liczba sklepów:', shopsData.length);
-      console.log('Sklepy:', shopsData.map(s => ({ name: s.name, id: s.id })));
 
-      // ✅ Sprawdź BEZPOŚREDNIO z sessionStorage (nie polegaj na state!)
       const shopFromSession = sessionStorage.getItem('shopName');
-      console.log('Sklep z sessionStorage:', shopFromSession);
-      console.log('Aktualny userShop (state):', userShop);
 
       if (shopsData.length > 0) {
-        // Użyj sklepu z sesji jeśli istnieje, inaczej pierwszy z bazy
         const correctShop = shopFromSession || shopsData[0].name;
-
-        if (shopFromSession) {
-          console.log('✅ Używam sklepu z SESJI:', correctShop);
-        } else {
-          console.log('⚠️ Używam DOMYŚLNEGO sklepu (brak w sesji):', correctShop);
-        }
 
         setUserShop(correctShop);
         setSelectedShop(correctShop);
         
-        // Znajdź UUID dla tego sklepu
         const shopWithUuid = shopsData.find((s: any) => s.name === correctShop);
         if (shopWithUuid?.id) {
           setSelectedShopUuid(shopWithUuid.id);
-          console.log('✅ Ustawiono UUID sklepu z listy:', shopWithUuid.id);
-        } else {
-          console.warn('⚠️ Nie znaleziono UUID dla sklepu:', correctShop);
         }
       }
     } catch (error) {
@@ -566,11 +528,6 @@ export default function SprzedazPage() {
   // Filter sales based on filters
   const currentShopId = getSessionStorageSafe("shopId", "");
   const currentUserRole = getSessionStorageSafe("userRole", "");
-
-  console.log('=== FILTROWANIE SPRZEDAŻY ===');
-  console.log('Current Shop ID:', currentShopId);
-  console.log('Current User Role:', currentUserRole);
-  console.log('Total sales before filter:', flattenedSales.length);
 
   const filteredSales = useMemo(() => {
     return flattenedSales.filter(sale => {
@@ -622,10 +579,19 @@ export default function SprzedazPage() {
     });
   }, [flattenedSales, filterCategory, filterEmployee, dateRange, customDateFrom, customDateTo, currentShopId, currentUserRole, userShop]);
 
-  console.log('Filtered sales count:', filteredSales.length);
-
-  const totalAmount = filteredSales.reduce((sum, sale) => sum + sale.totalPrice, 0);
-  const totalProfit = filteredSales.reduce((sum, sale) => sum + sale.totalProfit, 0);
+  const totalSalesAmount = filteredSales.reduce((sum, sale) => sum + sale.totalPrice, 0);
+  const totalSalesProfit = filteredSales.reduce((sum, sale) => sum + sale.totalProfit, 0);
+  
+  const totalCosts = costs
+    .filter(c => c.category !== 'gotowka')
+    .reduce((sum, c) => sum + c.amount, 0);
+  
+  const totalDoladowania = costs
+    .filter(c => c.category === 'gotowka')
+    .reduce((sum, c) => sum + c.amount, 0);
+  
+  const totalAmount = totalSalesAmount + totalDoladowania;
+  const totalProfit = totalSalesProfit - totalCosts;
 
   const addPosition = () => {
     if (!newEntry.name || !newEntry.price) return;
@@ -749,9 +715,8 @@ export default function SprzedazPage() {
             employee_id: employeeId
           };
           
-          console.log('📦 Dane sprzedaży:', JSON.stringify(saleData, null, 2));
-          
           const itemsData = cartItems.map((item, index) => ({
+            sale_id: newSale.id,
             product_name: item.name,
             category: item.cat,
             unit_price: item.price,
@@ -778,73 +743,28 @@ export default function SprzedazPage() {
           }
         } catch (dbError: any) {
           console.error('❌ Błąd zapisu do bazy:', dbError);
-          console.error('=== SZCZEGÓŁY BŁĘDU ===');
-          console.error('Type:', typeof dbError);
-          console.error('Is null:', dbError === null);
-          console.error('Is undefined:', dbError === undefined);
-          console.error('Constructor:', dbError?.constructor?.name);
-          
-          if (dbError) {
-            console.error('Keys:', Object.keys(dbError));
-            console.error('Properties:', Object.getOwnPropertyNames(dbError));
-            
-            if (dbError.message) console.error('Message:', dbError.message);
-            if (dbError.code) console.error('Code:', dbError.code);
-            if (dbError.details) console.error('Details:', dbError.details);
-            if (dbError.hint) console.error('Hint:', dbError.hint);
-            if (dbError.status) console.error('Status:', dbError.status);
-            if (dbError.statusText) console.error('StatusText:', dbError.statusText);
-            if (dbError.error) console.error('Inner error:', dbError.error);
-            if (dbError.error_description) console.error('Error desc:', dbError.error_description);
-            
-            // Sprawdź czy to odpowiedź HTTP
-            if (dbError.response) {
-              console.error('Response status:', dbError.response.status);
-              console.error('Response data:', dbError.response.data);
-              console.error('Response headers:', dbError.response.headers);
-            }
-            
-            // Sprawdź czy to błąd sieciowy
-            if (dbError instanceof TypeError) {
-              console.error('Network Error - brak połączenia?');
-            }
-            
-            // Pełny JSON błędu
-            try {
-              const errorStr = JSON.stringify(dbError, Object.getOwnPropertyNames(dbError), 2);
-              console.error('Full serialized:', errorStr.substring(0, 1000));
-            } catch(e) {
-              console.error('Cannot serialize error');
-            }
-          }
-          console.error('=========================');
           
           let errorMessage = 'Nieznany błąd';
           if (dbError?.code === '42501') errorMessage = 'Brak uprawnień (RLS)';
           else if (dbError?.code === '23505') errorMessage = 'Duplikat danych';
           else if (dbError?.code === '23502') errorMessage = 'Brak wymaganych pól';
           else if (dbError?.code === '22P02') errorMessage = 'Nieprawidłowy format ID';
-          else if (dbError?.code === '428C9') errorMessage = 'Błąd kolumny generowanej';
           else if (dbError?.message && typeof dbError.message === 'string') errorMessage = dbError.message;
           else if (typeof dbError === 'string') errorMessage = dbError;
-          else if (Object.keys(dbError || {}).length === 0) errorMessage = 'Pusty błąd - sprawdź konsolę po szczegóły';
           
-          addToast({ 
-            message: `⚠️ Sprzedaż zapisana lokalnie (błąd: ${errorMessage})`, 
-            variant: "warning" 
+          addToast({
+            message: `⚠️ Sprzedaż zapisana lokalnie (błąd: ${errorMessage})`,
+            variant: "info"
           });
         }
       } else {
-        console.log('⏭️ Pomijam zapis do bazy - brak poprawnych UUID:', { shopId, employeeId });
         addToast({ 
           message: '✅ Sprzedaż dodana (lokalnie - skonfiguruj sklep/pracownika)', 
           variant: "info" 
         });
       }
       
-      // Powiadom inne zakładki o aktualizacji danych
       window.dispatchEvent(new Event('sales_data_updated'));
-      console.log('📡 Wysłano sygnał: sales_data_updated');
       
       addToast({ message: `Sprzedaż dodana (${newSale.items.length} pozycji)`, variant: "success" });
       
@@ -925,9 +845,7 @@ export default function SprzedazPage() {
     setCosts(prev => [cost, ...prev]);
     localStorage.setItem('sprzedaz_costs', JSON.stringify([cost, ...costs]));
     
-    // Powiadom inne zakładki o aktualizacji danych
     window.dispatchEvent(new Event('costs_data_updated'));
-    console.log('📡 Wysłano sygnał: costs_data_updated');
     
     addAction({
       action_type: 'koszt',
@@ -939,14 +857,6 @@ export default function SprzedazPage() {
       details: `${newCost.amount} zł | ${newCost.paymentMethod}`,
       target_table: 'costs',
       target_type: 'cost'
-    });
-    
-    console.log('💰 Dodano koszt z danymi:', {
-      category: newCost.category,
-      amount: newCost.amount,
-      shop_id: selectedShopUuid || selectedShop,
-      shop_name: selectedShop,
-      isUUID: !!(selectedShopUuid && selectedShopUuid.includes('-'))
     });
     
     addToast({ message: `Koszt dodany: ${newCost.amount} zł`, variant: "success" });
@@ -1426,11 +1336,9 @@ export default function SprzedazPage() {
                       value={selectedShop || ""} 
                       onValueChange={(val) => {
                         setSelectedShop(val || selectedShop || "");
-                        // Znajdź i ustaw UUID dla wybranego sklepu
                         const shopWithId = shopsWithUuid.find((s: any) => s.name === val);
                         if (shopWithId?.id) {
                           setSelectedShopUuid(shopWithId.id);
-                          console.log('🔄 Zmieniono sklep na:', val, '(UUID:', shopWithId.id + ')');
                         }
                       }} 
                       items={shops.map(shop => ({ value: shop, label: shop }))}
@@ -1958,9 +1866,10 @@ export default function SprzedazPage() {
 
                     const today = new Date();
                     const invoiceItemsForDB = selectedSale.items.map((item, idx) => ({
+                      invoice_id: '',
                       item_name: item.name,
                       category: allCategories.find(c => c.id === item.cat)?.label || item.cat,
-                      description: `${item.name} - ${item.category || 'Produkt'}`,
+                      description: `${item.name} - ${item.cat || 'Produkt'}`,
                       unit_price: item.price,
                       quantity: 1,
                       unit_net_price: Math.round(item.price / 1.23 * 100) / 100,
@@ -2014,11 +1923,11 @@ export default function SprzedazPage() {
                       const errorStr = JSON.stringify(error, null, 2);
                       console.error('JSON:', errorStr);
                       
-                      if (error.message) console.error('Message:', error.message);
-                      if (error.code) console.error('Code:', error.code);
-                      if (error.details) console.error('Details:', error.details);
-                      if (error.hint) console.error('Hint:', error.hint);
-                      if (error.stack) console.error('Stack:', error.stack);
+                      if ((error as any).message) console.error('Message:', (error as any).message);
+                      if ((error as any).code) console.error('Code:', (error as any).code);
+                      if ((error as any).details) console.error('Details:', (error as any).details);
+                      if ((error as any).hint) console.error('Hint:', (error as any).hint);
+                      if ((error as any).stack) console.error('Stack:', (error as any).stack);
                     } else {
                       console.error('⚠️ Error is null or undefined!');
                     }
@@ -2026,10 +1935,10 @@ export default function SprzedazPage() {
                     
                     let errorMessage = 'Nieznany błąd (error jest pusty)';
                     
-                    if (error?.message) {
-                      errorMessage = error.message;
-                    } else if (error?.code) {
-                      errorMessage = `Kod błędu: ${error.code}`;
+                    if ((error as any)?.message) {
+                      errorMessage = (error as any).message;
+                    } else if ((error as any)?.code) {
+                      errorMessage = `Kod błędu: ${(error as any).code}`;
                     } else if (!error) {
                       errorMessage = 'Błąd bez szczegółów - sprawdź RLS policies w Supabase!';
                     } else if (typeof error === 'object') {
@@ -2039,7 +1948,7 @@ export default function SprzedazPage() {
                     addToast({
                       title: "Błąd faktury",
                       description: `${errorMessage}\n\n📋 Otwórz F12 → Console po pełne logi`,
-                      variant: "warning"
+                      variant: "error"
                     });
                   }
 
@@ -2952,11 +2861,9 @@ export default function SprzedazPage() {
                 value={selectedShop || ""} 
                 onValueChange={(val) => {
                   setSelectedShop(val || selectedShop || "");
-                  // Znajdź i ustaw UUID dla wybranego sklepu
                   const shopWithId = shopsWithUuid.find((s: any) => s.name === val);
                   if (shopWithId?.id) {
                     setSelectedShopUuid(shopWithId.id);
-                    console.log('🔄 Zmieniono sklep na:', val, '(UUID:', shopWithId.id + ')');
                   }
                 }} 
                 items={shops.map(shop => ({ value: shop, label: shop }))}

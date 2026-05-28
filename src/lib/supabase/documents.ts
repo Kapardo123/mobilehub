@@ -1,9 +1,41 @@
 import { supabase } from '../supabase';
-import type { Database } from '../supabase';
 
-type Document = Database['public']['Tables']['documents']['Row'];
-type DocumentInsert = Database['public']['Tables']['documents']['Insert'];
-type DocumentUpdate = Database['public']['Tables']['documents']['Update'];
+interface Document {
+  id: string;
+  shop_id: string;
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  file_size: number;
+  uploaded_by: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+interface DocumentInsert {
+  id?: string;
+  shop_id: string;
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  file_size: number;
+  uploaded_by: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+interface DocumentUpdate {
+  shop_id?: string;
+  file_name?: string;
+  file_url?: string;
+  file_type?: string;
+  file_size?: number;
+  uploaded_by?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
 
 export const documentsService = {
   async getAll(): Promise<Document[]> {

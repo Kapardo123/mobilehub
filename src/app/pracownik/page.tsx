@@ -9,7 +9,7 @@ import { getSessionStorageSafe, getLocalStorageSafe } from "@/lib/storage";
 import { cashRegisterService } from "@/lib/supabase/cashRegister";
 import { shopsService } from "@/lib/supabase/shops";
 import { Button } from "@/components/ui/button";
-import { formatDatePL, getCurrentDatePL, toISODateString, getCurrentTimePL } from "@/lib/dateFormat";
+import { formatDatePL, formatTimePL, getCurrentDatePL, toISODateString, getCurrentTimePL } from "@/lib/dateFormat";
 
 interface Action {
   id: string;
@@ -115,7 +115,7 @@ export default function PracownikDashboard() {
         role: cleanString(sessionStorage.getItem('userRole')) || 'employee'
       };
       sessionStorage.setItem('activeEmployees', JSON.stringify([autoEmployee]));
-      sessionStorage.setItem('selectedEmployeeId', cleanString(userId));
+      sessionStorage.setItem('selectedEmployeeId', cleanString(userId) || '');
       console.log('Utworzono activeEmployees:', autoEmployee);
     }
 
@@ -123,7 +123,7 @@ export default function PracownikDashboard() {
     const valid = finalActiveEmployees.length > 0 && userName && userId;
     console.log('valid:', valid, 'finalActiveEmployees.length:', finalActiveEmployees.length, 'userName:', userName, 'userId:', userId);
 
-    setHasValidSession(valid);
+    setHasValidSession(!!valid);
     setIsSessionChecked(true);
 
     if (!valid) return;

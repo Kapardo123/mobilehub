@@ -4,7 +4,18 @@ import { useState, useEffect, useCallback } from 'react';
 import { invoicesService, invoiceItemsService } from '@/lib/supabase/invoices';
 import type { Database } from '@/lib/supabase';
 
-type Invoice = Database['public']['Tables']['invoices']['Row'];
+type Invoice = Database['public']['Tables']['invoices']['Row'] & {
+  customer?: any;
+  shop?: any;
+  employee?: {
+    id: string;
+    first_name?: string;
+    last_name?: string;
+    initials?: string;
+  };
+  sale?: any;
+  invoice_items?: any[];
+};
 type InvoiceItem = Database['public']['Tables']['invoice_items']['Row'];
 
 interface UseInvoicesDataOptions {

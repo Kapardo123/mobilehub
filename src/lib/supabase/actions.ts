@@ -63,8 +63,8 @@ export const auditService = {
             .eq('is_primary', true)
             .limit(1);
           
-          if (userShops?.length > 0 && userShops[0].shop?.name) {
-            finalShopName = userShops[0].shop.name;
+          if (userShops && Array.isArray(userShops) && userShops.length > 0 && userShops[0]?.shop && typeof userShops[0].shop === 'object' && !Array.isArray(userShops[0].shop) && 'name' in userShops[0].shop) {
+            finalShopName = (userShops[0].shop as any).name;
             console.log(`   ✅ Uzupełniono sklep z user_shops: "${finalShopName}"`);
           }
         } catch (e) {

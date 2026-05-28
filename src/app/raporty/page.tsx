@@ -96,17 +96,6 @@ export default function RaportyPage() {
   const currentUserId = isMounted ? getSessionStorageSafe("userId", "") : "";
   const isEmployee = currentUserRole === 'employee';
 
-  console.log('🔐 Stan sesji raportów:', {
-    isMounted,
-    currentUserRole,
-    isEmployee,
-    currentUserId,
-    currentShopId,
-    currentShopName,
-    isUUID: currentShopId?.includes('-'),
-    shopIdLength: currentShopId?.length
-  });
-
   const [activeTab, setActiveTab] = useState<'sklepy' | 'pracownicy'>(isEmployee ? 'pracownicy' : 'sklepy');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -213,8 +202,7 @@ export default function RaportyPage() {
           }
           
           // Sprawdź czy pracownik ma przynajmniej jeden AKTYWNY sklep
-          const employeeShopNames = emp.shops?.map((s: any) => s.shop_name?.toLowerCase()) || 
-                                   (emp.shop_name ? [emp.shop_name.toLowerCase()] : []);
+          const employeeShopNames = emp.shops?.map((s: any) => s.shop_name?.toLowerCase()) || [];
           
           console.log(`🔍 Pracownik ${emp.first_name} ${emp.last_name}: sklepy=${employeeShopNames}, aktywne=${activeShopNames}`);
           
@@ -236,7 +224,7 @@ export default function RaportyPage() {
           name: `${emp.first_name} ${emp.last_name}`,
           initials: emp.initials || `${emp.first_name?.[0]}${emp.last_name?.[0]}`,
           role: emp.role === 'employee' ? 'Pracownik' : emp.role,
-          shops: emp.shops?.map((s: any) => s.shop_name) || [emp.shop_name || 'Brak danych']
+          shops: emp.shops?.map((s: any) => s.shop_name) || ['Brak danych']
         }));
         
         if (activeEmployees.length === 0 && !isEmployee) {
@@ -391,7 +379,7 @@ export default function RaportyPage() {
               imei: item.imei || undefined
             };
           }),
-          shop: sale.shop_name || shops.find(s => s.id === sale.shop_id)?.label || 'Nieznany sklep'
+          shop: shops.find(s => s.id === sale.shop_id)?.label || 'Nieznany sklep'
           };
         });
         
@@ -443,7 +431,7 @@ export default function RaportyPage() {
         if (error && typeof error === 'object') {
           console.error('Keys:', Object.keys(error));
           console.error('Properties:', Object.getOwnPropertyNames(error));
-          console.error('Message:', error.message || 'brak');
+          console.error('Message:', (error as any).message || 'brak');
           console.error('Code:', (error as any).code || 'brak');
           console.error('Details:', (error as any).details || 'brak');
           console.error('Hint:', (error as any).hint || 'brak');
@@ -1019,7 +1007,6 @@ export default function RaportyPage() {
                   <Card className="border-none shadow-sm rounded-2xl overflow-hidden border border-primary/10">
                     <CardContent className="p-5">
                       <h4 className="text-[11px] font-black text-muted-foreground uppercase tracking-widest mb-4">Sprzedaż wg kategorii</h4>
-                      {console.log('🎨 Kategorie w modalu:', selectedEmployee?.categoriesBreakdown, 'salesTotal:', selectedEmployee?.salesTotal)}
                       <div className="space-y-3">
                         <div className="flex items-center gap-3">
                           <Smartphone className="h-4 w-4 text-purple-500" />

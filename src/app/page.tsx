@@ -113,12 +113,14 @@ export default function Home() {
         role: cleanString(sessionStorage.getItem('userRole')) || 'owner'
       };
       sessionStorage.setItem('activeEmployees', JSON.stringify([autoEmployee]));
-      sessionStorage.setItem('selectedEmployeeId', cleanString(userId));
+      if (userId) {
+        sessionStorage.setItem('selectedEmployeeId', userId.replace(/^"|"$/g, '') || userId);
+      }
       console.log('Utworzono activeEmployees:', autoEmployee);
     }
 
     const finalActiveEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
-    const valid = finalActiveEmployees.length > 0 && userName && userId;
+    const valid = finalActiveEmployees.length > 0 && !!userName && !!userId;
     setHasValidSession(valid);
     setIsSessionChecked(true);
   }, []);
