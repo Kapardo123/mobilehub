@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from 'react';
-import { salesService, costsService, customersService, invoicesService, auditService } from '@/lib/supabase';
-import type { Sale, Cost, Customer, Invoice } from '@/lib/supabase';
+import { salesService, costsService, customersService, invoicesService, auditService } from '@/lib/supabase/index';
 import { toISODateString, getCurrentTimePL } from '@/lib/dateFormat';
 
 export interface CartItem {
@@ -31,9 +30,9 @@ export interface SaleGroup {
 
 export function useSalesData(shopId?: string) {
   const [sales, setSales] = useState<SaleGroup[]>([]);
-  const [costs, setCosts] = useState<Cost[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [costs, setCosts] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadSales = useCallback(async () => {
