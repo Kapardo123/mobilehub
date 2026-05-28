@@ -122,18 +122,18 @@ export const usersService = {
     
     if (!data || data.length === 0) return [];
     
-    const shopIds = [...new Set(data.map(row => row.shop_id))];
-    
+    const shopIds = [...new Set(data.map((row: any) => row.shop_id))];
+
     const { data: shopsData } = await supabase
       .from('shops')
       .select('id, name')
       .in('id', shopIds);
-    
+
     const shopMap = new Map();
-    (shopsData || []).forEach(shop => shopMap.set(shop.id, shop.name));
-    
+    (shopsData || []).forEach((shop: any) => shopMap.set(shop.id, shop.name));
+
     const uniqueShops = new Map();
-    data.forEach(row => {
+    data.forEach((row: any) => {
       if (!uniqueShops.has(row.shop_id)) {
         uniqueShops.set(row.shop_id, {
           shop_id: row.shop_id,
