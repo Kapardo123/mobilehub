@@ -188,7 +188,7 @@ export const shopAccessService = {
 
       const blockedShops = this.getBlockedShopsFromStorage();
 
-      const statusList: ShopAccessStatus[] = (shops || []).map(shop => {
+      const statusList: ShopAccessStatus[] = (shops || []).map((shop: any) => {
         const blocked = blockedShops.find(b => b.shopId === shop.id);
 
         return {
