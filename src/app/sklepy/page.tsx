@@ -132,7 +132,7 @@ export default function SklepyPage() {
       console.log('Znaleziono właścicieli:', owners?.length || 0);
       
       if (owners && owners.length > 0) {
-        const ownerAssignments = owners.map((owner, index) => ({
+        const ownerAssignments = owners.map((owner: any, index: number) => ({
           user_id: owner.id,
           shop_id: createdShop.id,
           is_primary: index === 0
