@@ -214,7 +214,7 @@ export const salesService = {
     
     if (error) throw error;
     
-    return data?.reduce((sum, sale) => sum + Number(sale.total_amount), 0) || 0;
+    return data?.reduce((sum: number, sale: any) => sum + Number(sale.total_amount), 0) || 0;
   },
 
   async deleteByShopId(shopId: string): Promise<void> {

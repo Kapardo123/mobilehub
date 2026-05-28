@@ -1,6 +1,8 @@
 import { supabase } from '../supabase';
-import type { CashRegisterClosing, Database } from '../supabase';
+import type { Database } from '../supabase';
 import { toISODateString } from '../dateFormat';
+
+type CashRegisterClosing = Database['public']['Tables']['cash_register_closings']['Row'];
 
 type CashRegisterClosingInsert = Database['public']['Tables']['cash_register_closings']['Insert'];
 type CashRegisterClosingUpdate = Database['public']['Tables']['cash_register_closings']['Update'];

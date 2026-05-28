@@ -162,6 +162,6 @@ export const costsService = {
     
     if (error) throw error;
     
-    return data?.reduce((sum, cost) => sum + Number(cost.amount), 0) || 0;
+    return data?.reduce((sum: number, cost: any) => sum + Number(cost.amount), 0) || 0;
   }
 };
