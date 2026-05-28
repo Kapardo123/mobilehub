@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = 'force-dynamic';
+
 import { Navbar } from "@/components/navbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Search, Filter, User, Store, Clock, ShoppingCart, Package, Wrench, Settings, DollarSign } from "lucide-react";
