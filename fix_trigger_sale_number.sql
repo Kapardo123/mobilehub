@@ -5,26 +5,26 @@
 DROP TRIGGER IF EXISTS trigger_generate_sale_number ON public.sales;
 DROP FUNCTION IF EXISTS public.generate_sale_number();
 
--- 2. STWÓRZ NOWĄ POPRAWNĄ FUNKCJĘ
+-- 2. STWÓRZ NOWĄ POPRAWNĄ FUNKCJĘ (SECURITY DEFINER - omija RLS)
 CREATE OR REPLACE FUNCTION public.generate_sale_number()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE 
     prefix TEXT; 
     seq_num INTEGER;
-    max_existing INTEGER;
 BEGIN
-    prefix := 'FS-' || TO_CHAR(CURRENT_DATE, 'YYYY') || '-';
+    prefix := 'FS-' || TO_CHAR(NEW.sale_date, 'YYYY') || '-';
     
-    -- Pobierz MAX numer dla DZISIEJSZEJ daty (nie sale_date z rekordu!)
     SELECT COALESCE(
         MAX(SUBSTRING(sale_number FROM '[0-9]+$')::INTEGER), 
         0
     ) + 1 INTO seq_num
     FROM public.sales 
-    WHERE sale_date = CURRENT_DATE  -- ← POPRAWKA: Używamy CURRENT_DATE!
+    WHERE sale_date = NEW.sale_date
       AND sale_number LIKE prefix || '%';
     
-    -- Jeśli nic nie znaleziono, zacznij od 1
     IF seq_num IS NULL THEN
         seq_num := 1;
     END IF;
@@ -35,9 +35,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 3. STWÓRZ NOWY TRIGGER
+-- 3. STWÓRZ NOWY TRIGGER (tylko gdy sale_number NIE jest ustawione)
 CREATE TRIGGER trigger_generate_sale_number
     BEFORE INSERT ON public.sales FOR EACH ROW
+    WHEN (NEW.sale_number IS NULL)
     EXECUTE FUNCTION public.generate_sale_number();
 
 -- 4. TEST: Sprawdź czy działa

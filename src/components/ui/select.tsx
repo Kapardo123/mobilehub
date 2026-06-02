@@ -114,8 +114,6 @@ function SelectItem({
   value,
   ...props
 }: SelectPrimitive.Item.Props) {
-  const displayValue = typeof children === 'string' ? children : value
-  
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
@@ -127,7 +125,7 @@ function SelectItem({
       {...props}
     >
       <SelectPrimitive.ItemText className="flex flex-1 shrink-0 gap-2 whitespace-nowrap">
-        {displayValue}
+        {children}
       </SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator
         render={

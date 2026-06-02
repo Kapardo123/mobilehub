@@ -2,827 +2,852 @@
 
 import { Navbar } from "@/components/navbar";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock, MapPin, Calendar, User, LogIn, Plus, X, Info, Copy } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock, MapPin, Calendar, User, Plus, X, Users, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger,
-  DialogFooter
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { getSessionStorageSafe } from "@/lib/storage";
 import { useShiftsData } from "@/hooks/useShiftsData";
 import { shopsService } from "@/lib/supabase/shops";
+import { usersService } from "@/lib/supabase/users";
 import { toISODateString } from "@/lib/dateFormat";
 
-// Employee colors for visual distinction
 const employeeColors = [
-  "bg-rose-500",
   "bg-blue-500",
   "bg-emerald-500",
   "bg-violet-500",
   "bg-amber-500",
-  "bg-cyan-500",
   "bg-pink-500",
-  "bg-indigo-500",
+  "bg-cyan-500",
+  "bg-orange-500",
+  "bg-teal-500",
 ];
+
+const monthNames = [
+  "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+  "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+];
+
+const generateInitials = (name: string): string => {
+  if (!name || typeof name !== 'string') return '??';
+  const parts = name.trim().split(' ').filter(p => p.length > 0);
+  if (parts.length === 0) return '??';
+  if (parts.length === 1) {
+    const word = parts[0];
+    return word.length >= 2 ? word.substring(0, 2).toUpperCase() : word.toUpperCase();
+  }
+  return parts.slice(0, 2).map(p => p[0].toUpperCase()).join('');
+};
+
+const padTime = (time: string): string => {
+  const parts = time.split(':');
+  return `${parts[0].padStart(2, '0')}:${parts[1]?.padStart(2, '0') || '00'}`;
+};
+
+const getDaysInMonth = (month: number, year: number) => {
+  const date = new Date(year, month, 1);
+  const days = [];
+  while (date.getMonth() === month) {
+    days.push({
+      date: date.getDate(),
+      day: ["Niedz", "Pon", "Wt", "Śr", "Czw", "Pt", "Sob"][date.getDay()],
+      dayNum: date.getDay()
+    });
+    date.setDate(date.getDate() + 1);
+  }
+  return days;
+};
+
+interface ShiftDisplay {
+  id: string;
+  shiftId: string;
+  employeeId: string;
+  name: string;
+  initials: string;
+  start: number;
+  end: number;
+  startTimeStr: string;
+  endTimeStr: string;
+  shop: string;
+  date: number;
+  status: string;
+}
+
+interface EmployeeData {
+  id: string;
+  name: string;
+  initials: string;
+  role: string;
+  shops: string[];
+}
 
 export default function GrafikPage() {
   const router = useRouter();
+
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [userShop, setUserShop] = useState("kaufland-wloclawek");
+  const [userShop, setUserShop] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [currentUserName, setCurrentUserName] = useState<string>("");
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const role = getSessionStorageSafe("userRole", "");
-    if (!role) {
-      router.push("/login");
-      return;
-    }
+    if (!role) { router.push("/login"); return; }
     setUserRole(role === "owner" ? "Właściciel" : "Pracownik");
-    const shop = getSessionStorageSafe("userShop", "kaufland-wloclawek");
-    setUserShop(shop);
+    setUserShop(getSessionStorageSafe("shopId", "kaufland-wloclawek"));
+    setCurrentUserId(getSessionStorageSafe("userId", ""));
+    setCurrentUserName(getSessionStorageSafe("userName", ""));
+    setIsMounted(true);
   }, [router]);
 
   const isOwner = userRole === "Właściciel";
-  const [selectedShop, setSelectedShop] = useState<string>("all");
-  const [shops, setShops] = useState<{id: string; name: string}[]>([]);
+  const isEmployee = userRole === "Pracownik";
+
+  const [selectedShop, setSelectedShop] = useState<string>("");
+  const [shops, setShops] = useState<{ id: string; name: string }[]>([]);
   const [shopLabels, setShopLabels] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    loadShops();
+  const selectedShopName = useMemo(() => {
+    if (!selectedShop) return "Wybierz sklep";
+    return shopLabels[selectedShop] || shops.find(s => s.id === selectedShop)?.name || selectedShop;
+  }, [selectedShop, shopLabels, shops]);
+
+  const loadShops = useCallback(async () => {
+    try {
+      const data = await shopsService.getAll();
+      setShops(data.map(s => ({ id: s.id, name: s.name })));
+      const labels: Record<string, string> = {};
+      data.forEach(s => { labels[s.id] = s.name; });
+      setShopLabels(labels);
+      if (data.length > 0 && !selectedShop) setSelectedShop(data[0].id);
+    } catch {}
   }, []);
 
-  const loadShops = async () => {
-    try {
-      const shopsData = await shopsService.getAll();
-      setShops(shopsData.map(shop => ({
-        id: shop.id,
-        name: shop.name
-      })));
-      
-      const labels: Record<string, string> = {};
-      shopsData.forEach(shop => {
-        labels[shop.id] = shop.name;
-      });
-      setShopLabels(labels);
-      
-      if (shopsData.length > 0 && selectedShop === "all") {
-        setSelectedShop(shopsData[0].id);
-      }
-      
-      console.log('Pobrano sklepy w grafiku:', shopsData.length);
-    } catch (error) {
-      console.error('Błąd podczas pobierania sklepów:', error);
-    }
-  };
+  useEffect(() => { loadShops(); }, [loadShops]);
 
   useEffect(() => {
-    if (!isOwner && userShop) {
+    if (isEmployee && userShop && shops.length > 0) {
       setSelectedShop(userShop);
     }
-  }, [isOwner, userShop]);
+  }, [isEmployee, userShop, shops]);
 
-  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [view, setView] = useState<"month" | "edit">("month");
 
-  useEffect(() => {
-    setView("month");
-  }, [isOwner]);
+  const effectiveShopId = isOwner ? selectedShop : userShop;
 
-  const monthNames = [
-    "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
-    "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
-  ];
+  const startDate = toISODateString(new Date(selectedYear, selectedMonth, 1));
+  const endDate = toISODateString(new Date(selectedYear, selectedMonth + 1, 0));
 
-  // Month navigation
-  const goToPrevMonth = () => {
-    if (selectedMonth === 0) {
-      setSelectedMonth(11);
-      setSelectedYear(selectedYear - 1);
-    } else {
-      setSelectedMonth(selectedMonth - 1);
-    }
-  };
-
-  const goToNextMonth = () => {
-    if (selectedMonth === 11) {
-      setSelectedMonth(0);
-      setSelectedYear(selectedYear + 1);
-    } else {
-      setSelectedMonth(selectedMonth + 1);
-    }
-  };
-
-  const goToToday = () => {
-    const today = new Date();
-    setSelectedMonth(today.getMonth());
-    setSelectedYear(today.getFullYear());
-    setSelectedDay(today.getDate());
-  };
-
-  const getDaysInMonth = (month: number, year: number) => {
-    const date = new Date(year, month, 1);
-    const days = [];
-    while (date.getMonth() === month) {
-      days.push({
-        date: date.getDate(),
-        day: ["Niedz", "Pon", "Wt", "Śr", "Czw", "Pt", "Sob"][date.getDay()],
-        dayNum: date.getDay()
-      });
-      date.setDate(date.getDate() + 1);
-    }
-    return days;
-  };
-
-  const monthDays = getDaysInMonth(selectedMonth, selectedYear);
-
-  const [activePreset, setActivePreset] = useState("Otwarcie");
-  const [customRange, setCustomRange] = useState({ start: "10:00", end: "15:00" });
-  const [isShiftDetailsOpen, setIsShiftDetailsOpen] = useState(false);
-  const [selectedShiftDetails, setSelectedShiftDetails] = useState<any>(null);
-
-  const [employees, setEmployees] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const saved = localStorage.getItem('pracownicy_employees');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        const grafikEmployees = parsed.map((emp: any) => ({
-          id: emp.id,
-          name: emp.name,
-          initials: emp.initials
-        }));
-        setEmployees(grafikEmployees);
-      } catch {
-        setEmployees([
-          { id: "jk", name: "Jan Kowalski", initials: "JK" },
-          { id: "an", name: "Anna Nowak", initials: "AN" },
-          { id: "pz", name: "Piotr Zakrzewski", initials: "PZ" },
-        ]);
-      }
-    } else {
-      setEmployees([
-        { id: "jk", name: "Jan Kowalski", initials: "JK" },
-        { id: "an", name: "Anna Nowak", initials: "AN" },
-        { id: "pz", name: "Piotr Zakrzewski", initials: "PZ" },
-      ]);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const handler = () => {
-      const saved = localStorage.getItem('pracownicy_employees');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          const grafikEmployees = parsed.map((emp: any) => ({
-            id: emp.id,
-            name: emp.name,
-            initials: emp.initials
-          }));
-          setEmployees(grafikEmployees);
-        } catch { }
-      }
-    };
-    window.addEventListener('pracownicy_updated', handler);
-    return () => window.removeEventListener('pracownicy_updated', handler);
-  }, []);
-
-  const [shifts, setShifts] = useState([
-    { name: "Tomasz Lewandowski", initials: "TL", shift: "09:00 - 17:00", start: 9, end: 17, shop: "kaufland-wloclawek", status: "W pracy", date: 12, shiftId: "" },
-    { name: "Marta Kowalczyk", initials: "MK", shift: "10:00 - 18:00", start: 10, end: 18, shop: "riviera-gdynia", status: "Zaplanowane", date: 12, shiftId: "" },
-    { name: "Piotr Zakrzewski", initials: "PZ", shift: "12:00 - 20:00", start: 12, end: 20, shop: "dominikanska-wroclaw", status: "Zaplanowane", date: 12, shiftId: "" },
-    { name: "Kamil Nowicki", initials: "KN", shift: "09:00 - 17:00", start: 9, end: 17, shop: "kaufland-wloclawek", status: "Zaplanowane", date: 15, shiftId: "" },
-  ]);
+  const hookOptions = useMemo(() => {
+    if (isOwner) return { shopId: effectiveShopId || undefined, startDate, endDate };
+    return { employeeId: currentUserId || undefined, startDate, endDate };
+  }, [isOwner, effectiveShopId, currentUserId, startDate, endDate]);
 
   const {
     shifts: shiftsData,
     isLoading,
-    error,
     addShift,
     deleteShift,
-    refresh
-  } = useShiftsData({ 
-    shopId: getSessionStorageSafe("shopId", ""),
-    startDate: toISODateString(new Date(selectedYear, selectedMonth, 1)),
-    endDate: toISODateString(new Date(selectedYear, selectedMonth + 1, 0))
-  });
+  } = useShiftsData(hookOptions);
+
+  const formattedShifts: ShiftDisplay[] = useMemo(() => {
+    if (!shiftsData) return [];
+    return shiftsData
+      .filter((shift: any) => {
+        if (isEmployee && currentUserId) {
+          return shift.employee_id === currentUserId;
+        }
+        return true;
+      })
+      .map((shift: any) => {
+        const name = `${shift.employee?.first_name || ''} ${shift.employee?.last_name || ''}`.trim() || 'Pracownik';
+        const initials = shift.employee?.initials && shift.employee?.initials !== '??'
+          ? shift.employee?.initials
+          : generateInitials(name);
+        const startTimeStr = padTime((shift.start_time || '08:00').substring(0, 5));
+        const endTimeStr = padTime((shift.end_time || '16:00').substring(0, 5));
+        return {
+          id: shift.id,
+          shiftId: shift.id,
+          employeeId: shift.employee_id || shift.employee?.id || '',
+          name,
+          initials,
+          start: parseInt(startTimeStr.split(':')[0]),
+          end: parseInt(endTimeStr.split(':')[0]),
+          startTimeStr,
+          endTimeStr,
+          shop: shift.shop_id || shift.shop?.code || effectiveShopId,
+          date: new Date(shift.shift_date).getDate(),
+          status: shift.status || 'planowany',
+        };
+      });
+  }, [shiftsData, effectiveShopId, isEmployee, currentUserId]);
+
+  const [employees, setEmployees] = useState<EmployeeData[]>([]);
+
+  const loadEmployees = useCallback(async () => {
+    try {
+      const data = await usersService.getAllWithShops();
+      if (data && data.length > 0) {
+        const mapped: EmployeeData[] = data
+          .filter(user => user.role === 'employee' || user.role === 'owner')
+          .map(user => {
+            const shopNames = user.shops && Array.isArray(user.shops) && user.shops.length > 0
+              ? user.shops.map((s: any) => s.shop_name)
+              : [];
+            const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Pracownik';
+            return {
+              id: user.id,
+              name,
+              initials: user.initials && user.initials !== '??' ? user.initials : generateInitials(name),
+              role: user.role,
+              shops: shopNames,
+            };
+          });
+        setEmployees(mapped);
+        localStorage.setItem('pracownicy_employees', JSON.stringify(mapped));
+        return;
+      }
+    } catch {}
+
+    const saved = localStorage.getItem('pracownicy_employees');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const mapped: EmployeeData[] = parsed.map((emp: any) => ({
+          id: emp.id,
+          name: emp.name,
+          initials: emp.initials && emp.initials !== '??' ? emp.initials : generateInitials(emp.name),
+          role: emp.role,
+          shops: emp.shops || []
+        }));
+        setEmployees(mapped);
+        return;
+      } catch {}
+    }
+
+    setEmployees([]);
+  }, []);
 
   useEffect(() => {
-    if (shiftsData.length > 0) {
-      const formattedShifts = shiftsData.map(shift => ({
-        id: shift.id,
-        name: `${shift.employee?.first_name || ''} ${shift.employee?.last_name || ''}`.trim() || 'Pracownik',
-        initials: shift.employee?.initials || '??',
-        shift: `${shift.start_time || '08:00'} - ${shift.end_time || '16:00'}`,
-        start: parseInt((shift.start_time || '08:00').split(':')[0]),
-        end: parseInt((shift.end_time || '16:00').split(':')[0]),
-        shop: shift.shop?.code || selectedShop,
-        status: shift.status === 'planowany' ? 'Zaplanowane' : 
-               shift.status === 'potwierdzony' ? 'Potwierdzony' :
-               shift.status === 'zrealizowany' ? 'W pracy' :
-               shift.status === 'anulowany' ? 'Anulowany' : 'Zaplanowane',
-        date: new Date(shift.shift_date).getDate(),
-        shiftId: shift.id
-      }));
-      
-      setShifts(formattedShifts);
+    loadEmployees();
+    window.addEventListener('pracownicy_updated', loadEmployees);
+    return () => window.removeEventListener('pracownicy_updated', loadEmployees);
+  }, [loadEmployees]);
+
+  const filteredEmployeesForShop = useMemo(() => {
+    if (isOwner) {
+      if (!selectedShop) return employees;
+      const shopName = shopLabels[selectedShop] || selectedShop;
+      return employees.filter(emp => {
+        if (!emp.shops || !Array.isArray(emp.shops) || emp.shops.length === 0) return true;
+        return emp.shops.some((s: string) =>
+          s.toLowerCase().includes(shopName.toLowerCase()) ||
+          shopName.toLowerCase().includes(s.toLowerCase())
+        );
+      });
     }
-  }, [shiftsData]);
+    if (isEmployee && userShop) {
+      const shopName = shopLabels[userShop] || userShop;
+      return employees.filter(emp => {
+        if (!emp.shops || !Array.isArray(emp.shops) || emp.shops.length === 0) return true;
+        return emp.shops.some((s: string) =>
+          s.toLowerCase().includes(shopName.toLowerCase()) ||
+          shopName.toLowerCase().includes(s.toLowerCase())
+        );
+      });
+    }
+    return employees;
+  }, [employees, isOwner, isEmployee, selectedShop, userShop, shopLabels]);
 
-  const shiftPresets = [
-    { label: "Otwarcie", range: "09:00 - 17:00", start: 9, end: 17 },
-    { label: "Cały dzień", range: "09:00 - 20:00", start: 9, end: 20 },
-    { label: "Zamknięcie", range: "12:00 - 20:00", start: 12, end: 20 },
-    { label: "Własna", range: `${customRange.start} - ${customRange.end}`, start: parseInt(customRange.start), end: parseInt(customRange.end) },
-  ];
+  const monthDays = useMemo(() => getDaysInMonth(selectedMonth, selectedYear), [selectedMonth, selectedYear]);
 
-  // Get color for employee
-  const getEmployeeColor = (initials: string) => {
-    const index = employees.findIndex(e => e.initials === initials);
-    return employeeColors[index % employeeColors.length];
+  const getDayShifts = useCallback((date: number) => {
+    return formattedShifts.filter(s => s.date === date);
+  }, [formattedShifts]);
+
+  const stats = useMemo(() => {
+    const totalHours = formattedShifts.reduce((acc, s) => acc + (s.end - s.start), 0);
+    const totalShifts = formattedShifts.length;
+    const uniqueEmp = new Set(formattedShifts.map(s => s.initials)).size;
+    return { totalHours, totalShifts, uniqueEmp };
+  }, [formattedShifts]);
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [dialogDate, setDialogDate] = useState<number>(1);
+  const [dialogDayShifts, setDialogDayShifts] = useState<ShiftDisplay[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [startHour, setStartHour] = useState("09");
+  const [startMinute, setStartMinute] = useState("00");
+  const [endHour, setEndHour] = useState("17");
+  const [endMinute, setEndMinute] = useState("00");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const openDialog = (dayDate: number) => {
+    if (!isOwner && !isEmployee) return;
+    setDialogDate(dayDate);
+    const dayShifts = getDayShifts(dayDate);
+    setDialogDayShifts(dayShifts);
+    setSelectedEmployeeId("");
+    setStartHour("09");
+    setStartMinute("00");
+    setEndHour("17");
+    setEndMinute("00");
+    setShowAddForm(false);
+    setIsDialogOpen(true);
   };
 
-  const toggleShift = async (empId: string, dayDate: number) => {
-    const emp = employees.find(e => e.id === empId);
+  const saveShift = async () => {
+    if (!selectedEmployeeId || isSaving) return;
+    const emp = employees.find(e => e.id === selectedEmployeeId);
     if (!emp) return;
 
-    const existingIndex = shifts.findIndex(s => s.date === dayDate && s.initials === emp.initials && s.shop === selectedShop);
-    
-    if (existingIndex >= 0) {
-      // Remove shift
-      const existingShift = shifts[existingIndex];
-      if (existingShift.shiftId) {
-        try {
-          await deleteShift(existingShift.shiftId);
-          setShifts(prev => prev.filter((_, i) => i !== existingIndex));
-        } catch (error) {
-          console.error('Error deleting shift:', error);
-        }
-      } else {
-        setShifts(prev => prev.filter((_, i) => i !== existingIndex));
-      }
-    } else {
-      // Add shift using active preset
-      const preset = shiftPresets.find(p => p.label === activePreset) || shiftPresets[0];
-      
-      try {
-        const shopId = getSessionStorageSafe("shopId", "");
-        
-        const newShift = await addShift({
-          shift_date: toISODateString(new Date(selectedYear, selectedMonth, dayDate)),
-          start_time: `${preset.start.toString().padStart(2, '0')}:00`,
-          end_time: `${preset.end.toString().padStart(2, '0')}:00`,
-          shop_id: shopId,
-          employee_id: emp.id,
-          status: 'planowany',
-          preset_name: activePreset
-        });
-        
-        setShifts(prev => [...prev, {
-          id: newShift.id,
-          name: emp.name,
-          initials: emp.initials,
-          shift: preset.range,
-          start: preset.start,
-          end: preset.end,
-          shop: selectedShop,
-          status: "Zaplanowane",
-          date: dayDate,
-          shiftId: newShift.id
-        }]);
-      } catch (error) {
-        console.error('Error adding shift:', error);
-      }
-    }
-  };
-
-  const showShiftDetails = (dayDate: number) => {
-    const dayShifts = shifts.filter(s => s.date === dayDate && s.shop === selectedShop);
-    if (dayShifts.length > 0) {
-      setSelectedShiftDetails({
-        date: dayDate,
-        dayName: monthDays.find(d => d.date === dayDate)?.day,
-        monthName: monthNames[selectedMonth],
-        shifts: dayShifts
+    setIsSaving(true);
+    try {
+      const shiftDate = toISODateString(new Date(selectedYear, selectedMonth, dialogDate));
+      const startTime = `${startHour}:${startMinute}`;
+      const endTime = `${endHour}:${endMinute}`;
+      await addShift({
+        shift_date: shiftDate,
+        start_time: startTime + ":00",
+        end_time: endTime + ":00",
+        shop_id: effectiveShopId,
+        employee_id: selectedEmployeeId,
+        status: 'planowany',
       });
-      setIsShiftDetailsOpen(true);
+      setIsDialogOpen(false);
+    } catch {} finally {
+      setIsSaving(false);
     }
   };
 
-  const clearMonth = async (empId: string) => {
-    const emp = employees.find(e => e.id === empId);
-    if (!emp) return;
-    
-    const employeeShifts = shifts.filter(s => s.initials === emp.initials && s.shop === selectedShop);
-    
-    for (const shift of employeeShifts) {
-      if (shift.shiftId) {
-        try {
-          await deleteShift(shift.shiftId);
-        } catch (error) {
-          console.error('Error deleting shift:', error);
-        }
-      }
-    }
-    
-    setShifts(prev => prev.filter(s => !(s.initials === emp.initials && s.shop === selectedShop)));
+  const removeShift = async (shiftId: string) => {
+    try { await deleteShift(shiftId); } catch {}
   };
 
-  const clearAll = () => {
-    if (typeof window !== 'undefined' && window.confirm(`Czy na pewno chcesz wyczyścić CAŁY grafik dla tego sklepu?`)) {
-      const shopShifts = shifts.filter(s => s.shop === selectedShop);
-      
-      shopShifts.forEach(async (shift) => {
-        if (shift.shiftId) {
-          try {
-            await deleteShift(shift.shiftId);
-          } catch (error) {
-            console.error('Error deleting shift:', error);
-          }
-        }
-      });
-      
-      setShifts(prev => prev.filter(s => s.shop !== selectedShop));
-    }
-  };
-
-  // Copy week to next week
-  const copyWeek = () => {
-    const startDay = selectedDay;
-    const endDay = startDay + 6;
-    const weekShifts = shifts.filter(s => s.date >= startDay && s.date <= endDay && s.shop === selectedShop);
-    
-    const newShifts = weekShifts.map(shift => ({
-      ...shift,
-      date: shift.date + 7
-    }));
-
-    setShifts(prev => {
-      // Remove existing shifts in target week
-      const filtered = prev.filter(s => !(s.date >= startDay + 7 && s.date <= endDay + 7 && s.shop === selectedShop));
-      return [...filtered, ...newShifts];
-    });
-  };
-
-  const filteredShifts = shifts.filter(s => s.shop === selectedShop && s.date === selectedDay);
-  
-  const myShift = useMemo(() => {
-    return filteredShifts.find(s => s.initials === "JK"); 
-  }, [filteredShifts]);
-
-  const timelineHours = Array.from({ length: 14 }, (_, i) => i + 8);
-
-  const getDayCoverageStatus = (dayDate: number) => {
-    const dayShifts = shifts.filter(s => s.date === dayDate && s.shop === selectedShop);
-    if (dayShifts.length === 0) return "none";
-    
-    const hasOpening = dayShifts.some(s => s.start <= 10);
-    const hasClosing = dayShifts.some(s => s.end >= 18);
-    
-    return (hasOpening && hasClosing) ? "full" : "partial";
+  const getEmpColorIndex = (employeeId: string) => {
+    return Math.max(0, filteredEmployeesForShop.findIndex(e => e.id === employeeId));
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-accent/20">
+    <div className="flex flex-col min-h-screen bg-gray-50">
       <Navbar />
-      
-      <main className="flex-1 p-4 max-w-2xl mx-auto w-full space-y-6">
-        {/* Header with Navigation */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Link href="/">
-              <Button variant="ghost" size="icon" className="rounded-full hover:bg-accent text-primary">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-xl font-black text-foreground uppercase tracking-tight">Grafik Pracy</h1>
-              <p className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">{monthNames[selectedMonth]} {selectedYear}</p>
+
+      <main className="flex-1 p-4 max-w-5xl mx-auto w-full">
+        <div className="bg-white rounded-lg shadow-sm border p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Link href="/">
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">
+                  {isOwner ? "Grafik pracowników" : "Mój grafik"}
+                </h1>
+                <p className="text-xs text-gray-500">{monthNames[selectedMonth]} {selectedYear}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {isOwner && shops.length > 0 && (
+                <Select value={selectedShop} onValueChange={(v) => setSelectedShop(v || "")}>
+                  <SelectTrigger className="w-[220px] h-9 text-sm">
+                    <MapPin className="h-4 w-4 mr-2" />
+                    <span className="truncate">{selectedShopName}</span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {shops.map(shop => (
+                      <SelectItem key={shop.id} value={shop.id}>{shop.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {isEmployee && (
+                <Badge variant="secondary" className="text-xs gap-1">
+                  <User className="h-3 w-3" />
+                  {currentUserName}
+                </Badge>
+              )}
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
+        </div>
+
+        <div className="flex items-center justify-between bg-white rounded-lg shadow-sm border p-3 mb-4">
+          <Button variant="ghost" size="sm" onClick={() => {
+            if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(selectedYear - 1); }
+            else setSelectedMonth(selectedMonth - 1);
+          }}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="font-semibold text-sm">{monthNames[selectedMonth]} {selectedYear}</span>
+          <Button variant="ghost" size="sm" onClick={() => {
+            if (selectedMonth === 11) { setSelectedMonth(0); setSelectedYear(selectedYear + 1); }
+            else setSelectedMonth(selectedMonth + 1);
+          }}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <Card className="border">
+            <CardContent className="p-3 text-center">
+              <div className="text-xl font-bold text-blue-600">{stats.totalHours}h</div>
+              <div className="text-[10px] text-gray-500">Godziny</div>
+            </CardContent>
+          </Card>
+          <Card className="border">
+            <CardContent className="p-3 text-center">
+              <div className="text-xl font-bold text-green-600">{stats.totalShifts}</div>
+              <div className="text-[10px] text-gray-500">Zmiany</div>
+            </CardContent>
+          </Card>
+          <Card className="border">
+            <CardContent className="p-3 text-center">
+              <div className="text-xl font-bold text-purple-600">{stats.uniqueEmp}</div>
+              <div className="text-[10px] text-gray-500">Osób</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="border">
+          <CardContent className="p-4">
             {isOwner && (
-              <Tabs value={view} onValueChange={(v: any) => setView(v)} className="bg-white p-1 rounded-xl h-10 shadow-sm border border-primary/5">
-                <TabsList className="bg-transparent border-none">
-                  <TabsTrigger value="month" className="rounded-lg text-[10px] font-black uppercase tracking-widest px-3 data-[state=active]:bg-accent data-[state=active]:text-primary">Miesiąc</TabsTrigger>
-                  <TabsTrigger value="edit" className="rounded-lg text-[10px] font-black uppercase tracking-widest px-3 data-[state=active]:bg-primary data-[state=active]:text-white shadow-sm">Ustal grafik</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            )}
-            {!isOwner && (
-              <Badge className="bg-primary text-white font-black text-[10px] uppercase tracking-widest px-4 py-2 rounded-xl shadow-lg shadow-primary/10">
-                Podgląd Miesięczny
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        {/* Month Navigation */}
-        <div className="flex items-center justify-between bg-white p-3 rounded-2xl shadow-sm border border-primary/5">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={goToPrevMonth}
-            className="rounded-full hover:bg-accent"
-          >
-            <ChevronLeft className="h-5 w-5 text-primary" />
-          </Button>
-          <Button 
-            variant="outline"
-            onClick={goToToday}
-            className="text-[10px] font-black uppercase tracking-widest border-primary/10 text-primary"
-          >
-            Dzisiaj
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={goToNextMonth}
-            className="rounded-full hover:bg-accent"
-          >
-            <ChevronRight className="h-5 w-5 text-primary" />
-          </Button>
-        </div>
-
-        <div className={cn(
-          "bg-white p-1 rounded-2xl shadow-sm border border-primary/5",
-          !isOwner && "opacity-80 pointer-events-none"
-        )}>
-          <Select 
-            value={selectedShop} 
-            onValueChange={(val) => isOwner && val && setSelectedShop(val)}
-            disabled={!isOwner}
-            items={shops.map(shop => ({ value: shop.id, label: shop.name }))}
-          >
-            <SelectTrigger className="border-none bg-transparent h-12 focus:ring-0 font-bold text-foreground">
-              <div className="flex items-center gap-2 pl-2">
-                <MapPin className="h-4 w-4 text-primary" />
-                <span>{shopLabels[selectedShop] || selectedShop}</span>
+              <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl flex items-center gap-3 shadow-sm">
+                <div className="w-10 h-10 rounded-lg bg-blue-500 text-white flex items-center justify-center font-bold text-sm shadow-md flex-shrink-0">
+                  <Plus className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-blue-900">Dodawanie do grafiku</div>
+                  <div className="text-xs text-blue-700">Kliknij na dowolny dzień, aby zarządzać zmianami</div>
+                </div>
               </div>
-            </SelectTrigger>
-            <SelectContent className="rounded-2xl border-primary/5">
-              {shops.map(shop => (
-                <SelectItem key={shop.id} value={shop.id}>{shop.name}</SelectItem>
+            )}
+
+            {isEmployee && (
+              <div className="mb-4 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl flex items-center gap-3 shadow-sm">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-md flex-shrink-0">
+                  <Calendar className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-emerald-900">Twój grafik</div>
+                  <div className="text-xs text-emerald-700">Kliknij na dzień, aby zobaczyć szczegóły zmiany</div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Ndz"].map(day => (
+                <div key={day} className="text-center text-xs font-medium text-gray-500 py-2">{day}</div>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
+            </div>
 
-        {view === "month" ? (
-          /* FULL MONTH CALENDAR VIEW */
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden border border-primary/5 p-6">
-              <div className="grid grid-cols-7 gap-2 mb-4">
-                {["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"].map(d => (
-                  <div key={d} className="text-center text-[9px] font-black uppercase text-muted-foreground/50 tracking-widest py-2">
-                    {d}
-                  </div>
-                ))}
-                
-                {/* Empty slots for first week offset */}
-                {Array.from({ length: (monthDays[0].dayNum + 6) % 7 }).map((_, i) => (
-                  <div key={`empty-${i}`} className="h-14 sm:h-20" />
-                ))}
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: (monthDays[0].dayNum + 6) % 7 }).map((_, i) => (
+                <div key={`empty-${i}`} className="h-28" />
+              ))}
 
-                {monthDays.map((d) => {
-                  const dayShifts = shifts.filter(s => s.date === d.date && s.shop === selectedShop);
-                  const myDayShift = dayShifts.find(s => s.initials === "JK");
-                  const isToday = d.date === new Date().getDate() && selectedMonth === new Date().getMonth();
-                  const coverage = getDayCoverageStatus(d.date);
-                  
-                  return (
-                    <div
-                      key={d.date}
-                      onClick={() => showShiftDetails(d.date)}
-                      className={cn(
-                        "h-14 sm:h-20 rounded-2xl flex flex-col items-center justify-center relative transition-all group border cursor-pointer",
-                        isToday ? "border-primary/30 ring-1 ring-primary/10" : "border-transparent",
-                        myDayShift ? "bg-primary text-white shadow-lg shadow-primary/20" : 
-                        coverage === "full" ? "bg-emerald-500/10" : 
-                        coverage === "partial" ? "bg-amber-500/10" : "bg-accent/30",
-                        !myDayShift && dayShifts.length > 0 && "hover:bg-accent/50"
-                      )}
-                    >
-                      <span className={cn(
-                        "text-xs font-black",
-                        myDayShift ? "text-white" : "text-foreground"
-                      )}>{d.date}</span>
-                      
-                      {/* Show employee color dots */}
-                      {!myDayShift && dayShifts.length > 0 && (
-                        <div className="flex gap-0.5 mt-1">
-                          {dayShifts.slice(0, 3).map((shift, i) => (
-                            <div 
-                              key={i}
-                              className={cn(
-                                "h-1.5 w-1.5 rounded-full",
-                                getEmployeeColor(shift.initials)
-                              )}
-                            />
-                          ))}
-                          {dayShifts.length > 3 && (
-                            <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+              {monthDays.map((d) => {
+                const dayShifts = getDayShifts(d.date);
+                const isToday = d.date === new Date().getDate() &&
+                  selectedMonth === new Date().getMonth() &&
+                  selectedYear === new Date().getFullYear();
+                const totalHoursDay = dayShifts.reduce((acc, s) => acc + (s.end - s.start), 0);
+                const hasFullCoverage = dayShifts.length >= 2 || totalHoursDay >= 12;
+
+                return (
+                  <div
+                    key={d.date}
+                    onClick={() => openDialog(d.date)}
+                    className={cn(
+                      "h-28 p-2 rounded-lg border cursor-pointer transition-all relative group",
+                      isToday ? "border-blue-500 bg-blue-50 shadow-md" :
+                      dayShifts.length > 0 ? cn(
+                        "border-l-4",
+                        hasFullCoverage ? "border-green-500 bg-green-50/30" :
+                        dayShifts.length === 1 ? "border-yellow-500 bg-yellow-50/30" :
+                        "border-gray-200 hover:border-blue-400"
+                      ) : "border-gray-200 hover:border-blue-400 hover:bg-gray-50"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className={cn("text-sm font-bold", isToday ? "text-blue-600" : "text-gray-800")}>
+                          {d.date}
+                        </span>
+                        {dayShifts.length > 0 && (
+                          <Badge variant="secondary" className={cn(
+                            "text-[9px] px-1.5 py-0 h-4 font-bold",
+                            hasFullCoverage ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                          )}>
+                            {dayShifts.length} {dayShifts.length === 1 ? "osoba" : "osoby"}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {dayShifts.length > 0 && <Clock className="h-3 w-3 text-gray-500" />}
+                        {isOwner && (
+                          <Plus className="h-3.5 w-3.5 text-blue-500 opacity-60 group-hover:opacity-100 transition-opacity" />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      {dayShifts.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-14 text-gray-300 group-hover:text-blue-400 transition-colors border-2 border-dashed border-gray-200 rounded-lg group-hover:border-blue-300">
+                          {isOwner ? (
+                            <>
+                              <Plus className="h-5 w-5 mb-1" />
+                              <span className="text-[10px] font-semibold">Dodaj pracownika</span>
+                            </>
+                          ) : (
+                            <span className="text-[10px]">Brak zmian</span>
                           )}
                         </div>
-                      )}
-                      
-                      {myDayShift && (
-                        <div className="hidden sm:flex flex-col items-center mt-1">
-                          <span className="text-[7px] font-black uppercase text-white/70 leading-none">{myDayShift.shift}</span>
-                        </div>
-                      )}
-
-                      {/* Coverage indicator */}
-                      {!myDayShift && (
-                        <div className={cn(
-                          "absolute top-1 right-1 h-1.5 w-1.5 rounded-full",
-                          coverage === "full" ? "bg-emerald-500" : 
-                          coverage === "partial" ? "bg-amber-500" : "bg-red-200"
-                        )} />
+                      ) : (
+                        <>
+                          {dayShifts.slice(0, 3).map((shift, i) => {
+                            const empIndex = getEmpColorIndex(shift.employeeId);
+                            const empFromList = employees.find(e => e.id === shift.employeeId);
+                            const displayInitials = empFromList?.initials || shift.initials;
+                            return (
+                              <div
+                                key={`${shift.shiftId}-${i}`}
+                                className={cn(
+                                  "px-2 py-1 rounded text-white shadow-sm text-center",
+                                  employeeColors[empIndex % employeeColors.length]
+                                )}
+                              >
+                                <span className="inline-flex items-center justify-center font-black text-[11px] bg-white/25 rounded px-1.5 py-0.5 leading-none">
+                                  {displayInitials}
+                                </span>
+                                <div className="text-[10px] opacity-90 mt-0.5 font-medium">
+                                  {shift.startTimeStr} – {shift.endTimeStr}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {dayShifts.length > 3 && (
+                            <div className="text-center py-1 px-2 bg-gray-100 rounded text-[10px] font-bold text-gray-600">
+                              +{dayShifts.length - 3} więcej
+                            </div>
+                          )}
+                          {totalHoursDay > 0 && (
+                            <div className="flex items-center justify-between pt-1 border-t border-black/10 mt-1">
+                              <span className="text-[9px] text-gray-600 font-medium">Razem:</span>
+                              <span className="text-[10px] font-bold text-gray-800">{totalHoursDay}h</span>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
-                  );
-                })}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {isLoading && (
+          <div className="text-center py-8 text-gray-500 text-sm">
+            Ładowanie grafiku...
+          </div>
+        )}
+
+        {employees.length > 0 && (
+          <div className="mt-4 bg-white rounded-lg shadow-sm border p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                {isOwner
+                  ? `Pracownicy (${filteredEmployeesForShop.length})`
+                  : `Pracownicy (${filteredEmployeesForShop.length})`}
               </div>
-
-              <div className="mt-6 space-y-3">
-                <div className="p-4 bg-accent/30 rounded-2xl flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-white">
-                    <Calendar className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-0.5">Twoje podsumowanie</p>
-                    <p className="text-sm font-black text-foreground uppercase tracking-tight">
-                      {shifts.filter(s => s.initials === "JK" && s.shop === selectedShop).length} dni roboczych w tym miesiącu
-                    </p>
-                  </div>
-                </div>
-
-                {/* Coverage legend */}
-                {isOwner && (
-                  <div className="p-4 bg-white border border-primary/5 rounded-2xl flex items-center gap-6 justify-center">
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                      <span className="text-[10px] font-bold uppercase text-muted-foreground">Pełne pokrycie</span>
+              {isOwner && filteredEmployeesForShop.length > 0 && (
+                <Badge variant="secondary" className="bg-blue-50 text-blue-700 text-xs font-semibold px-3 py-1">
+                  Dostępni do grafiku
+                </Badge>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {filteredEmployeesForShop.map((emp, index) => {
+                const empShiftsCount = formattedShifts.filter(s => s.employeeId === emp.id).length;
+                return (
+                  <div key={emp.id} className="flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all bg-white">
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg text-white flex items-center justify-center font-bold text-xs shadow-sm flex-shrink-0",
+                      employeeColors[index % employeeColors.length]
+                    )}>
+                      {emp.initials}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-amber-500" />
-                      <span className="text-[10px] font-bold uppercase text-muted-foreground">Częściowe</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-red-200" />
-                      <span className="text-[10px] font-bold uppercase text-muted-foreground">Brak</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-gray-800 truncate">{emp.name}</div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        {empShiftsCount > 0 ? (
+                          <Badge variant="secondary" className={cn(
+                            "text-[9px] px-1.5 py-0 h-3.5 font-bold",
+                            empShiftsCount >= 10 ? "bg-green-100 text-green-700" :
+                            empShiftsCount >= 5 ? "bg-blue-100 text-blue-700" : "bg-yellow-100 text-yellow-700"
+                          )}>
+                            {empShiftsCount} zmian
+                          </Badge>
+                        ) : (
+                          <span className="text-[9px] text-gray-400">Brak zmian</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
-            </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-            <section className="space-y-4">
-              <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] px-1">Nadchodzące zmiany</h2>
-              <div className="grid gap-3">
-                {shifts
-                  .filter(s => s.initials === "JK" && s.shop === selectedShop && s.date >= new Date().getDate())
-                  .sort((a, b) => a.date - b.date)
-                  .slice(0, 3)
-                  .map((shift, i) => (
-                    <Card key={i} className="border-none shadow-sm bg-white rounded-3xl border border-primary/5">
-                      <CardContent className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-2xl bg-accent text-primary flex items-center justify-center font-black text-xs">
-                            {shift.date}
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) setIsDialogOpen(false); }}>
+          <DialogContent className="sm:max-w-[480px] p-0 max-h-[90vh] overflow-y-auto">
+            <div className="p-5 space-y-4">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-blue-600" />
+                  {dialogDate} {monthNames[selectedMonth]} {selectedYear}
+                </DialogTitle>
+              </DialogHeader>
+
+              {dialogDayShifts.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                    <Clock className="h-4 w-4" />
+                    Zaplanowane zmiany ({dialogDayShifts.length})
+                  </Label>
+                  <div className="space-y-2">
+                    {dialogDayShifts.map((shift) => {
+                      const empIndex = getEmpColorIndex(shift.employeeId);
+                      return (
+                        <div
+                          key={shift.shiftId}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-xl text-white shadow-md",
+                            employeeColors[empIndex % employeeColors.length]
+                          )}
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-white/25 flex items-center justify-center font-bold text-sm flex-shrink-0 border-2 border-white/40">
+                            {shift.initials}
                           </div>
-                          <div>
-                            <p className="text-sm font-black text-foreground uppercase tracking-tight">
-                              {monthDays.find(d => d.date === shift.date)?.day}, {monthNames[selectedMonth]}
-                            </p>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <Clock className="h-3 w-3 text-primary" />
-                              <span className="text-xs font-bold text-muted-foreground uppercase">{shift.shift}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold text-sm">{shift.name}</div>
+                            <div className="text-xs opacity-90">
+                              {shift.startTimeStr} - {shift.endTimeStr}
+                              <span className="ml-1">({shift.end - shift.start}h)</span>
                             </div>
                           </div>
+                          {isOwner && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-white hover:bg-white/20 rounded-lg flex-shrink-0"
+                              onClick={() => removeShift(shift.shiftId)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
-                        <Badge className="bg-emerald-500/10 text-emerald-600 border-none font-black text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-xl">
-                          Zaplanowane
-                        </Badge>
-                      </CardContent>
-                    </Card>
-                  ))}
-              </div>
-            </section>
-          </div>
-        ) : view === "edit" ? (
-          /* EDIT GRID VIEW */
-          <div className="space-y-6">
-            <div className="flex flex-col gap-6 bg-white p-6 rounded-3xl shadow-sm border border-primary/5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Wybierz Godziny</Label>
-                  <div className="flex gap-2 flex-wrap">
-                    {shiftPresets.map((p) => (
-                      <Button
-                        key={p.label}
-                        size="sm"
-                        variant={activePreset === p.label ? "default" : "outline"}
-                        className={cn(
-                          "h-8 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                          activePreset === p.label ? "bg-primary shadow-lg shadow-primary/20" : "border-primary/10 text-primary"
-                        )}
-                        onClick={() => setActivePreset(p.label)}
-                      >
-                        {p.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <Button 
-                  variant="outline"
-                  onClick={copyWeek}
-                  className="border-primary/20 text-primary rounded-xl font-black text-[10px] uppercase tracking-widest h-10 px-4"
-                >
-                  <Copy className="h-4 w-4 mr-2" />
-                  Kopiuj tydzień
-                </Button>
-              </div>
-              
-              {activePreset === "Własna" && (
-                <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <div className="space-y-1.5">
-                    <Label className="text-[9px] font-black uppercase text-muted-foreground ml-1">Od</Label>
-                    <Input 
-                      type="time" 
-                      value={customRange.start}
-                      onChange={(e) => setCustomRange({...customRange, start: e.target.value})}
-                      className="h-10 bg-accent/30 border-none rounded-xl font-bold text-xs" 
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-[9px] font-black uppercase text-muted-foreground ml-1">Do</Label>
-                    <Input 
-                      type="time" 
-                      value={customRange.end}
-                      onChange={(e) => setCustomRange({...customRange, end: e.target.value})}
-                      className="h-10 bg-accent/30 border-none rounded-xl font-bold text-xs" 
-                    />
+                      );
+                    })}
                   </div>
                 </div>
               )}
-            </div>
 
-            <Card className="border-none shadow-xl bg-white rounded-[2.5rem] overflow-hidden border border-primary/5">
-              <div className="p-0 overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-secondary hover:bg-secondary border-none">
-                      <TableHead className="w-40 text-[10px] font-black uppercase text-white tracking-widest pl-8 h-14">Pracownik</TableHead>
-                      {monthDays.slice(selectedDay - 1, selectedDay + 6).map((d) => {
-                        const coverage = getDayCoverageStatus(d.date);
-                        return (
-                          <TableHead key={d.date} className="text-center p-0 min-w-[3rem]">
-                            <div className="flex flex-col items-center py-2">
-                              <span className="text-[8px] font-black text-white/50 uppercase">{d.day}</span>
-                              <span className="text-xs font-black text-white">{d.date}</span>
-                              <div className={cn(
-                                "h-1.5 w-1.5 rounded-full mt-1",
-                                coverage === "full" ? "bg-emerald-400" : 
-                                coverage === "partial" ? "bg-amber-400" : "bg-red-300"
-                              )} />
-                            </div>
-                          </TableHead>
-                        );
-                      })}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {employees.map((emp, empIndex) => (
-                      <TableRow key={emp.id} className="border-b border-primary/5 hover:bg-accent/10 transition-colors">
-                        <TableCell className="pl-8 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "h-8 w-8 rounded-xl text-white flex items-center justify-center font-black text-[10px] uppercase",
-                              employeeColors[empIndex % employeeColors.length]
-                            )}>
-                              {emp.initials}
-                            </div>
-                            <span className="text-xs font-black text-foreground uppercase tracking-tight">{emp.name}</span>
-                          </div>
-                        </TableCell>
-                        {monthDays.slice(selectedDay - 1, selectedDay + 6).map((d) => {
-                          const hasShift = shifts.some(s => s.date === d.date && s.initials === emp.initials && s.shop === selectedShop);
-                          const shift = shifts.find(s => s.date === d.date && s.initials === emp.initials && s.shop === selectedShop);
-                          return (
-                            <TableCell key={d.date} className="p-1 text-center">
-                              <button
-                                onClick={() => toggleShift(emp.id, d.date)}
-                                className={cn(
-                                  "w-10 h-10 rounded-xl transition-all flex items-center justify-center group relative",
-                                  hasShift 
-                                    ? `${employeeColors[empIndex % employeeColors.length]} text-white shadow-md scale-110` 
-                                    : "bg-accent/30 text-primary/20 hover:bg-primary/10 hover:text-primary/40"
-                                )}
-                              >
-                                {hasShift ? (
-                                  <Clock className="h-4 w-4" />
-                                ) : (
-                                  <Plus className="h-4 w-4" />
-                                )}
-                                {hasShift && shift && (
-                                  <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-black text-white text-[8px] font-black px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50">
-                                    {shift.shift}
+              {isOwner && (
+                <>
+                  {!showAddForm ? (
+                    <Button
+                      variant="outline"
+                      className="w-full h-10 border-2 border-dashed border-blue-300 text-blue-600 hover:bg-blue-50 hover:border-blue-400 font-semibold"
+                      onClick={() => setShowAddForm(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Dodaj zmianę
+                    </Button>
+                  ) : (
+                    <div className="space-y-3 p-4 bg-blue-50/50 rounded-xl border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-bold text-blue-900">Nowa zmiana</Label>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-gray-400 hover:text-gray-600"
+                          onClick={() => setShowAddForm(false)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold text-gray-600">Pracownik</Label>
+                        <Select value={selectedEmployeeId} onValueChange={(v) => setSelectedEmployeeId(v || "")}>
+                          <SelectTrigger className="h-10 bg-white border-2 hover:border-blue-400 transition-colors">
+                            {selectedEmployeeId
+                              ? (() => {
+                                  const emp = employees.find(e => e.id === selectedEmployeeId);
+                                  if (emp) return (
+                                    <div className="flex items-center gap-2">
+                                      <div className={cn(
+                                        "w-6 h-6 rounded-full text-white text-[10px] font-bold flex items-center justify-center",
+                                        employeeColors[getEmpColorIndex(emp.id) % employeeColors.length]
+                                      )}>
+                                        {emp.initials}
+                                      </div>
+                                      <span className="truncate">{emp.name}</span>
+                                    </div>
+                                  );
+                                  return <span className="text-muted-foreground">Wybierz pracownika...</span>;
+                                })()
+                              : <span className="text-muted-foreground">Wybierz pracownika...</span>
+                            }
+                          </SelectTrigger>
+                          <SelectContent>
+                            {filteredEmployeesForShop.map((emp, index) => (
+                              <SelectItem key={emp.id} value={emp.id}>
+                                <div className="flex items-center gap-2">
+                                  <div className={cn(
+                                    "w-6 h-6 rounded-full text-white text-[10px] font-bold flex items-center justify-center",
+                                    employeeColors[index % employeeColors.length]
+                                  )}>
+                                    {emp.initials}
                                   </div>
-                                )}
-                              </button>
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </Card>
+                                  <span>{emp.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-            <div className="flex gap-4">
-              <Button 
-                variant="ghost" 
-                onClick={clearAll}
-                className="flex-1 h-12 rounded-2xl font-black text-xs uppercase tracking-widest text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-all"
-              >
-                Wyczyść wszystko
-              </Button>
-              <Button className="flex-[2] h-12 bg-secondary hover:bg-secondary/90 rounded-2xl font-black text-xs uppercase tracking-widest text-white shadow-xl shadow-secondary/10">
-                Zapisz grafik
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </main>
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-[11px] text-gray-500">Od</Label>
+                          <div className="flex items-center gap-1">
+                            <Select value={startHour} onValueChange={(v) => setStartHour(v || "09")}>
+                              <SelectTrigger className="h-9 flex-1 text-sm font-semibold px-2 min-w-0">
+                                {startHour}
+                              </SelectTrigger>
+                              <SelectContent className="max-h-48">
+                                {Array.from({ length: 24 }, (_, i) => (
+                                  <SelectItem key={i} value={String(i).padStart(2, '0')}>
+                                    {String(i).padStart(2, '0')}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <span className="text-gray-400 font-bold text-sm shrink-0">:</span>
+                            <Select value={startMinute} onValueChange={(v) => setStartMinute(v || "00")}>
+                              <SelectTrigger className="h-9 w-[52px] text-sm font-semibold px-1.5">
+                                {startMinute}
+                              </SelectTrigger>
+                              <SelectContent className="max-h-48">
+                                {Array.from({ length: 60 }, (_, i) => (
+                                  <SelectItem key={i} value={String(i).padStart(2, '0')}>
+                                    {String(i).padStart(2, '0')}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[11px] text-gray-500">Do</Label>
+                          <div className="flex items-center gap-1">
+                            <Select value={endHour} onValueChange={(v) => setEndHour(v || "17")}>
+                              <SelectTrigger className="h-9 flex-1 text-sm font-semibold px-2 min-w-0">
+                                {endHour}
+                              </SelectTrigger>
+                              <SelectContent className="max-h-48">
+                                {Array.from({ length: 24 }, (_, i) => (
+                                  <SelectItem key={i} value={String(i).padStart(2, '0')}>
+                                    {String(i).padStart(2, '0')}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <span className="text-gray-400 font-bold text-sm shrink-0">:</span>
+                            <Select value={endMinute} onValueChange={(v) => setEndMinute(v || "00")}>
+                              <SelectTrigger className="h-9 w-[52px] text-sm font-semibold px-1.5">
+                                {endMinute}
+                              </SelectTrigger>
+                              <SelectContent className="max-h-48">
+                                {Array.from({ length: 60 }, (_, i) => (
+                                  <SelectItem key={i} value={String(i).padStart(2, '0')}>
+                                    {String(i).padStart(2, '0')}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
 
-      {/* Shift Details Dialog */}
-      <Dialog open={isShiftDetailsOpen} onOpenChange={setIsShiftDetailsOpen}>
-        <DialogContent className="rounded-[2rem] border-none p-6 max-w-md">
-          <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle className="text-xl font-black uppercase tracking-tight">
-              {selectedShiftDetails?.dayName} {selectedShiftDetails?.date} {selectedShiftDetails?.monthName}
-            </DialogTitle>
-            <Button variant="ghost" size="icon" onClick={() => setIsShiftDetailsOpen(false)} className="rounded-full hover:bg-accent">
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogHeader>
-          <div className="space-y-3 py-4">
-            {selectedShiftDetails?.shifts.map((shift: any, i: number) => {
-              const empIndex = employees.findIndex(e => e.initials === shift.initials);
-              return (
-                <div key={i} className="flex items-center justify-between p-3 bg-accent/30 rounded-2xl">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "h-10 w-10 rounded-xl text-white flex items-center justify-center font-black text-xs",
-                      employeeColors[empIndex % employeeColors.length]
-                    )}>
-                      {shift.initials}
+                      {(() => {
+                        const sh = parseInt(startHour) || 0;
+                        const sm = parseInt(startMinute) || 0;
+                        const eh = parseInt(endHour) || 0;
+                        const em = parseInt(endMinute) || 0;
+                        const totalMinutes = (eh * 60 + em) - (sh * 60 + sm);
+                        const hours = totalMinutes > 0 ? Math.round((totalMinutes / 60) * 10) / 10 : 0;
+                        return (
+                          <div className="text-center py-2 bg-blue-100 rounded-lg">
+                            <span className="text-sm font-bold text-blue-800">
+                              {hours} {hours === 1 ? 'godzina' : hours >= 2 && hours <= 4 ? 'godziny' : 'godzin'}
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowAddForm(false)}
+                          className="flex-1 h-9 text-sm"
+                        >
+                          Anuluj
+                        </Button>
+                        <Button
+                          onClick={saveShift}
+                          disabled={!selectedEmployeeId || isSaving}
+                          className="flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-50"
+                        >
+                          {isSaving ? "Zapisywanie..." : "Dodaj"}
+                        </Button>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs font-black text-foreground uppercase tracking-tight">{shift.name}</p>
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase">{shift.shift}</p>
-                    </div>
-                  </div>
-                  <Badge className="bg-emerald-500/10 text-emerald-600 font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-xl">
-                    {shift.status}
-                  </Badge>
+                  )}
+                </>
+              )}
+
+              {!isOwner && dialogDayShifts.length === 0 && (
+                <div className="text-center py-6 text-gray-500">
+                  <Calendar className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm">Brak zmian w tym dniu</p>
                 </div>
-              );
-            })}
-            {selectedShiftDetails?.shifts.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <Info className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm font-bold">Brak zaplanowanych zmian</p>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </main>
     </div>
   );
 }

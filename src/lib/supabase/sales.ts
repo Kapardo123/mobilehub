@@ -97,68 +97,80 @@ export const salesService = {
   },
 
   async generateSaleNumber(saleDate: string): Promise<string> {
-    const year = new Date(saleDate).getFullYear();
-    const prefix = `FS-${year}-`;
-    
-    const { data } = await supabase
-      .from('sales')
-      .select('sale_number')
-      .eq('sale_date', saleDate)
-      .like('sale_number', `${prefix}%`)
-      .order('sale_number', { ascending: false })
-      .limit(1);
-    
-    let nextNum = 1;
-    
-    if (data && data.length > 0) {
-      const lastNumber = data[0].sale_number;
-      const lastNum = parseInt(lastNumber.replace(prefix, ''));
-      if (!isNaN(lastNum)) {
-        nextNum = lastNum + 1;
-      }
-    }
-    
-    return `${prefix}${String(nextNum).padStart(4, '0')}`;
+    const now = new Date();
+    const year = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const ms = String(now.getMilliseconds()).padStart(3, '0');
+    return `FS-${year}${mm}${dd}-${hh}${min}${ss}${ms}`;
   },
 
   async create(sale: SaleInsert, items: SaleItemInsert[]): Promise<Sale> {
     console.log('📥 salesService.create - sale data:', JSON.stringify(sale, null, 2));
     console.log('📥 salesService.create - items count:', items.length);
-    
-    const { data, error } = await supabase
-      .from('sales')
-      .insert(sale)
-      .select()
-      .single();
-    
-    console.log('📤 salesService.create - sale result:', { data: data?.id, error: error?.message });
-    
-    if (error) {
+
+    if (!sale.sale_number) {
+      sale.sale_number = await this.generateSaleNumber(sale.sale_date);
+    }
+
+    let currentSale = { ...sale };
+    const MAX_RETRIES = 3;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const { data, error } = await supabase
+        .from('sales')
+        .insert(currentSale)
+        .select()
+        .single();
+
+      console.log('📤 salesService.create - sale result:', { data: data?.id, error: error?.message });
+
+      if (!error) {
+        if (items.length > 0) {
+          const itemsWithSaleId = items.map(item => ({
+            ...item,
+            tax_type: (item.tax_type as string) === 'marża' ? 'marza' : item.tax_type,
+            sale_id: data.id
+          }));
+
+          console.log('📥 salesService.create - inserting items:', JSON.stringify(itemsWithSaleId, null, 2));
+
+          const { error: itemsError } = await supabase
+            .from('sale_items')
+            .insert(itemsWithSaleId);
+
+          console.log('📤 salesService.create - items result:', itemsError);
+
+          if (itemsError) {
+            console.error('❌ Błąd dodawania pozycji:', JSON.stringify(itemsError, null, 2));
+            throw itemsError;
+          }
+        }
+
+        return this.getById(data.id) as Promise<Sale>;
+      }
+
+      if (error.code === '23505') {
+        console.warn(`🔄 Duplikat numeru (próba ${attempt + 1}/${MAX_RETRIES}) - trigger DB nadpisał numer.`);
+        
+        if (attempt < MAX_RETRIES - 1) {
+          currentSale = { ...currentSale, sale_number: undefined };
+          await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
+          continue;
+        }
+
+        console.error('❌ Trigger DB generuje zduplikowany numer. Uruchom fix_trigger_sale_number.sql w Supabase SQL Editor.');
+        throw new Error('Duplikat numeru sprzedaży - trigger bazy danych wymaga naprawy (fix_trigger_sale_number.sql)');
+      }
+
       console.error('❌ Błąd tworzenia sprzedaży:', JSON.stringify(error, null, 2));
       throw error;
     }
-    
-    if (items.length > 0) {
-      const itemsWithSaleId = items.map(item => ({
-        ...item,
-        sale_id: data.id
-      }));
-      
-      console.log('📥 salesService.create - inserting items:', JSON.stringify(itemsWithSaleId, null, 2));
-      
-      const { error: itemsError } = await supabase
-        .from('sale_items')
-        .insert(itemsWithSaleId);
-      
-      console.log('📤 salesService.create - items result:', itemsError);
-      
-      if (itemsError) {
-        console.error('❌ Błąd dodawania pozycji:', JSON.stringify(itemsError, null, 2));
-        throw itemsError;
-      }
-    }
-    
-    return this.getById(data.id) as Promise<Sale>;
+
+    throw new Error('Nie udało się utworzyć sprzedaży');
   },
 
   async update(id: string, updates: SaleUpdate): Promise<Sale> {
@@ -245,6 +257,7 @@ export const saleItemsService = {
   async addItems(saleId: string, items: SaleItemInsert[]): Promise<void> {
     const itemsWithSaleId = items.map(item => ({
       ...item,
+      tax_type: (item.tax_type as string) === 'marża' ? 'marza' : item.tax_type,
       sale_id: saleId
     }));
     

@@ -21,6 +21,59 @@ export function useShiftsData(options: UseShiftsDataOptions = {}) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const loadShiftsFromLocalStorage = useCallback((): Shift[] => {
+    if (typeof window === 'undefined') return [];
+    
+    try {
+      const saved = localStorage.getItem('grafik_shifts');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (shopId) {
+          return parsed.filter((shift: any) => shift.shop_id === shopId);
+        }
+        if (employeeId) {
+          return parsed.filter((shift: any) => shift.employee_id === employeeId);
+        }
+        return parsed;
+      }
+    } catch (err) {
+      // Silent fail
+    }
+    
+    return [];
+  }, [shopId, employeeId]);
+
+  const saveShiftToLocalStorage = useCallback((shift: Shift) => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const existing = JSON.parse(localStorage.getItem('grafik_shifts') || '[]');
+      const index = existing.findIndex((s: any) => s.id === shift.id);
+      
+      if (index >= 0) {
+        existing[index] = shift;
+      } else {
+        existing.push(shift);
+      }
+      
+      localStorage.setItem('grafik_shifts', JSON.stringify(existing));
+    } catch (err) {
+      // Silent fail
+    }
+  }, []);
+
+  const removeShiftFromLocalStorage = useCallback((id: string) => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const existing = JSON.parse(localStorage.getItem('grafik_shifts') || '[]');
+      const filtered = existing.filter((s: any) => s.id !== id);
+      localStorage.setItem('grafik_shifts', JSON.stringify(filtered));
+    } catch (err) {
+      // Silent fail
+    }
+  }, []);
+
   const loadShifts = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -40,12 +93,12 @@ export function useShiftsData(options: UseShiftsDataOptions = {}) {
       
       setShifts(data);
     } catch (err) {
-      console.error('Error loading shifts:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load shifts');
+      const localShifts = loadShiftsFromLocalStorage();
+      setShifts(localShifts as Shift[]);
     } finally {
       setIsLoading(false);
     }
-  }, [shopId, employeeId, startDate, endDate]);
+  }, [shopId, employeeId, startDate, endDate, loadShiftsFromLocalStorage]);
 
   useEffect(() => {
     if (autoLoad) {
@@ -59,10 +112,19 @@ export function useShiftsData(options: UseShiftsDataOptions = {}) {
       setShifts(prev => [newShift, ...prev]);
       return newShift;
     } catch (err) {
-      console.error('Error adding shift:', err);
-      throw err;
+      const localShift: Shift = {
+        ...shiftData,
+        id: `local_${Date.now()}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as Shift;
+      
+      setShifts(prev => [localShift, ...prev]);
+      saveShiftToLocalStorage(localShift);
+      
+      return localShift;
     }
-  }, []);
+  }, [saveShiftToLocalStorage]);
 
   const updateShift = useCallback(async (id: string, updates: Database['public']['Tables']['shifts']['Update']): Promise<Shift> => {
     try {
@@ -72,20 +134,28 @@ export function useShiftsData(options: UseShiftsDataOptions = {}) {
       ));
       return updatedShift;
     } catch (err) {
-      console.error('Error updating shift:', err);
+      const localShift = shifts.find(s => s.id === id);
+      if (localShift) {
+        const updated = { ...localShift, ...updates };
+        setShifts(prev => prev.map(shift => 
+          shift.id === id ? updated : shift
+        ));
+        saveShiftToLocalStorage(updated);
+        return updated;
+      }
       throw err;
     }
-  }, []);
+  }, [shifts, saveShiftToLocalStorage]);
 
   const deleteShift = useCallback(async (id: string): Promise<void> => {
     try {
       await shiftsService.delete(id);
       setShifts(prev => prev.filter(shift => shift.id !== id));
     } catch (err) {
-      console.error('Error deleting shift:', err);
-      throw err;
+      setShifts(prev => prev.filter(shift => shift.id !== id));
+      removeShiftFromLocalStorage(id);
     }
-  }, []);
+  }, [removeShiftFromLocalStorage]);
 
   const confirmShift = useCallback(async (id: string, confirmedBy: string): Promise<Shift> => {
     try {
@@ -95,10 +165,18 @@ export function useShiftsData(options: UseShiftsDataOptions = {}) {
       ));
       return confirmedShift;
     } catch (err) {
-      console.error('Error confirming shift:', err);
+      const localShift = shifts.find(s => s.id === id);
+      if (localShift) {
+        const confirmed = { ...localShift, status: 'potwierdzony' as const, confirmed_by: confirmedBy };
+        setShifts(prev => prev.map(shift => 
+          shift.id === id ? confirmed : shift
+        ));
+        saveShiftToLocalStorage(confirmed);
+        return confirmed;
+      }
       throw err;
     }
-  }, []);
+  }, [shifts, saveShiftToLocalStorage]);
 
   const realizeShift = useCallback(async (id: string): Promise<Shift> => {
     try {
@@ -108,10 +186,18 @@ export function useShiftsData(options: UseShiftsDataOptions = {}) {
       ));
       return realizedShift;
     } catch (err) {
-      console.error('Error realizing shift:', err);
+      const localShift = shifts.find(s => s.id === id);
+      if (localShift) {
+        const realized = { ...localShift, status: 'zrealizowany' as const };
+        setShifts(prev => prev.map(shift => 
+          shift.id === id ? realized : shift
+        ));
+        saveShiftToLocalStorage(realized);
+        return realized;
+      }
       throw err;
     }
-  }, []);
+  }, [shifts, saveShiftToLocalStorage]);
 
   const cancelShift = useCallback(async (id: string): Promise<Shift> => {
     try {
@@ -121,10 +207,18 @@ export function useShiftsData(options: UseShiftsDataOptions = {}) {
       ));
       return cancelledShift;
     } catch (err) {
-      console.error('Error cancelling shift:', err);
+      const localShift = shifts.find(s => s.id === id);
+      if (localShift) {
+        const cancelled = { ...localShift, status: 'anulowany' as const };
+        setShifts(prev => prev.map(shift => 
+          shift.id === id ? cancelled : shift
+        ));
+        saveShiftToLocalStorage(cancelled);
+        return cancelled;
+      }
       throw err;
     }
-  }, []);
+  }, [shifts, saveShiftToLocalStorage]);
 
   const refresh = useCallback(() => {
     return loadShifts();

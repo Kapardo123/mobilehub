@@ -110,6 +110,17 @@ export default function PracownicyPage() {
         
         setEmployees(formattedEmployees);
         console.log('Ustawiono pracowników:', formattedEmployees.length);
+        
+        if (typeof window !== "undefined") {
+          const grafikEmployees = formattedEmployees.map(emp => ({
+            id: emp.id,
+            name: emp.name,
+            initials: emp.initials,
+            role: emp.role,
+            shops: emp.shops
+          }));
+          localStorage.setItem('pracownicy_employees', JSON.stringify(grafikEmployees));
+        }
       } else {
         console.log('Brak danych z bazy, pozostawiono domyślnych');
       }
@@ -217,6 +228,18 @@ export default function PracownicyPage() {
       };
 
       setEmployees([...employees, employee]);
+      
+      if (typeof window !== "undefined") {
+        const grafikEmployees = [...employees, employee].map(emp => ({
+          id: emp.id,
+          name: emp.name,
+          initials: emp.initials,
+          role: emp.role,
+          shops: emp.shops
+        }));
+        localStorage.setItem('pracownicy_employees', JSON.stringify(grafikEmployees));
+      }
+      
       window.dispatchEvent(new CustomEvent('pracownicy_updated'));
       addToast({ message: `Dodano pracownika ${employee.name}`, variant: "success" });
       setShowCredentialsFor(employee);
@@ -233,7 +256,20 @@ export default function PracownicyPage() {
       await usersService.softDelete(id);
       
       const emp = employees.find(e => e.id === id);
-      setEmployees(employees.filter(emp => emp.id !== id));
+      const updatedEmployees = employees.filter(employee => employee.id !== id);
+      setEmployees(updatedEmployees);
+      
+      if (typeof window !== "undefined") {
+        const grafikEmployees = updatedEmployees.map(e => ({
+          id: e.id,
+          name: e.name,
+          initials: e.initials,
+          role: e.role,
+          shops: e.shops
+        }));
+        localStorage.setItem('pracownicy_employees', JSON.stringify(grafikEmployees));
+      }
+      
       window.dispatchEvent(new CustomEvent('pracownicy_updated'));
       if (emp) addToast({ message: `Usunięto pracownika ${emp.name}`, variant: "info" });
     } catch (error) {

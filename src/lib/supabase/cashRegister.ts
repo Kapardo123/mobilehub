@@ -52,16 +52,16 @@ export const cashRegisterService = {
   },
 
   async getPreviousDayState(shopId: string): Promise<number> {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const dateStr = toISODateString(yesterday);
+    const today = toISODateString();
     
     const { data } = await supabase
       .from('cash_register_closings')
       .select('closing_cash_amount')
       .eq('shop_id', shopId)
-      .eq('closing_date', dateStr)
+      .lt('closing_date', today)
       .is('deleted_at', null)
+      .order('closing_date', { ascending: false })
+      .limit(1)
       .single();
     
     return data?.closing_cash_amount || 0;

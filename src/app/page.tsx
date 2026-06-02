@@ -16,8 +16,10 @@ import {
   DialogHeader, 
   DialogTitle, 
   DialogTrigger,
-  DialogFooter
+  DialogFooter,
+  DialogClose 
 } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/toast";
 import { 
   Table, 
   TableBody, 
@@ -40,6 +42,9 @@ export default function Home() {
   const pathname = usePathname();
   const [selectedShop, setSelectedShop] = useState("all");
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isCloseDayDialogOpen, setIsCloseDayDialogOpen] = useState(false);
+  const [isClosingDay, setIsClosingDay] = useState(false);
+  const [isTodayClosed, setIsTodayClosed] = useState(false);
   const [hasValidSession, setHasValidSession] = useState(false);
   const [isSessionChecked, setIsSessionChecked] = useState(false);
   const [recentActions, setRecentActions] = useState<Action[]>([]);
@@ -50,6 +55,7 @@ export default function Home() {
   const [sales, setSales] = useState<any[]>([]);
   const [stanKasyPoprzedniegoDnia, setStanKasyPoprzedniegoDnia] = useState<number>(0);
   const [shops, setShops] = useState<{id: string; name: string}[]>([]);
+  const { addToast } = useToast();
 
   useEffect(() => {
     loadShops();
@@ -172,24 +178,6 @@ export default function Home() {
     };
   }, []);
 
-  useEffect(() => {
-    const loadCashState = async () => {
-      try {
-        if (typeof window === "undefined") return;
-        const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
-        const shopId = activeEmployees[0]?.shopId || '';
-        if (shopId) {
-          const previousDayState = await cashRegisterService.getPreviousDayState(shopId);
-          setStanKasyPoprzedniegoDnia(previousDayState);
-        }
-      } catch (error) {
-        console.error('Błąd pobierania stanu kasy:', error);
-      }
-    };
-    
-    loadCashState();
-  }, []);
-
   const today = toISODateString();
   
   const [isMounted, setIsMounted] = useState(false);
@@ -218,6 +206,29 @@ export default function Home() {
   const currentShopId = isMounted ? getSessionStorageSafe("shopId", "") : "";
   const currentShopName = isMounted ? getSessionStorageSafe("shopName", "") : "";
   const isEmployee = currentUserRole === 'employee';
+  
+  useEffect(() => {
+    const loadCashState = async () => {
+      try {
+        if (typeof window === "undefined" || !isMounted) return;
+        const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
+        const shopId = activeEmployees[0]?.shopId || '';
+        
+        const effectiveShopIdForLoad = currentUserRole === 'employee' 
+          ? shopId 
+          : (selectedShop === 'all' ? shopId : selectedShop);
+          
+        if (effectiveShopIdForLoad) {
+          const previousDayState = await cashRegisterService.getPreviousDayState(effectiveShopIdForLoad);
+          setStanKasyPoprzedniegoDnia(previousDayState);
+        }
+      } catch (error) {
+        console.error('Błąd pobierania stanu kasy:', error);
+      }
+    };
+    
+    loadCashState();
+  }, [selectedShop, currentUserRole, isMounted]);
   
   console.log('=== OBLICZANIE ZYSKU - GŁÓWNA STRONA ===');
   console.log('User Role:', currentUserRole);
@@ -629,72 +640,25 @@ export default function Home() {
           onClick={async () => {
             try {
               const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
-              console.log('Active employees:', activeEmployees);
               const shopId = activeEmployees[0]?.shopId || '';
-              console.log('Shop ID:', shopId);
               const userId = getSessionStorageSafe('userId', '');
-              
+
               if (!shopId) {
-                alert(`Brak ID sklepu!\n\nActive Employees: ${JSON.stringify(activeEmployees, null, 2)}\n\nZaloguj się ponownie`);
+                addToast({ title: "Brak sklepu", message: "Zaloguj się ponownie, aby zamknąć dzień.", variant: "error" });
                 return;
               }
-              
-              const isClosed = await cashRegisterService.isTodayClosed(shopId);
-              if (isClosed) {
-                alert('Dzisiaj został już zamknięty!');
+
+              const closed = await cashRegisterService.isTodayClosed(shopId);
+              setIsTodayClosed(closed);
+
+              if (closed) {
+                addToast({ title: "Dzień już zamknięty", message: "Dzisiejszy dzień został już rozliczony.", variant: "info" });
                 return;
               }
-              
-              if (!confirm(`Zamknąć dzień?\n\nStan kasy: ${kasaDzis.toFixed(2)} zł\nSprzedaż gotówkowa: ${cashSalesToday.toFixed(2)} zł\nSprzedaż kartowa: ${cardSalesToday.toFixed(2)} zł\nKoszty: ${totalCostsToday.toFixed(2)} zł`)) {
-                return;
-              }
-              
-              try {
-                await cashRegisterService.closeDay({
-                  shopId,
-                  employeeId: userId,
-                  totalCashSales: cashSalesToday,
-                  totalCardSales: cardSalesToday,
-                  totalCosts: totalCostsToday,
-                  totalDoladowania: doladowaniaToday,
-                  createdBy: userId
-                });
-                
-                alert('✅ Dzień zamknięty pomyślnie! (zapisano w bazie)');
-              } catch (error) {
-                console.error('❌ Błąd zapisu do Supabase:', error);
-                
-                const closingData = {
-                  id: `local_${Date.now()}`,
-                  shopId,
-                  employeeId: userId,
-                  date: today,
-                  closedAt: new Date().toISOString(),
-                  kasaDzis,
-                  cashSalesToday,
-                  cardSalesToday,
-                  totalCostsToday,
-                  doladowaniaToday,
-                  zyskNetto,
-                  error: error instanceof Error ? error.message : 'Unknown error',
-                  syncedToServer: false
-                };
-                
-                const existingClosings = JSON.parse(localStorage.getItem('cash_register_closings_local') || '[]');
-                localStorage.setItem('cash_register_closings_local', JSON.stringify([closingData, ...existingClosings]));
-                
-                alert(`⚠️ Dzień zamknięty (lokalnie)!\n\nBłąd Supabase: ${error instanceof Error ? error.message : 'Unknown'}\n\nDane zostały zapisane lokalnie.\nZostaną zsynchronizowane później.`);
-              }
-              
-              window.location.reload();
-            } catch (error: any) {
-              console.error('Błąd zamykania dnia:', error);
-              console.error('Error details:', JSON.stringify(error, null, 2));
-              console.error('Error message:', error?.message);
-              console.error('Error code:', error?.code);
-              console.error('Error details:', error?.details);
-              console.error('Error hint:', error?.hint);
-              alert(`Błąd podczas zamykania dnia:\n\n${error?.message || 'Nieznany błąd'}\n\nCode: ${error?.code || 'brak'}\n\nDetails: ${error?.details || 'brak'}\n\nHint: ${error?.hint || 'brak'}`);
+
+              setIsCloseDayDialogOpen(true);
+            } catch {
+              addToast({ title: "Błąd", message: "Nie udało się sprawdzić stanu kasy. Spróbuj ponownie.", variant: "error" });
             }
           }}
           className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold text-sm py-4 rounded-2xl shadow-xl shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] mt-4"
@@ -702,6 +666,115 @@ export default function Home() {
           <Clock className="h-5 w-5 mr-2" />
           Zamknij Dzień - Zapisz Stan Kasy
         </Button>
+
+        {/* Dialog potwierdzenia zamknięcia dnia */}
+        <Dialog open={isCloseDayDialogOpen} onOpenChange={setIsCloseDayDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-lg">Zamknąć dzień?</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between p-2 bg-gray-50 rounded-lg">
+                  <span className="text-gray-500">Stan kasy</span>
+                  <span className="font-bold">{kasaDzis.toFixed(2)} zł</span>
+                </div>
+                <div className="flex justify-between p-2 bg-gray-50 rounded-lg">
+                  <span className="text-gray-500">Wpływy</span>
+                  <span className="font-bold">{totalSalesToday.toFixed(2)} zł</span>
+                </div>
+                <div className="flex justify-between p-2 bg-gray-50 rounded-lg">
+                  <span className="text-gray-500">Gotówka</span>
+                  <span className="font-bold">{cashSalesToday.toFixed(2)} zł</span>
+                </div>
+                <div className="flex justify-between p-2 bg-gray-50 rounded-lg">
+                  <span className="text-gray-500">Karty</span>
+                  <span className="font-bold">{cardSalesToday.toFixed(2)} zł</span>
+                </div>
+                <div className="flex justify-between p-2 bg-red-50 rounded-lg">
+                  <span className="text-red-500">Koszty</span>
+                  <span className="font-bold text-red-600">{totalCostsToday.toFixed(2)} zł</span>
+                </div>
+                <div className="flex justify-between p-2 bg-emerald-50 rounded-lg">
+                  <span className="text-emerald-600">Zysk</span>
+                  <span className="font-bold text-emerald-700">{zyskNetto >= 0 ? '+' : ''}{zyskNetto.toFixed(2)} zł</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 text-center">
+                Stan kasy zostanie zapisany i będzie dostępny następnego dnia.
+              </p>
+            </div>
+            <DialogFooter>
+              <DialogClose className="px-4 py-2 text-sm font-medium rounded-lg border hover:bg-gray-50">Anuluj</DialogClose>
+              <Button
+                onClick={async () => {
+                  setIsClosingDay(true);
+                  try {
+                    const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
+                    const shopId = activeEmployees[0]?.shopId || '';
+                    const userId = getSessionStorageSafe('userId', '');
+
+                    await cashRegisterService.closeDay({
+                      shopId,
+                      employeeId: userId,
+                      totalCashSales: cashSalesToday,
+                      totalCardSales: cardSalesToday,
+                      totalCosts: totalCostsToday,
+                      totalDoladowania: doladowaniaToday,
+                      createdBy: userId
+                    });
+
+                    addToast({
+                      title: "Dzień zamknięty",
+                      message: `Stan kasy ${kasaDzis.toFixed(2)} zł zapisany pomyślnie.`,
+                      variant: "success"
+                    });
+                    setIsTodayClosed(true);
+                    setIsCloseDayDialogOpen(false);
+                  } catch (error: any) {
+                    console.error('❌ Błąd zamknięcia dnia:', error?.message || error);
+                    console.warn('💡 RLS w Supabase blokuje INSERT - uruchom fix_cash_register_rls.sql w SQL Editor');
+
+                    const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
+                    const shopId = activeEmployees[0]?.shopId || '';
+                    const userId = getSessionStorageSafe('userId', '');
+
+                    const closingData = {
+                      id: `local_${Date.now()}`,
+                      shopId,
+                      employeeId: userId,
+                      date: today,
+                      closedAt: new Date().toISOString(),
+                      kasaDzis,
+                      cashSalesToday,
+                      cardSalesToday,
+                      totalCostsToday,
+                      doladowaniaToday,
+                      zyskNetto,
+                      syncedToServer: false
+                    };
+
+                    const existingClosings = JSON.parse(localStorage.getItem('cash_register_closings_local') || '[]');
+                    localStorage.setItem('cash_register_closings_local', JSON.stringify([closingData, ...existingClosings]));
+
+                    addToast({
+                      title: "Zapisano lokalnie",
+                      message: `Dzień zamknięty w pamięci przeglądarki. Dane zostaną zsynchronizowane później.`,
+                      variant: "info"
+                    });
+                    setIsCloseDayDialogOpen(false);
+                  } finally {
+                    setIsClosingDay(false);
+                  }
+                }}
+                disabled={isClosingDay}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {isClosingDay ? "Zamykanie..." : "Zamknij dzień"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Navigation Grid - Premium Look */}
         <section className="space-y-4">

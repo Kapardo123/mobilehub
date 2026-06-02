@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { LogOut, Settings, Bell, Search, BookOpen, Calculator, ShoppingCart, Users, LayoutDashboard, MapPin, User, ChevronDown, Store, ClipboardList, FileText, UserPlus, LogIn, Smartphone, Lock, Eye, EyeOff, AlertTriangle, ArrowRightCircle } from "lucide-react";
+import { LogOut, Settings, Bell, Search, Calculator, ShoppingCart, Users, LayoutDashboard, MapPin, User, ChevronDown, Store, ClipboardList, FileText, UserPlus, LogIn, Smartphone, Lock, Eye, EyeOff, AlertTriangle, ArrowRightCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -591,13 +591,6 @@ export function Navbar() {
             <DropdownMenuSeparator className="h-px bg-primary/5 my-1" />
 
             <DropdownMenuGroup>
-              <DropdownMenuItem variant="default" className="p-0">
-                <Link href="/dokumenty" className="flex items-center w-full px-2 py-2 font-bold text-xs uppercase tracking-tight hover:bg-accent rounded-xl transition-colors">
-                  <BookOpen className="mr-2 h-4 w-4 text-primary" />
-                  <span>Dokumenty</span>
-                </Link>
-              </DropdownMenuItem>
-
               <DropdownMenuItem variant="default" className="p-0">
                 <Link href="/faktury" className="flex items-center w-full px-2 py-2 font-bold text-xs uppercase tracking-tight hover:bg-accent rounded-xl transition-colors">
                   <FileText className="mr-2 h-4 w-4 text-primary" />
