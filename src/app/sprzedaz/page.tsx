@@ -492,11 +492,21 @@ export default function SprzedazPage() {
               { name: "Naprawa gniazda ładowania", category: "serwis" as const, purchase_price: 60, selling_price: 180, profit_margin: 120, tax_type: "marza" as const, stock_quantity: 999, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} }
             ];
 
+            let seedSuccessCount = 0;
             for (const item of allDemoItems) {
-              await inventoryService.create(item);
+              try {
+                await inventoryService.create(item);
+                seedSuccessCount++;
+              } catch (itemError: any) {
+                // Ignoruj błędy unikalności (IMEI/sku) - element mógł już istnieć z poprzedniego seeda
+                if (itemError?.code === '23505') {
+                  console.warn('Sprzedaż: ⚠️ Pominięto duplikat:', item.name, '-', itemError?.details);
+                  continue;
+                }
+                throw itemError;
+              }
             }
-
-            console.log('Sprzedaż: ✅ Dodano', allDemoItems.length, 'pozycji demo do Supabase (telefony + akcesoria + usługi + serwisy)');
+            console.log('Sprzedaż: ✅ Dodano', seedSuccessCount, '/', allDemoItems.length, 'pozycji demo (reszta to duplikaty)');
 
             supabaseData = await (shopId ? inventoryService.getByShop(shopId) : inventoryService.getAll());
             console.log('Sprzedaż: Ponownie pobrano', supabaseData.length, 'pozycji');
