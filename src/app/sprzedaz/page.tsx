@@ -437,121 +437,58 @@ export default function SprzedazPage() {
   useEffect(() => {
     if (typeof window === "undefined" || !isMounted) return;
 
+    const applyInventoryData = (mappedItems: any[], _shopName: string) => {
+      const availablePhones = mappedItems.filter((item: any) =>
+        item.category === "telefon" && !item.statusSprzedany
+      );
+      const availableUslugi = mappedItems.filter((item: any) =>
+        item.category === "usluga"
+      );
+      const availableSerwisy = mappedItems.filter((item: any) =>
+        item.category === "serwis"
+      );
+      const availableAkcesoria = mappedItems.filter((item: any) =>
+        item.category === "akcesoria"
+      );
+
+      setWarehousePhones(availablePhones);
+      setWarehouseUslugi(availableUslugi);
+      setWarehouseSerwisy(availableSerwisy);
+      setWarehouseAkcesoria(availableAkcesoria);
+
+      console.log('Sprzedaż: ✅ Telefony:', availablePhones.length, '| Usługi:', availableUslugi.length, '| Serwisy:', availableSerwisy.length, '| Akcesoria:', availableAkcesoria.length);
+    };
+
     const loadInventoryFromSupabase = async () => {
       try {
         const shopId = getSessionStorageSafe("shopId", "");
         const shopName = getSessionStorageSafe("shopName", "Kaufland Włocławek");
         console.log('Sprzedaż: Ładowanie magazynu z Supabase, shopId:', shopId);
 
-        let supabaseData: any[] = [];
-        let useFallback = false;
+        // 1) Najpierw pokaż to co jest w localStorage (synchronizowane z magazynem)
+        const localInventory = getLocalStorageSafe('magazyn_inventory', []);
+        if (localInventory.length > 0) {
+          console.log('Sprzedaż: 📦 Załadowano z localStorage:', localInventory.length, 'pozycji');
+          applyInventoryData(localInventory, shopName);
+        }
 
+        // 2) W tle pobierz najnowsze dane z Supabase
+        let supabaseData: any[] = [];
         try {
           if (shopId) {
             supabaseData = await inventoryService.getByShop(shopId);
           } else {
             supabaseData = await inventoryService.getAll();
           }
-          console.log('Sprzedaż: Pobrano', supabaseData.length, 'pozycji z Supabase');
+          console.log('Sprzedaż: ✅ Pobrano', supabaseData.length, 'pozycji z Supabase');
         } catch (supabaseError) {
-          console.error('Sprzedaż: ❌ Błąd Supabase (prawdopodobnie brak zmiennych środowiskowych):', supabaseError);
-          console.error('Sprzedaż: Używam danych fallback (lokalnych)');
-          useFallback = true;
+          console.error('Sprzedaż: ❌ Błąd Supabase:', supabaseError);
+          return; // zachowaj dane z localStorage
         }
 
-        if (supabaseData.length === 0 && !useFallback) {
-          console.log('Sprzedaż: 🌱 Inventory puste - próbuję dodać dane demo do Supabase...');
-
-          try {
-            const allDemoItems = [
-              { name: "iPhone 15 Pro", category: "telefon" as const, brand: "Apple", model: "15 Pro", memory: "256GB", color: "Natural Titanium", condition: "nowy" as const, battery_health: "100%", imei: "351234567890123", purchase_price: 3800, selling_price: 4500, profit_margin: 700, tax_type: "marza" as const, stock_quantity: 1, is_sold: false, status: "nowy" as const, warranty_months: 12, set_includes: "pudełko, kabel, ładowarka", notes: "Bez rys, like new", shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Samsung S23 Ultra", category: "telefon" as const, brand: "Samsung", model: "S23 Ultra", memory: "512GB", color: "Phantom Black", condition: "uzywany" as const, battery_health: "95%", imei: "354455667788990", purchase_price: 2600, selling_price: 3200, profit_margin: 600, tax_type: "marza" as const, stock_quantity: 1, is_sold: false, status: "uzywany" as const, warranty_months: 12, set_includes: "pudełko, kabel, rysik", notes: "Perfekcyjny stan", shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "iPhone 14 Pro Max", category: "telefon" as const, brand: "Apple", model: "14 Pro Max", memory: "256GB", color: "Deep Purple", condition: "uzywany" as const, battery_health: "97%", imei: "356789012345678", purchase_price: 3500, selling_price: 4200, profit_margin: 700, tax_type: "marza" as const, stock_quantity: 1, is_sold: false, status: "uzywany" as const, warranty_months: 6, set_includes: "pudełko, kabel", notes: "Zadbany", shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Xiaomi 13 Pro", category: "telefon" as const, brand: "Xiaomi", model: "13 Pro", memory: "256GB", color: "Ceramic Black", condition: "uzywany" as const, battery_health: "92%", imei: "357890123456789", purchase_price: 2200, selling_price: 2800, profit_margin: 600, tax_type: "VAT" as const, stock_quantity: 1, is_sold: false, status: "uzywany" as const, warranty_months: 12, set_includes: "pudełko, kabel, ładowarka", notes: "Stan idealny", shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "iPhone 12 Mini", category: "telefon" as const, brand: "Apple", model: "12 Mini", memory: "64GB", color: "Blue", condition: "uzywany" as const, battery_health: "85%", imei: "358901234567890", purchase_price: 1300, selling_price: 1600, profit_margin: 300, tax_type: "marza" as const, stock_quantity: 1, is_sold: false, status: "uzywany" as const, warranty_months: 3, set_includes: "pudełko", notes: "Drobne ryski", shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Samsung S22", category: "telefon" as const, brand: "Samsung", model: "S22", memory: "128GB", color: "Green", condition: "uzywany" as const, battery_health: "90%", imei: "359012345678901", purchase_price: 1500, selling_price: 1900, profit_margin: 400, tax_type: "VAT" as const, stock_quantity: 1, is_sold: false, status: "uzywany" as const, warranty_months: 6, set_includes: "pudełko, kabel", notes: "Bardzo zadbany", shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "iPhone 11", category: "telefon" as const, brand: "Apple", model: "11", memory: "64GB", color: "Purple", condition: "uzywany" as const, battery_health: "78%", imei: "350123456789012", purchase_price: 900, selling_price: 1200, profit_margin: 300, tax_type: "marza" as const, stock_quantity: 1, is_sold: false, status: "uzywany" as const, warranty_months: 3, set_includes: "kabel", notes: "Ślady użytkowania", shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "iPhone 16 Pro Max", category: "telefon" as const, brand: "Apple", model: "16 Pro Max", memory: "512GB", color: "Desert Titanium", condition: "nowy" as const, battery_health: "99%", imei: "350987654321098", purchase_price: 4500, selling_price: 5200, profit_margin: 700, tax_type: "VAT" as const, stock_quantity: 1, is_sold: false, status: "nowy" as const, warranty_months: 24, set_includes: "pełne pudełko", notes: "Folia na ekranie", shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Samsung S24 Ultra", category: "telefon" as const, brand: "Samsung", model: "S24 Ultra", memory: "256GB", color: "Titanium Gray", condition: "uzywany" as const, battery_health: "96%", imei: "351098765432109", purchase_price: 4200, selling_price: 4800, profit_margin: 600, tax_type: "VAT" as const, stock_quantity: 1, is_sold: false, status: "uzywany" as const, warranty_months: 12, set_includes: "pudełko, kabel, ładowarka, rysik", notes: "Bardzo zadbany, folia na ekranie", shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "iPhone 15", category: "telefon" as const, brand: "Apple", model: "15", memory: "128GB", color: "Blue", condition: "uzywany" as const, battery_health: "94%", imei: "352109876543210", purchase_price: 3200, selling_price: 3800, profit_margin: 600, tax_type: "marza" as const, stock_quantity: 1, is_sold: false, status: "uzywany" as const, warranty_months: 9, set_includes: "pudełko, kabel", notes: "Lekkie ślady", shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Szkło hartowane iPhone 15", category: "akcesoria" as const, brand: "Apple", purchase_price: 20, selling_price: 49, profit_margin: 29, tax_type: "marza" as const, stock_quantity: 50, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Etui MagSafe iPhone 14", category: "akcesoria" as const, brand: "Apple", purchase_price: 60, selling_price: 129, profit_margin: 69, tax_type: "marza" as const, stock_quantity: 30, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Ładowarka 20W USB-C", category: "akcesoria" as const, brand: "Apple", purchase_price: 50, selling_price: 99, profit_margin: 49, tax_type: "marza" as const, stock_quantity: 25, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Kabel USB-C Lightning", category: "akcesoria" as const, brand: "Apple", purchase_price: 30, selling_price: 79, profit_margin: 49, tax_type: "marza" as const, stock_quantity: 40, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Powerbank 10000mAh", category: "akcesoria" as const, brand: "Baseus", purchase_price: 70, selling_price: 149, profit_margin: 79, tax_type: "marza" as const, stock_quantity: 15, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Słuchawki Bluetooth", category: "akcesoria" as const, brand: "Samsung", purchase_price: 100, selling_price: 199, profit_margin: 99, tax_type: "marza" as const, stock_quantity: 20, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Uchwyt samochodowy", category: "akcesoria" as const, brand: "Baseus", purchase_price: 30, selling_price: 59, profit_margin: 29, tax_type: "marza" as const, stock_quantity: 18, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Konfiguracja telefonu", category: "usluga" as const, purchase_price: 0, selling_price: 50, profit_margin: 50, tax_type: "marza" as const, stock_quantity: 999, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Przeniesienie danych", category: "usluga" as const, purchase_price: 0, selling_price: 80, profit_margin: 80, tax_type: "marza" as const, stock_quantity: 999, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Ustawienie konta Google/Apple", category: "usluga" as const, purchase_price: 0, selling_price: 30, profit_margin: 30, tax_type: "marza" as const, stock_quantity: 999, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Wymiana szybki", category: "serwis" as const, purchase_price: 50, selling_price: 150, profit_margin: 100, tax_type: "marza" as const, stock_quantity: 999, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Wymiana baterii", category: "serwis" as const, purchase_price: 40, selling_price: 120, profit_margin: 80, tax_type: "marza" as const, stock_quantity: 999, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Diagnostyka telefonu", category: "serwis" as const, purchase_price: 0, selling_price: 50, profit_margin: 50, tax_type: "marza" as const, stock_quantity: 999, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Wymiana wyświetlacza OLED", category: "serwis" as const, purchase_price: 150, selling_price: 350, profit_margin: 200, tax_type: "marza" as const, stock_quantity: 999, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Polerowanie obudowy", category: "serwis" as const, purchase_price: 20, selling_price: 80, profit_margin: 60, tax_type: "marza" as const, stock_quantity: 999, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} },
-              { name: "Naprawa gniazda ładowania", category: "serwis" as const, purchase_price: 60, selling_price: 180, profit_margin: 120, tax_type: "marza" as const, stock_quantity: 999, is_sold: false, status: "nowy" as const, shop_id: shopId || "default", added_by: getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000"), metadata: {} }
-            ];
-
-            let seedSuccessCount = 0;
-            for (const item of allDemoItems) {
-              try {
-                await inventoryService.create(item);
-                seedSuccessCount++;
-              } catch (itemError: any) {
-                // Ignoruj błędy unikalności (IMEI/sku) - element mógł już istnieć z poprzedniego seeda
-                if (itemError?.code === '23505') {
-                  console.warn('Sprzedaż: ⚠️ Pominięto duplikat:', item.name, '-', itemError?.details);
-                  continue;
-                }
-                throw itemError;
-              }
-            }
-            console.log('Sprzedaż: ✅ Dodano', seedSuccessCount, '/', allDemoItems.length, 'pozycji demo (reszta to duplikaty)');
-
-            supabaseData = await (shopId ? inventoryService.getByShop(shopId) : inventoryService.getAll());
-            console.log('Sprzedaż: Ponownie pobrano', supabaseData.length, 'pozycji');
-          } catch (seedError) {
-            console.error('Sprzedaż: ❌ Błąd dodawania do Supabase:', seedError);
-            useFallback = true;
-          }
-        }
-
-        if ((supabaseData.length > 0) || useFallback) {
-          let mappedItems;
-
-          if (useFallback || supabaseData.length === 0) {
-            console.log('Sprzedaż: 📦 Używam DANYCH FALLBACK (domyślnych) - Supabaze niedostępny');
-
-            mappedItems = [
-              { id: "fb1", name: "iPhone 15 Pro", category: "telefon", stock: 1, price: "4500 zł", alert: false, imei: "351234567890123", battery: "100%", color: "Natural Titanium", condition: "Nowy", memory: "256GB", brand: "Apple", model: "15 Pro", purchasePrice: "3800", taxType: "marza", purchaseDate: "2024-01-15", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Bez rys, like new", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb2", name: "Samsung S23 Ultra", category: "telefon", stock: 1, price: "3200 zł", alert: false, imei: "354455667788990", battery: "95%", color: "Phantom Black", condition: "Używany", memory: "512GB", brand: "Samsung", model: "S23 Ultra", purchasePrice: "2600", taxType: "marza", purchaseDate: "2024-03-05", warranty: "12 m-cy", setIncludes: "pudełko, kabel, rysik", notes: "Perfekcyjny stan", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb3", name: "iPhone 14 Pro Max", category: "telefon", stock: 1, price: "4200 zł", alert: false, imei: "356789012345678", battery: "97%", color: "Deep Purple", condition: "Używany", memory: "256GB", brand: "Apple", model: "14 Pro Max", purchasePrice: "3500", taxType: "marza", purchaseDate: "2024-04-01", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Zadbany", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb4", name: "Xiaomi 13 Pro", category: "telefon", stock: 1, price: "2800 zł", alert: false, imei: "357890123456789", battery: "92%", color: "Ceramic Black", condition: "Używany", memory: "256GB", brand: "Xiaomi", model: "13 Pro", purchasePrice: "2200", taxType: "VAT", purchaseDate: "2024-03-20", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Stan idealny", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb5", name: "iPhone 12 Mini", category: "telefon", stock: 1, price: "1600 zł", alert: false, imei: "358901234567890", battery: "85%", color: "Blue", condition: "Używany", memory: "64GB", brand: "Apple", model: "12 Mini", purchasePrice: "1300", taxType: "marza", purchaseDate: "2024-02-25", warranty: "3 m-ce", setIncludes: "pudełko", notes: "Drobne ryski", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb6", name: "Samsung S22", category: "telefon", stock: 1, price: "1900 zł", alert: false, imei: "359012345678901", battery: "90%", color: "Green", condition: "Używany", memory: "128GB", brand: "Samsung", model: "S22", purchasePrice: "1500", taxType: "VAT", purchaseDate: "2024-03-10", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Bardzo zadbany", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb7", name: "iPhone 11", category: "telefon", stock: 1, price: "1200 zł", alert: false, imei: "350123456789012", battery: "78%", color: "Purple", condition: "Używany", memory: "64GB", brand: "Apple", model: "11", purchasePrice: "900", taxType: "marza", purchaseDate: "2024-01-20", warranty: "3 m-ce", setIncludes: "kabel", notes: "Ślady użytkowania", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb8", name: "iPhone 16 Pro Max", category: "telefon", stock: 1, price: "5200 zł", alert: false, imei: "350987654321098", battery: "99%", color: "Desert Titanium", condition: "Nowy", memory: "512GB", brand: "Apple", model: "16 Pro Max", purchasePrice: "4500", taxType: "VAT", purchaseDate: "2024-06-01", warranty: "24 m-cy", setIncludes: "pełne pudełko", notes: "Folia na ekranie", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb9", name: "Samsung S24 Ultra", category: "telefon", stock: 1, price: "4800 zł", alert: false, imei: "351098765432109", battery: "96%", color: "Titanium Gray", condition: "Używany", memory: "256GB", brand: "Samsung", model: "S24 Ultra", purchasePrice: "4200", taxType: "VAT", purchaseDate: "2024-05-20", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka, rysik", notes: "Bardzo zadbany, folia na ekranie", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb10", name: "iPhone 15", category: "telefon", stock: 1, price: "3800 zł", alert: false, imei: "352109876543210", battery: "94%", color: "Blue", condition: "Używany", memory: "128GB", brand: "Apple", model: "15", purchasePrice: "3200", taxType: "marza", purchaseDate: "2024-04-15", warranty: "9 m-cy", setIncludes: "pudełko, kabel", notes: "Lekkie ślady", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb11", name: "Szkło hartowane iPhone 15", category: "akcesoria", stock: 50, price: "49 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "Apple", model: "", purchasePrice: "20", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb12", name: "Etui MagSafe iPhone 14", category: "akcesoria", stock: 30, price: "129 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "Apple", model: "", purchasePrice: "60", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb13", name: "Ładowarka 20W USB-C", category: "akcesoria", stock: 25, price: "99 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "Apple", model: "", purchasePrice: "50", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb14", name: "Kabel USB-C Lightning", category: "akcesoria", stock: 40, price: "79 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "Apple", model: "", purchasePrice: "30", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb15", name: "Powerbank 10000mAh", category: "akcesoria", stock: 15, price: "149 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "Baseus", model: "", purchasePrice: "70", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb16", name: "Słuchawki Bluetooth", category: "akcesoria", stock: 20, price: "199 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "Samsung", model: "", purchasePrice: "100", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb17", name: "Uchwyt samochodowy", category: "akcesoria", stock: 18, price: "59 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "Baseus", model: "", purchasePrice: "30", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb18", name: "Konfiguracja telefonu", category: "usluga", stock: 999, price: "50 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "", model: "", purchasePrice: "0", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb19", name: "Przeniesienie danych", category: "usluga", stock: 999, price: "80 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "", model: "", purchasePrice: "0", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb20", name: "Ustawienie konta Google/Apple", category: "usluga", stock: 999, price: "30 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "", model: "", purchasePrice: "0", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb21", name: "Wymiana szybki", category: "serwis", stock: 999, price: "150 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "", model: "", purchasePrice: "50", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb22", name: "Wymiana baterii", category: "serwis", stock: 999, price: "120 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "", model: "", purchasePrice: "40", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb23", name: "Diagnostyka telefonu", category: "serwis", stock: 999, price: "50 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "", model: "", purchasePrice: "0", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb24", name: "Wymiana wyświetlacza OLED", category: "serwis", stock: 999, price: "350 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "", model: "", purchasePrice: "150", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb25", name: "Polerowanie obudowy", category: "serwis", stock: 999, price: "80 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "", model: "", purchasePrice: "20", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName },
-              { id: "fb26", name: "Naprawa gniazda ładowania", category: "serwis", stock: 999, price: "180 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "", model: "", purchasePrice: "60", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: shopName }
-            ];
-          } else {
-            mappedItems = supabaseData.map((item: any) => ({
+        // 3) Mapuj dane z Supabase i aktualizuj stan + localStorage
+        if (supabaseData.length > 0) {
+          const mappedItems = supabaseData.map((item: any) => ({
             id: item.id,
             name: item.name || '',
             category: item.category || 'telefon',
@@ -561,7 +498,7 @@ export default function SprzedazPage() {
             imei: item.imei || '',
             battery: item.battery_health || '',
             color: item.color || '',
-            condition: item.condition === 'nowy' ? 'Nowy' : item.condition === 'uzywany' ? 'Używany' : 'Używany',
+            condition: item.condition === 'nowy' ? 'Nowy' : 'Używany',
             memory: item.memory || '',
             brand: item.brand || '',
             model: item.model || '',
@@ -575,38 +512,32 @@ export default function SprzedazPage() {
             dataSprzedazy: item.sold_at || '',
             shop: ''
           }));
-          }
-
+          applyInventoryData(mappedItems, shopName);
           localStorage.setItem('magazyn_inventory', JSON.stringify(mappedItems));
-
-          const availablePhones = mappedItems.filter((item: any) =>
-            item.category === "telefon" && !item.statusSprzedany
-          );
-          const availableUslugi = mappedItems.filter((item: any) =>
-            item.category === "usluga"
-          );
-          const availableSerwisy = mappedItems.filter((item: any) =>
-            item.category === "serwis"
-          );
-          const availableAkcesoria = mappedItems.filter((item: any) =>
-            item.category === "akcesoria"
-          );
-
-          setWarehousePhones(availablePhones);
-          setWarehouseUslugi(availableUslugi);
-          setWarehouseSerwisy(availableSerwisy);
-          setWarehouseAkcesoria(availableAkcesoria);
-
-          console.log('Sprzedaż: ✅ Załadowano telefony:', availablePhones.length, '| Usługi:', availableUslugi.length, '| Serwisy:', availableSerwisy.length, '| Akcesoria:', availableAkcesoria.length);
         } else {
-          console.log('Sprzedaż: ⚠️ Brak danych wszędzie - używam pustej listy');
+          console.log('Sprzedaż: ⚠️ Brak danych w Supabase - używam localStorage (jeśli jest)');
         }
       } catch (error) {
         console.error('Sprzedaż: Błąd ładowania magazynu:', error);
       }
     };
 
+    // Nasłuchuj zmian w magazynie (dodanie/edycja/usunięcie w /magazyn)
+    const onMagazynUpdated = () => {
+      console.log('Sprzedaż: 🔄 Otrzymano event magazyn_updated - przeładowuję');
+      const localInventory = getLocalStorageSafe('magazyn_inventory', []);
+      const shopName = getSessionStorageSafe("shopName", "Kaufland Włocławek");
+      if (localInventory.length > 0) {
+        applyInventoryData(localInventory, shopName);
+      }
+    };
+    window.addEventListener('magazyn_updated', onMagazynUpdated);
+
     loadInventoryFromSupabase();
+
+    return () => {
+      window.removeEventListener('magazyn_updated', onMagazynUpdated);
+    };
   }, [isMounted]);
 
   // Load sales from localStorage
