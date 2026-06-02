@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/select";
 
 type InventoryItem = {
+  id?: string;
   name: string;
   category: "telefon" | "akcesoria" | "usluga" | "serwis";
   price: string;
@@ -124,7 +125,7 @@ export default function MagazynPage() {
     notes: "",
     warranty: "",
     imei: "",
-    taxType: "marża",
+    taxType: "marza",
     purchaseDate: "",
     sellingDate: "",
     statusSprzedany: false,
@@ -175,7 +176,7 @@ export default function MagazynPage() {
     notes: "",
     warranty: "",
     imei: "",
-    taxType: "marża",
+    taxType: "marza",
     purchaseDate: "",
     sellingDate: "",
     statusSprzedany: false,
@@ -183,26 +184,26 @@ export default function MagazynPage() {
   });
 
   const getDefaultInventory = () => [
-    { name: "iPhone 15 Pro", category: "telefon", stock: 1, price: "4500 zł", alert: false, imei: "351234567890123", battery: "100%", color: "Natural Titanium", condition: "Nowy", memory: "256GB", brand: "Apple", model: "15 Pro", purchasePrice: "3800", taxType: "marża", purchaseDate: "2024-01-15", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Bez rys, like new", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
-    { name: "iPhone 13", category: "telefon", stock: 1, price: "2100 zł", alert: false, imei: "359876543210987", battery: "89%", color: "Midnight", condition: "Używany", memory: "128GB", brand: "Apple", model: "13", purchasePrice: "1700", taxType: "marża", purchaseDate: "2024-02-10", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Lekkie ryski na obudowie", statusSprzedany: true, dataSprzedazy: "2024-05-10", shop: "Kaufland Włocławek" },
+    { name: "iPhone 15 Pro", category: "telefon", stock: 1, price: "4500 zł", alert: false, imei: "351234567890123", battery: "100%", color: "Natural Titanium", condition: "Nowy", memory: "256GB", brand: "Apple", model: "15 Pro", purchasePrice: "3800", taxType: "marza", purchaseDate: "2024-01-15", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Bez rys, like new", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
+    { name: "iPhone 13", category: "telefon", stock: 1, price: "2100 zł", alert: false, imei: "359876543210987", battery: "89%", color: "Midnight", condition: "Używany", memory: "128GB", brand: "Apple", model: "13", purchasePrice: "1700", taxType: "marza", purchaseDate: "2024-02-10", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Lekkie ryski na obudowie", statusSprzedany: true, dataSprzedazy: "2024-05-10", shop: "Kaufland Włocławek" },
     { name: "Samsung S23 Ultra", category: "telefon", stock: 1, price: "3200 zł", alert: false, imei: "354455667788990", battery: "95%", color: "Phantom Black", condition: "Używany", memory: "512GB", brand: "Samsung", model: "S23 Ultra", purchasePrice: "2600", taxType: "VAT", purchaseDate: "2024-03-05", warranty: "12 m-cy", setIncludes: "pudełko, kabel, rysik", notes: "Perfekcyjny stan", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
-    { name: "iPhone 14 Pro Max", category: "telefon", stock: 1, price: "4200 zł", alert: false, imei: "356789012345678", battery: "97%", color: "Deep Purple", condition: "Używany", memory: "256GB", brand: "Apple", model: "14 Pro Max", purchasePrice: "3500", taxType: "marża", purchaseDate: "2024-04-01", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Zadbany", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
+    { name: "iPhone 14 Pro Max", category: "telefon", stock: 1, price: "4200 zł", alert: false, imei: "356789012345678", battery: "97%", color: "Deep Purple", condition: "Używany", memory: "256GB", brand: "Apple", model: "14 Pro Max", purchasePrice: "3500", taxType: "marza", purchaseDate: "2024-04-01", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Zadbany", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
     { name: "Xiaomi 13 Pro", category: "telefon", stock: 1, price: "2800 zł", alert: false, imei: "357890123456789", battery: "92%", color: "Ceramic Black", condition: "Używany", memory: "256GB", brand: "Xiaomi", model: "13 Pro", purchasePrice: "2200", taxType: "VAT", purchaseDate: "2024-03-20", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Stan idealny", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
-    { name: "iPhone 12 Mini", category: "telefon", stock: 1, price: "1600 zł", alert: false, imei: "358901234567890", battery: "85%", color: "Blue", condition: "Używany", memory: "64GB", brand: "Apple", model: "12 Mini", purchasePrice: "1300", taxType: "marża", purchaseDate: "2024-02-25", warranty: "3 m-ce", setIncludes: "pudełko", notes: "Drobne ryski", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
+    { name: "iPhone 12 Mini", category: "telefon", stock: 1, price: "1600 zł", alert: false, imei: "358901234567890", battery: "85%", color: "Blue", condition: "Używany", memory: "64GB", brand: "Apple", model: "12 Mini", purchasePrice: "1300", taxType: "marza", purchaseDate: "2024-02-25", warranty: "3 m-ce", setIncludes: "pudełko", notes: "Drobne ryski", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
     { name: "Samsung S22", category: "telefon", stock: 1, price: "1900 zł", alert: false, imei: "359012345678901", battery: "90%", color: "Green", condition: "Używany", memory: "128GB", brand: "Samsung", model: "S22", purchasePrice: "1500", taxType: "VAT", purchaseDate: "2024-03-10", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Bardzo zadbany", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
-    { name: "iPhone 11", category: "telefon", stock: 1, price: "1200 zł", alert: false, imei: "350123456789012", battery: "78%", color: "Purple", condition: "Używany", memory: "64GB", brand: "Apple", model: "11", purchasePrice: "900", taxType: "marża", purchaseDate: "2024-01-20", warranty: "3 m-ce", setIncludes: "kabel", notes: "Ślady użytkowania", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
+    { name: "iPhone 11", category: "telefon", stock: 1, price: "1200 zł", alert: false, imei: "350123456789012", battery: "78%", color: "Purple", condition: "Używany", memory: "64GB", brand: "Apple", model: "11", purchasePrice: "900", taxType: "marza", purchaseDate: "2024-01-20", warranty: "3 m-ce", setIncludes: "kabel", notes: "Ślady użytkowania", statusSprzedany: false, dataSprzedazy: "", shop: "Kaufland Włocławek" },
 
     { name: "iPhone 16 Pro Max", category: "telefon", stock: 1, price: "5200 zł", alert: false, imei: "350987654321098", battery: "99%", color: "Desert Titanium", condition: "Nowy", memory: "512GB", brand: "Apple", model: "16 Pro Max", purchasePrice: "4500", taxType: "VAT", purchaseDate: "2024-06-01", warranty: "24 m-cy", setIncludes: "pełne pudełko", notes: "Folia na ekranie", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
     { name: "Samsung S24 Ultra", category: "telefon", stock: 1, price: "4800 zł", alert: false, imei: "351098765432109", battery: "96%", color: "Titanium Gray", condition: "Używany", memory: "256GB", brand: "Samsung", model: "S24 Ultra", purchasePrice: "4200", taxType: "VAT", purchaseDate: "2024-05-20", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka, rysik", notes: "Bardzo zadbany, folia na ekranie", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
-    { name: "iPhone 15", category: "telefon", stock: 1, price: "3800 zł", alert: false, imei: "352109876543210", battery: "94%", color: "Blue", condition: "Używany", memory: "128GB", brand: "Apple", model: "15", purchasePrice: "3200", taxType: "marża", purchaseDate: "2024-04-15", warranty: "9 m-cy", setIncludes: "pudełko, kabel", notes: "Lekkie ślady", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
+    { name: "iPhone 15", category: "telefon", stock: 1, price: "3800 zł", alert: false, imei: "352109876543210", battery: "94%", color: "Blue", condition: "Używany", memory: "128GB", brand: "Apple", model: "15", purchasePrice: "3200", taxType: "marza", purchaseDate: "2024-04-15", warranty: "9 m-cy", setIncludes: "pudełko, kabel", notes: "Lekkie ślady", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
     { name: "Xiaomi 14 Ultra", category: "telefon", stock: 1, price: "3600 zł", alert: false, imei: "353210987654321", battery: "91%", color: "White", condition: "Używany", memory: "512GB", brand: "Xiaomi", model: "14 Ultra", purchasePrice: "2900", taxType: "VAT", purchaseDate: "2024-03-25", warranty: "12 m-cy", setIncludes: "pudełko, kabel, ładowarka, etui", notes: "Bardzo zadbany", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
     { name: "Samsung A54", category: "telefon", stock: 1, price: "1400 zł", alert: false, imei: "354321098765432", battery: "88%", color: "Lavender", condition: "Używany", memory: "128GB", brand: "Samsung", model: "A54", purchasePrice: "1100", taxType: "VAT", purchaseDate: "2024-02-18", warranty: "6 m-cy", setIncludes: "kabel", notes: "Normalne ślady", statusSprzedany: false, dataSprzedazy: "", shop: "Riviera Gdynia" },
-    { name: "iPhone SE (2nd gen)", category: "telefon", stock: 1, price: "950 zł", alert: false, imei: "355432109876543", battery: "82%", color: "Red", condition: "Używany", memory: "64GB", brand: "Apple", model: "SE (2nd gen)", purchasePrice: "750", taxType: "marża", purchaseDate: "2024-01-28", warranty: "3 m-ce", setIncludes: "kabel", notes: "Drobne ryski", statusSprzedany: true, dataSprzedazy: "2024-06-05", shop: "Riviera Gdynia" },
+    { name: "iPhone SE (2nd gen)", category: "telefon", stock: 1, price: "950 zł", alert: false, imei: "355432109876543", battery: "82%", color: "Red", condition: "Używany", memory: "64GB", brand: "Apple", model: "SE (2nd gen)", purchasePrice: "750", taxType: "marza", purchaseDate: "2024-01-28", warranty: "3 m-ce", setIncludes: "kabel", notes: "Drobne ryski", statusSprzedany: true, dataSprzedazy: "2024-06-05", shop: "Riviera Gdynia" },
 
-    { name: "iPhone 14 Plus", category: "telefon", stock: 1, price: "3400 zł", alert: false, imei: "356543210987654", battery: "93%", color: "Starlight", condition: "Używany", memory: "256GB", brand: "Apple", model: "14 Plus", purchasePrice: "2800", taxType: "marża", purchaseDate: "2024-04-08", warranty: "8 m-cy", setIncludes: "pudełko, kabel", notes: "Zadbany egzemplarz", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
+    { name: "iPhone 14 Plus", category: "telefon", stock: 1, price: "3400 zł", alert: false, imei: "356543210987654", battery: "93%", color: "Starlight", condition: "Używany", memory: "256GB", brand: "Apple", model: "14 Plus", purchasePrice: "2800", taxType: "marza", purchaseDate: "2024-04-08", warranty: "8 m-cy", setIncludes: "pudełko, kabel", notes: "Zadbany egzemplarz", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
     { name: "Samsung S23 FE", category: "telefon", stock: 1, price: "2400 zł", alert: false, imei: "357654321098765", battery: "89%", color: "Cream", condition: "Używany", memory: "128GB", brand: "Samsung", model: "S23 FE", purchasePrice: "1900", taxType: "VAT", purchaseDate: "2024-03-30", warranty: "9 m-cy", setIncludes: "pudełko, kabel, ładowarka", notes: "Lekkie ślady na ramce", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
     { name: "Xiaomi 13T Pro", category: "telefon", stock: 1, price: "2600 zł", alert: false, imei: "358765432109876", battery: "87%", color: "Black", condition: "Używany", memory: "256GB", brand: "Xiaomi", model: "13T Pro", purchasePrice: "2000", taxType: "VAT", purchaseDate: "2024-02-22", warranty: "10 m-cy", setIncludes: "pudełko, kabel, ładowarka 67W", notes: "Działa bez zarzutów", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
-    { name: "iPhone 12", category: "telefon", stock: 1, price: "1400 zł", alert: false, imei: "359876543210987", battery: "80%", color: "White", condition: "Używany", memory: "64GB", brand: "Apple", model: "12", purchasePrice: "1050", taxType: "marża", purchaseDate: "2024-01-15", warranty: "3 m-ce", setIncludes: "kabel", notes: "Widoczne ślady użytkowania", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
+    { name: "iPhone 12", category: "telefon", stock: 1, price: "1400 zł", alert: false, imei: "359876543210987", battery: "80%", color: "White", condition: "Używany", memory: "64GB", brand: "Apple", model: "12", purchasePrice: "1050", taxType: "marza", purchaseDate: "2024-01-15", warranty: "3 m-ce", setIncludes: "kabel", notes: "Widoczne ślady użytkowania", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
     { name: "Samsung A34", category: "telefon", stock: 1, price: "1200 zł", alert: false, imei: "350111222333444", battery: "86%", color: "Graphite", condition: "Używany", memory: "128GB", brand: "Samsung", model: "A34", purchasePrice: "950", taxType: "VAT", purchaseDate: "2024-02-10", warranty: "6 m-cy", setIncludes: "kabel", notes: "Średni stan", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
     { name: "Redmi Note 13 Pro+", category: "telefon", stock: 1, price: "1800 zł", alert: false, imei: "351222333444555", battery: "92%", color: "Black", condition: "Nowy", memory: "256GB", brand: "Xiaomi", model: "Note 13 Pro+", purchasePrice: "1600", taxType: "VAT", purchaseDate: "2024-05-15", warranty: "24 m-cy", setIncludes: "pełne pudełko, ładowarka 120W", notes: "Odblokowany, folia na ekranie", statusSprzedany: false, dataSprzedazy: "", shop: "Dominikańska Wrocław" },
 
@@ -337,7 +338,7 @@ export default function MagazynPage() {
             brand: item.brand || '',
             model: item.model || '',
             purchasePrice: item.purchase_price?.toString() || '',
-            taxType: item.tax_type === 'VAT' ? 'VAT' : 'marża',
+            taxType: item.tax_type === 'VAT' ? 'VAT' : 'marza',
             purchaseDate: item.purchase_date || '',
             warranty: item.warranty_months ? `${item.warranty_months} m-cy` : '',
             setIncludes: item.set_includes || '',
@@ -528,7 +529,7 @@ export default function MagazynPage() {
       notes: "",
       warranty: "",
       imei: "",
-      taxType: "marża",
+      taxType: "marza",
       purchaseDate: toISODateString(),
       sellingDate: "",
       statusSprzedany: false,
@@ -542,17 +543,35 @@ export default function MagazynPage() {
     });
   };
 
-  const handleDeleteItem = (itemIndex: number) => {
+  const handleDeleteItem = async (itemIndex: number) => {
     const item = filteredItems[itemIndex];
     const itemName = item.name;
-    
+
     const newInventory = inventory.filter((invItem) => {
       if (item.imei && invItem.imei === item.imei) return false;
       if (item.name === invItem.name && item.category === invItem.category && item.price === invItem.price) return false;
       return true;
     });
-    
+
     setInventory(newInventory);
+    window.dispatchEvent(new CustomEvent('magazyn_updated'));
+
+    // Usuń też z Supabase (soft delete) jeśli przedmiot ma id
+    if (item.id) {
+      try {
+        await inventoryService.softDelete(item.id);
+        console.log('Magazyn: ✅ Usunięto z Supabase:', itemName);
+      } catch (err) {
+        console.error('Magazyn: ❌ Błąd usuwania z Supabase:', err);
+        addToast({
+          title: "Usunięto lokalnie",
+          description: `${itemName} usunięto z magazynu, ale wystąpił błąd synchronizacji z bazą`,
+          variant: "error"
+        });
+        return;
+      }
+    }
+
     addToast({
       title: "Usunięto przedmiot",
       description: `${itemName} został usunięty z magazynu`,
@@ -587,7 +606,7 @@ export default function MagazynPage() {
       notes: item.notes || "",
       warranty: item.warranty || "",
       imei: item.imei || "",
-      taxType: item.taxType || "marża",
+      taxType: item.taxType || "marza",
       purchaseDate: item.purchaseDate || "",
       sellingDate: item.sellingDate || "",
       statusSprzedany: item.statusSprzedany || false,
@@ -1150,14 +1169,14 @@ export default function MagazynPage() {
                       <div className="space-y-2">
                         <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Typ podatku</Label>
                         <Select value={newItem.taxType} onValueChange={(val) => val && setNewItem({...newItem, taxType: val})} items={[
-                          { value: "marża", label: "Marża" },
+                          { value: "marza", label: "Marża" },
                           { value: "VAT", label: "VAT" }
                         ]}>
                           <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl">
                             <SelectValue placeholder="Wybierz..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="marża">Marża</SelectItem>
+                            <SelectItem value="marza">Marża</SelectItem>
                             <SelectItem value="VAT">VAT</SelectItem>
                           </SelectContent>
                         </Select>
@@ -1275,7 +1294,7 @@ export default function MagazynPage() {
                           notes: "",
                           warranty: "",
                           imei: "",
-                          taxType: "marża",
+                          taxType: "marza",
                           purchaseDate: toISODateString(),
                           sellingDate: "",
                           statusSprzedany: false,
