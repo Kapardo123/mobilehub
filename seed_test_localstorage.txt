@@ -1,0 +1,31 @@
+// Dodaje 6 telefonów + 4 akcesoria + 3 usługi testowe do localStorage
+// Wklej w konsoli przeglądarki (F12) na stronie /sprzedaz lub /magazyn
+
+const testInventory = [
+  // === TELEFONY ===
+  { id: "a11-1", name: "iPhone 14 Pro", category: "telefon", stock: 1, price: "4299 zł", alert: false, imei: "359111111111001", battery: "94%", color: "Space Black", condition: "Używany", memory: "256GB", brand: "Apple", model: "iPhone 14 Pro", purchasePrice: "3600", taxType: "marza", purchaseDate: "2024-09-15", warranty: "6 m-cy", setIncludes: "pudełko, kabel USB-C", notes: "Lekkie ślady na obudowie, ekran idealny", statusSprzedany: false, dataSprzedazy: "", shop: "" },
+  { id: "a11-2", name: "iPhone 15", category: "telefon", stock: 1, price: "3699 zł", alert: false, imei: "359111111111002", battery: "96%", color: "Blue", condition: "Używany", memory: "128GB", brand: "Apple", model: "iPhone 15", purchasePrice: "3100", taxType: "marza", purchaseDate: "2024-10-20", warranty: "9 m-cy", setIncludes: "pudełko, kabel", notes: "Stan bardzo dobry, brak rys", statusSprzedany: false, dataSprzedazy: "", shop: "" },
+  { id: "a11-3", name: "Samsung Galaxy S23", category: "telefon", stock: 1, price: "2899 zł", alert: false, imei: "359111111111003", battery: "91%", color: "Phantom Black", condition: "Używany", memory: "256GB", brand: "Samsung", model: "Galaxy S23", purchasePrice: "2400", taxType: "marza", purchaseDate: "2024-08-10", warranty: "6 m-cy", setIncludes: "pudełko, kabel", notes: "Drobne ryski na rogach", statusSprzedany: false, dataSprzedazy: "", shop: "" },
+  { id: "a11-4", name: "Xiaomi 14", category: "telefon", stock: 1, price: "3299 zł", alert: false, imei: "359111111111004", battery: "100%", color: "Titan Black", condition: "Nowy", memory: "256GB", brand: "Xiaomi", model: "14", purchasePrice: "2800", taxType: "VAT", purchaseDate: "2025-01-05", warranty: "24 m-ce", setIncludes: "pełne pudełko, ładowarka 90W", notes: "Fabrycznie zafoliowany", statusSprzedany: false, dataSprzedazy: "", shop: "" },
+  { id: "a11-5", name: "Google Pixel 8", category: "telefon", stock: 1, price: "2599 zł", alert: false, imei: "359111111111005", battery: "97%", color: "Hazel", condition: "Używany", memory: "128GB", brand: "Google", model: "Pixel 8", purchasePrice: "2200", taxType: "marza", purchaseDate: "2024-11-12", warranty: "3 m-ce", setIncludes: "pudełko, kabel", notes: "Stan idealny, kupiony w Polsce", statusSprzedany: false, dataSprzedazy: "", shop: "" },
+  { id: "a11-6", name: "iPhone 13", category: "telefon", stock: 1, price: "2099 zł", alert: false, imei: "359111111111006", battery: "88%", color: "Pink", condition: "Używany", memory: "128GB", brand: "Apple", model: "iPhone 13", purchasePrice: "1700", taxType: "marza", purchaseDate: "2024-06-25", warranty: "3 m-ce", setIncludes: "kabel", notes: "Bateria 88%, sprawny 100%", statusSprzedany: false, dataSprzedazy: "", shop: "" },
+
+  // === AKCESORIA ===
+  { id: "a22-1", name: "Szkło hartowane iPhone 15 Pro", category: "akcesoria", stock: 25, price: "49 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "Apple", model: "", purchasePrice: "18", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: "" },
+  { id: "a22-2", name: "Etui silikonowe MagSafe", category: "akcesoria", stock: 15, price: "129 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "Apple", model: "", purchasePrice: "55", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: "" },
+  { id: "a22-3", name: "Ładowarka indukcyjna 15W", category: "akcesoria", stock: 12, price: "119 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "Samsung", model: "", purchasePrice: "60", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: "" },
+  { id: "a22-4", name: "Kabel USB-C 2m", category: "akcesoria", stock: 30, price: "59 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "Baseus", model: "", purchasePrice: "25", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: "" },
+
+  // === USŁUGI ===
+  { id: "a33-1", name: "Wymiana baterii iPhone", category: "usluga", stock: 999, price: "149 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "", model: "", purchasePrice: "30", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: "" },
+  { id: "a33-2", name: "Wymiana ekranu", category: "usluga", stock: 999, price: "299 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "", model: "", purchasePrice: "80", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: "" },
+  { id: "a33-3", name: "Diagnostyka telefonu", category: "usluga", stock: 999, price: "50 zł", alert: false, imei: "", battery: "", color: "", condition: "Nowy", memory: "", brand: "", model: "", purchasePrice: "0", taxType: "marza", purchaseDate: "", warranty: "", setIncludes: "", notes: "", statusSprzedany: false, dataSprzedazy: "", shop: "" }
+];
+
+localStorage.setItem('magazyn_inventory', JSON.stringify(testInventory));
+window.dispatchEvent(new CustomEvent('magazyn_updated'));
+console.log('✅ Dodano ' + testInventory.length + ' pozycji testowych do magazynu:');
+console.log('   📱 Telefony: 6');
+console.log('   🔌 Akcesoria: 4');
+console.log('   🛠️  Usługi: 3');
+console.log('🔄 Odśwież stronę aby zobaczyć zmiany');
