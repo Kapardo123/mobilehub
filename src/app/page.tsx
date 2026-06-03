@@ -662,57 +662,52 @@ export default function Home() {
   }
 
   return (
-    <div key={routeKey} className="flex flex-col min-h-screen bg-accent/20">
+    <div key={routeKey} className="flex flex-col min-h-screen bg-gray-100">
       <Navbar />
       
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full space-y-6">
-        {/* Compact & Premium Header Stats */}
+        {/* Header Stats - Simple & Clear */}
         <section>
-          <Card className="bg-secondary border-none shadow-xl text-white overflow-hidden relative rounded-[2rem]">
-            {/* Subtle Gradient Glow */}
-            <div className="absolute -top-24 -right-24 h-48 w-48 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
-            
-            <CardContent className="p-6 space-y-6 relative z-10">
-              {/* Top Row: Date & Shop Selectors (More Compact) */}
+          <Card className="bg-white shadow-sm">
+            <CardContent className="p-6 space-y-6">
+              {/* Top Row: Date & Shop Selectors */}
               <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-xl border border-white/5 group hover:border-primary/30 transition-all w-full sm:w-auto">
-                  <CalendarIcon className="h-3.5 w-3.5 text-primary" />
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <CalendarIcon className="h-4 w-4" />
                   <Input 
                     type="date"
                     value={today}
                     onChange={(e) => {
                       console.log('Zmieniono datę na:', e.target.value);
                     }}
-                    className="bg-transparent border-none h-6 text-white text-[10px] font-bold focus-visible:ring-0 [color-scheme:dark] w-full sm:w-28 p-0"
+                    className="border-gray-200 h-9 text-sm focus-visible:ring-1 focus-visible:ring-offset-1"
                   />
                 </div>
                 
                 <div className="w-full sm:w-auto flex-1 max-w-[200px]">
                   {currentUserRole === 'employee' ? (
-                    <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/5 h-10 rounded-xl">
-                      <MapPin className="h-3.5 w-3.5 text-primary" />
-                      <span className="text-[10px] font-black uppercase tracking-widest text-white">
-                        {currentShopName || 'Brak sklepu'}
-                      </span>
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <MapPin className="h-4 w-4" />
+                      <span>{currentShopName || 'Brak sklepu'}</span>
                     </div>
                   ) : (
                     <Select value={selectedShop} onValueChange={(val) => setSelectedShop(val || "all")} items={[
                       { value: "all", label: "Wszystkie punkty" },
                       ...shops.map(shop => ({ value: shop.id, label: shop.name }))
                     ]}>
-                      <SelectTrigger className="bg-white/5 border-white/5 h-10 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-white/10 transition-colors px-4">
+                      <SelectTrigger className="h-9 text-sm border-gray-200">
                         <div className="flex items-center gap-2">
-                          <MapPin className="h-3.5 w-3.5 text-primary" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">
+                          <MapPin className="h-4 w-4" />
+                          <span>
                             {selectedShop === "all" ? "Wszystkie punkty" : 
                              (shops.find(s => s.id === selectedShop)?.name || selectedShop)}
                           </span>
                         </div>
                       </SelectTrigger>
-                      <SelectContent className="bg-secondary border-white/10 text-white rounded-xl">
-                        <SelectItem value="all" className="font-bold text-[10px] uppercase tracking-widest">Wszystkie punkty</SelectItem>
+                      <SelectContent className="bg-white border-gray-200">
+                        <SelectItem value="all" className="text-sm">Wszystkie punkty</SelectItem>
                         {shops.map(shop => (
-                          <SelectItem key={shop.id} value={shop.id} className="font-bold text-[10px] uppercase tracking-widest">{shop.name}</SelectItem>
+                          <SelectItem key={shop.id} value={shop.id} className="text-sm">{shop.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -720,30 +715,17 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* Bilans Dnia - Nowy, bardziej czytelny design z tooltipami */}
-              <div className="space-y-5 py-6">
-                
-                {/* Stan Kasy z Poprzedniego Dnia - Hero Card */}
-                <div 
-                  className="relative overflow-hidden bg-gradient-to-br from-emerald-900/40 via-slate-800/80 to-slate-900/90 border border-emerald-500/20 rounded-2xl p-6 shadow-lg shadow-black/20 cursor-help"
-                  title="Stan Kasy z Poprzedniego Dnia to kwota, która została zapisana podczas zamknięcia dnia wczoraj. To jest twój punkt wyjścia na dzisiejsze obliczenia."
-                >
-                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-emerald-500/20 rounded-full blur-3xl" />
-                  <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-emerald-400/10 rounded-full blur-3xl" />
-
-                  <div className="relative flex items-start justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                          <DollarSign className="h-4 w-4 text-emerald-400" />
-                        </div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-white/50">Stan Kasy</p>
-                      </div>
-                      <p className="text-lg font-black text-white uppercase tracking-tight">z Poprzedniego Dnia</p>
+              {/* Main Stats */}
+              <div className="space-y-4 py-4">
+                {/* Stan Kasy z Poprzedniego Dnia */}
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Stan Kasy</p>
+                      <p className="text-sm font-bold text-gray-900">z Poprzedniego Dnia</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-5xl font-black text-emerald-400 tabular-nums drop-shadow-[0_0_25px_rgba(52,211,153,0.4)]">{stanKasyPoprzedniegoDnia.toFixed(0)}</p>
-                      <p className="text-xs font-bold uppercase tracking-widest text-emerald-400/60 mt-1">zł</p>
+                      <p className="text-2xl font-bold text-gray-900">{stanKasyPoprzedniegoDnia.toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
                     </div>
                   </div>
                 </div>
@@ -752,149 +734,100 @@ export default function Home() {
                 {currentUserRole === 'owner' && (
                   <Button
                     onClick={() => setIsCashTopUpDialogOpen(true)}
-                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-sm py-4 rounded-xl shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                    className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 rounded-lg"
                   >
                     <div className="flex items-center justify-center gap-2">
-                      <Banknote className="h-5 w-5" />
-                      <span className="tracking-widest uppercase">Zasilanie Gotówką</span>
+                      <Banknote className="h-4 w-4" />
+                      <span>Zasilanie Gotówką</span>
                     </div>
                   </Button>
                 )}
 
-                {/* Wpływy + Koszty - w jednym wierszu */}
+                {/* Wpływy + Koszty */}
                 <div className="grid grid-cols-2 gap-3">
                   {/* Wpływy */}
-                  <div 
-                    className="relative overflow-hidden bg-gradient-to-br from-blue-500/15 via-blue-600/10 to-transparent border border-blue-500/20 rounded-2xl p-5 shadow-md hover:border-blue-500/30 transition-all cursor-help"
-                    title="Wpływy to suma wszystkich pieniędzy, które wpłynęły do sklepu dzisiaj: sprzedaż kartą oraz zasilanie gotówką."
-                  >
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl" />
-                    <div className="relative flex items-start justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <ArrowRight className="h-4 w-4 text-blue-400" />
-                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-300">Wpływy</p>
-                        </div>
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Wpływy</p>
                       </div>
-                      <p className="text-3xl font-black text-blue-300 tabular-nums">{(totalSalesToday + doladowaniaToday).toFixed(0)}<span className="text-xs ml-1 text-blue-400/60">zł</span></p>
+                      <p className="text-xl font-bold text-gray-900">{(totalSalesToday + doladowaniaToday).toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
                     </div>
                   </div>
 
                   {/* Suma Kosztów */}
-                  <div 
-                    className="relative overflow-hidden bg-gradient-to-br from-red-500/15 via-red-600/10 to-transparent border border-red-500/20 rounded-2xl p-5 shadow-md hover:border-red-500/30 transition-all cursor-help"
-                    title="Suma Kosztów to wszystkie wydatki dzisiaj, bez zasilania gotówką. Należą do nich m.in. skupy, zaliczki i paczki."
-                  >
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full blur-2xl" />
-                    <div className="relative flex items-start justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="h-4 w-4 text-red-400" />
-                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300">Koszty</p>
-                        </div>
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Koszty</p>
                       </div>
-                      <p className={`text-3xl font-black tabular-nums ${totalCostsToday > 0 ? 'text-red-400' : 'text-red-300/60'}`}>{totalCostsToday > 0 ? `-${totalCostsToday.toFixed(0)}` : '0'}<span className="text-xs ml-1 text-red-400/60">zł</span></p>
+                      <p className={`text-xl font-bold ${totalCostsToday > 0 ? 'text-red-600' : 'text-gray-500'}`}>{totalCostsToday > 0 ? `-${totalCostsToday.toFixed(0)}` : '0'}<span className="text-xs ml-1 text-gray-500">zł</span></p>
                     </div>
                   </div>
                 </div>
 
-                {/* Kasa + Karty - Sposoby płatności */}
+                {/* Kasa + Karty */}
                 <div className="grid grid-cols-2 gap-3">
                   {/* Kasa - Gotówka */}
-                  <div 
-                    className="relative overflow-hidden bg-gradient-to-br from-emerald-500/15 via-emerald-600/10 to-transparent border border-emerald-500/20 rounded-2xl p-5 shadow-md hover:border-emerald-500/30 transition-all cursor-help"
-                    title="Kasa to suma sprzedaży gotówkowej dzisiaj. To kwota, którą powinieneś mieć w kasie (plus stan z wczoraj i zasilania)."
-                  >
-                    <div className="absolute bottom-0 right-0 w-20 h-20 bg-emerald-500/10 rounded-full blur-2xl" />
-                    <div className="relative space-y-3">
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                    <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                          <Banknote className="h-4 w-4 text-emerald-400" />
-                        </div>
-                        <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300">Kasa</p>
+                        <Banknote className="h-4 w-4 text-gray-600" />
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Kasa</p>
                       </div>
-                      <p className="text-3xl font-black text-white tabular-nums">{cashSalesToday.toFixed(0)}<span className="text-xs ml-1 text-emerald-400/60">zł</span></p>
-                      <div className="h-1 w-24 bg-gradient-to-r from-emerald-500/40 to-transparent rounded-full" />
+                      <p className="text-xl font-bold text-gray-900">{cashSalesToday.toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
                     </div>
                   </div>
 
                   {/* Karty */}
-                  <div 
-                    className="relative overflow-hidden bg-gradient-to-br from-indigo-500/15 via-indigo-600/10 to-transparent border border-indigo-500/20 rounded-2xl p-5 shadow-md hover:border-indigo-500/30 transition-all cursor-help"
-                    title="Karty to suma sprzedaży kartą dzisiaj. Ta kwota trafi na twoje konto bankowe."
-                  >
-                    <div className="absolute bottom-0 right-0 w-20 h-20 bg-indigo-500/10 rounded-full blur-2xl" />
-                    <div className="relative space-y-3">
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                    <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-                          <CreditCard className="h-4 w-4 text-indigo-400" />
-                        </div>
-                        <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-300">Karty</p>
+                        <CreditCard className="h-4 w-4 text-gray-600" />
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Karty</p>
                       </div>
-                      <p className="text-3xl font-black text-white tabular-nums">{cardSalesToday.toFixed(0)}<span className="text-xs ml-1 text-indigo-400/60">zł</span></p>
-                      <div className="h-1 w-24 bg-gradient-to-r from-indigo-500/40 to-transparent rounded-full" />
+                      <p className="text-xl font-bold text-gray-900">{cardSalesToday.toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
                     </div>
                   </div>
                 </div>
 
                 {/* Divider */}
-                <div className="h-px bg-gradient-to-r from-transparent via-white/15 to-transparent my-3" />
+                <div className="h-px bg-gray-200 my-2" />
 
                 {/* Suma Sprzedaży + Zysk Netto */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                   
                   {/* Suma Sprzedaży (obrót) */}
-                  <div 
-                    className="flex items-center justify-between px-2 py-4 bg-white/5 rounded-xl border border-white/10 cursor-help"
-                    title="Suma Sprzedaży (obrót) to całkowita wartość wszystkich sprzedaży dzisiaj, zarówno gotówkowej jak i kartą."
-                  >
+                  <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white">
                     <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-xl bg-primary/20 flex items-center justify-center">
-                        <TrendingUp className="h-4 w-4 text-primary" />
-                      </div>
+                      <TrendingUp className="h-4 w-4 text-gray-600" />
                       <div>
-                        <span className="text-sm font-black uppercase tracking-widest text-white/80">Suma Sprzedaży</span>
-                        <span className="text-[10px] font-normal text-white/40 block italic mt-0.5">(obrót)</span>
+                        <span className="text-sm font-medium text-gray-700">Suma Sprzedaży</span>
+                        <span className="text-xs text-gray-500 block">(obrót)</span>
                       </div>
                     </div>
-                    <span className="text-2xl font-black text-white tabular-nums">
-                      {totalSalesToday.toFixed(0)}
-                      <span className="text-sm font-normal text-white/50 ml-1.5">zł</span>
+                    <span className="text-lg font-bold text-gray-900">
+                      {totalSalesToday.toFixed(0)}<span className="text-xs font-normal text-gray-500 ml-1">zł</span>
                     </span>
                   </div>
 
-                  {/* Zysk Netto - Najważniejszy wskaźnik */}
-                  <div 
-                    className="relative overflow-hidden bg-gradient-to-r from-emerald-600/30 via-green-500/25 to-emerald-500/30 border-2 border-emerald-500/40 rounded-2xl p-6 shadow-xl shadow-emerald-900/30 cursor-help"
-                    title="Zysk Netto to suma marż ze wszystkich sprzedaży dzisiaj. To jest to, co faktycznie zarabiasz po odjęciu kosztów zakupu towarów."
-                  >
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(52,211,153,0.15)_0%,_transparent_70%)]" />
-                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400/70 to-transparent" />
-                    
-                    <div className="relative flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shadow-lg shadow-emerald-900/20">
-                          <DollarSign className="h-6 w-6 text-emerald-400" />
-                        </div>
-                        <div>
-                          <span className="text-lg font-black uppercase tracking-[0.25em] text-emerald-200">Zysk</span>
-                        </div>
+                  {/* Zysk Netto */}
+                  <div className="border-2 border-gray-900 rounded-lg p-4 bg-gray-900 text-white">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <DollarSign className="h-5 w-5" />
+                        <span className="text-sm font-bold uppercase tracking-wide">Zysk Netto</span>
                       </div>
-                      
                       <div className="text-right">
-                        <p className={`text-5xl font-black tabular-nums drop-shadow-[0_0_30px_rgba(52,211,153,0.5)] ${zyskNetto >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+                        <p className={`text-2xl font-bold ${zyskNetto >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                           {zyskNetto >= 0 ? '+' : ''}{zyskNetto.toFixed(0)}
                         </p>
-                        <p className="text-sm font-bold uppercase tracking-[0.25em] text-emerald-300/70 mt-1.5">zysk netto</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Divider przed przyciskiem */}
-                <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-4" />
-
-                {/* Przycisk Zamknij Dzień - teraz w środku panelu */}
+                {/* Przycisk Zamknij Dzień */}
                 <Button
                   onClick={async () => {
                     try {
@@ -920,11 +853,11 @@ export default function Home() {
                       addToast({ title: "Błąd", message: "Nie udało się sprawdzić stanu kasy. Spróbuj ponownie.", variant: "error" });
                     }
                   }}
-                  className="w-full bg-gradient-to-r from-primary via-primary/90 to-primary/80 hover:from-primary/90 hover:via-primary/80 hover:to-primary/70 text-white font-black text-lg py-5 rounded-3xl shadow-2xl shadow-primary/30 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                  className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 rounded-lg"
                 >
-                  <div className="flex items-center justify-center gap-4">
-                    <Clock className="h-7 w-7" />
-                    <span className="tracking-widest uppercase">Zamknij Dzień</span>
+                  <div className="flex items-center justify-center gap-3">
+                    <Clock className="h-5 w-5" />
+                    <span>Zamknij Dzień</span>
                   </div>
                 </Button>
               </div>
@@ -1043,25 +976,25 @@ export default function Home() {
         
         {/* Dialog Zasilania Gotówką */}
         <Dialog open={isCashTopUpDialogOpen} onOpenChange={setIsCashTopUpDialogOpen}>
-          <DialogContent className="sm:max-w-md rounded-3xl border-none shadow-2xl">
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-3 text-xl">
-                <Banknote className="h-6 w-6 text-purple-600" />
+              <DialogTitle className="flex items-center gap-3 text-lg">
+                <Banknote className="h-5 w-5 text-gray-600" />
                 Zasilanie Gotówką
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-4">
               <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Sklep</label>
+                <label className="text-sm font-medium text-gray-700">Sklep</label>
                 <Select 
                   value={cashTopUpShopId}
                   onValueChange={(val) => setCashTopUpShopId(val || '')}
                   items={shops.map(shop => ({ value: shop.id, label: shop.name }))}
                 >
-                  <SelectTrigger className="h-12 rounded-xl bg-accent/30 border-none font-bold text-sm">
+                  <SelectTrigger className="h-10 border-gray-200">
                     <SelectValue placeholder="Wybierz sklep" />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  <SelectContent className="border-gray-200">
                     {shops.map(shop => (
                       <SelectItem key={shop.id} value={shop.id}>
                         {shop.name}
@@ -1071,23 +1004,23 @@ export default function Home() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Kwota (zł)</label>
+                <label className="text-sm font-medium text-gray-700">Kwota (zł)</label>
                 <Input
                   type="number"
                   step="0.01"
                   value={cashTopUpAmount}
                   onChange={(e) => setCashTopUpAmount(e.target.value)}
                   placeholder="0.00"
-                  className="h-12 rounded-xl bg-accent/30 border-none font-bold text-lg"
+                  className="h-10 border-gray-200"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Opis</label>
+                <label className="text-sm font-medium text-gray-700">Opis</label>
                 <textarea
                   value={cashTopUpDescription}
                   onChange={(e) => setCashTopUpDescription(e.target.value)}
                   placeholder="np. Wpłata z banku..."
-                  className="w-full h-24 px-4 py-3 rounded-xl bg-accent/30 border-none resize-none font-medium text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                  className="w-full h-24 px-4 py-3 border border-gray-200 rounded-lg resize-none text-sm focus:ring-1 focus:ring-offset-1 outline-none"
                 />
               </div>
             </div>
@@ -1095,7 +1028,7 @@ export default function Home() {
               <DialogClose className="px-4 py-2 text-sm font-medium rounded-lg border hover:bg-gray-50">Anuluj</DialogClose>
               <Button
                 onClick={handleAddCashTopUp}
-                className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg transition-all active:scale-95"
+                className="bg-gray-900 hover:bg-gray-800 text-white"
               >
                 Dodaj zasilanie
               </Button>
@@ -1103,47 +1036,45 @@ export default function Home() {
           </DialogContent>
         </Dialog>
 
-        {/* Navigation Grid - Premium Look */}
+        {/* Navigation Grid - Simple */}
         <section className="space-y-4">
-          <div className="flex justify-between items-center px-1">
-            <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Panel Zarządzania</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-sm font-medium text-gray-600">Panel Zarządzania</h2>
           </div>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { href: "/sprzedaz", label: "Sprzedaż", icon: ShoppingCart, color: "bg-primary", shadow: "shadow-primary/10" },
-              { href: "/magazyn", label: "Magazyn", icon: ClipboardList, color: "bg-primary", shadow: "shadow-primary/10" },
+              { href: "/sprzedaz", label: "Sprzedaż", icon: ShoppingCart },
+              { href: "/magazyn", label: "Magazyn", icon: ClipboardList },
               ...(!isEmployee ? [
-                { href: "/pracownicy", label: "Pracownicy", icon: Users, color: "bg-primary", shadow: "shadow-primary/10" },
-                { href: "/raporty", label: "Raporty", icon: Search, color: "bg-primary", shadow: "shadow-primary/10" },
+                { href: "/pracownicy", label: "Pracownicy", icon: Users },
+                { href: "/raporty", label: "Raporty", icon: Search },
               ] : [
-                { href: "/dokumenty", label: "Dokumenty", icon: BookOpen, color: "bg-primary", shadow: "shadow-primary/10" },
-                { href: "/faktury", label: "Faktury", icon: FileText, color: "bg-primary", shadow: "shadow-primary/10" },
+                { href: "/dokumenty", label: "Dokumenty", icon: BookOpen },
+                { href: "/faktury", label: "Faktury", icon: FileText },
               ])
             ].map((item) => (
               <Link key={item.href} href={item.href} className="group">
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-primary/5 group-hover:border-primary/20 group-hover:shadow-md transition-all flex items-center gap-3">
-                  <div className={`h-10 w-10 rounded-xl ${item.color} text-white flex items-center justify-center shadow-lg ${item.shadow} group-hover:scale-105 transition-transform`}>
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-gray-300 hover:shadow transition-all flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-gray-900 text-white flex items-center justify-center">
                     <item.icon className="h-5 w-5" />
                   </div>
-                  <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{item.label}</span>
+                  <span className="font-medium text-sm text-gray-900">{item.label}</span>
                 </div>
               </Link>
             ))}
           </div>
         </section>
 
-
-
-        {/* Quick Access List - More Refined */}
-        <section className="bg-white rounded-[2rem] p-6 shadow-sm border border-primary/5">
-          <div className="flex items-center justify-between mb-6 px-1">
-            <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Ostatnie Akcje</h2>
+        {/* Quick Access List - Simple */}
+        <section className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-medium text-gray-600">Ostatnie Akcje</h2>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-2 mb-6">
+          <div className="flex flex-col sm:flex-row gap-2 mb-4">
             {isEmployee ? (
-              <div className="bg-accent/30 border-none h-10 text-[10px] font-bold uppercase rounded-xl flex-1 flex items-center gap-2 px-4">
-                <MapPin className="h-3 w-3 text-primary" />
+              <div className="bg-gray-100 h-10 text-sm rounded-lg flex items-center gap-2 px-4">
+                <MapPin className="h-4 w-4 text-gray-600" />
                 <span className="truncate">{currentShopName || 'Twój sklep'}</span>
               </div>
             ) : (
@@ -1152,19 +1083,19 @@ export default function Home() {
                   { value: "all", label: "Wszystkie sklepy" },
                   ...shops.map(shop => ({ value: shop.id, label: shop.name }))
                 ]}>
-                  <SelectTrigger className="bg-accent/30 border-none h-10 text-[10px] font-bold uppercase rounded-xl flex-1">
+                  <SelectTrigger className="bg-gray-100 border-gray-200 h-10 text-sm rounded-lg flex-1">
                     <div className="flex items-center gap-2">
-                      <MapPin className="h-3 w-3 text-primary" />
+                      <MapPin className="h-4 w-4 text-gray-600" />
                       <span className="truncate">
                         {actionFilterShop === "all" ? "Wszystkie sklepy" : 
                          (shops.find(s => s.id === actionFilterShop)?.name || actionFilterShop)}
                       </span>
                     </div>
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="all" className="font-bold text-[10px] uppercase">Wszystkie sklepy</SelectItem>
+                  <SelectContent className="bg-white border-gray-200">
+                    <SelectItem value="all" className="text-sm">Wszystkie sklepy</SelectItem>
                     {shops.map(shop => (
-                      <SelectItem key={shop.id} value={shop.id} className="font-bold text-[10px] uppercase">{shop.name}</SelectItem>
+                      <SelectItem key={shop.id} value={shop.id} className="text-sm">{shop.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1173,19 +1104,19 @@ export default function Home() {
                   { value: "all", label: "Wszyscy pracownicy" },
                   ...employees.map(emp => ({ value: emp.id, label: emp.name }))
                 ]}>
-                  <SelectTrigger className="bg-accent/30 border-none h-10 text-[10px] font-bold uppercase rounded-xl flex-1">
+                  <SelectTrigger className="bg-gray-100 border-gray-200 h-10 text-sm rounded-lg flex-1">
                     <div className="flex items-center gap-2">
-                      <Users className="h-3 w-3 text-primary" />
+                      <Users className="h-4 w-4 text-gray-600" />
                       <span className="truncate">
                         {actionFilterEmployee === "all" ? "Wszyscy pracownicy" : 
                          employees.find(e => e.id === actionFilterEmployee)?.name || actionFilterEmployee}
                       </span>
                     </div>
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="all" className="font-bold text-[10px] uppercase">Wszyscy pracownicy</SelectItem>
+                  <SelectContent className="bg-white border-gray-200">
+                    <SelectItem value="all" className="text-sm">Wszyscy pracownicy</SelectItem>
                     {employees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id} className="font-bold text-[10px] uppercase">
+                      <SelectItem key={emp.id} value={emp.id} className="text-sm">
                         {emp.name}
                       </SelectItem>
                     ))}
@@ -1195,7 +1126,7 @@ export default function Home() {
             )}
           </div>
           
-          <div className="space-y-6">
+          <div className="space-y-4">
             {recentActions.length > 0 ? recentActions.map((action, idx) => {
               const actionIcons: Record<string, any> = {
                 sprzedaz: ShoppingCart,
@@ -1210,18 +1141,6 @@ export default function Home() {
               const displayName = action.employeeName || action.actor_name || 'Nieznany użytkownik';
               const displayShop = action.shopName || action.shop_name || 'Nieznany sklep';
               
-              if (idx === 0) {
-                console.log('🖥️ WYŚWIETLANIE akcji #0:', {
-                  actionKeys: Object.keys(action),
-                  employeeName: action.employeeName,
-                  actor_name: action.actor_name,
-                  shopName: action.shopName,
-                  shop_name: action.shop_name,
-                  displayName,
-                  displayShop
-                });
-              }
-              
               let timeStr = '';
               if (action.timestamp) {
                 try {
@@ -1232,21 +1151,21 @@ export default function Home() {
               }
               
               return (
-                <div key={action.id || idx} className="flex items-center justify-between group cursor-pointer">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-xl bg-accent/50 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Icon className="h-5 w-5 text-primary" />
+                <div key={action.id || idx} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-gray-100 flex items-center justify-center">
+                      <Icon className="h-4 w-4 text-gray-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{action.description || ''}</p>
-                      <p className="text-[10px] text-muted-foreground font-medium">{displayName} • {displayShop}</p>
+                      <p className="text-sm font-medium text-gray-900">{action.description || ''}</p>
+                      <p className="text-xs text-gray-500">{displayName} • {displayShop}</p>
                     </div>
                   </div>
-                  <p className="text-xs font-black text-muted-foreground">{timeStr}</p>
+                  <p className="text-xs text-gray-500">{timeStr}</p>
                 </div>
               );
             }) : (
-              <p className="text-sm text-muted-foreground text-center py-4">Brak ostatnich akcji</p>
+              <p className="text-sm text-gray-500 text-center py-4">Brak ostatnich akcji</p>
             )}
           </div>
         </section>
