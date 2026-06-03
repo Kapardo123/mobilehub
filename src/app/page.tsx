@@ -734,7 +734,7 @@ export default function Home() {
                 {currentUserRole === 'owner' && (
                   <Button
                     onClick={() => setIsCashTopUpDialogOpen(true)}
-                    className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 rounded-lg"
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-3 rounded-lg"
                   >
                     <div className="flex items-center justify-center gap-2">
                       <Banknote className="h-4 w-4" />
@@ -751,7 +751,7 @@ export default function Home() {
                       <div>
                         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Wpływy</p>
                       </div>
-                      <p className="text-xl font-bold text-gray-900">{(totalSalesToday + doladowaniaToday).toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
+                      <p className="text-xl font-bold text-orange-500">{(totalSalesToday + doladowaniaToday).toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
                     </div>
                   </div>
 
@@ -772,10 +772,10 @@ export default function Home() {
                   <div className="border border-gray-200 rounded-lg p-4 bg-white">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Banknote className="h-4 w-4 text-gray-600" />
+                        <Banknote className="h-4 w-4 text-orange-500" />
                         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Kasa</p>
                       </div>
-                      <p className="text-xl font-bold text-gray-900">{cashSalesToday.toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
+                      <p className="text-xl font-bold text-orange-500">{cashSalesToday.toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
                     </div>
                   </div>
 
@@ -783,10 +783,10 @@ export default function Home() {
                   <div className="border border-gray-200 rounded-lg p-4 bg-white">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4 text-gray-600" />
+                        <CreditCard className="h-4 w-4 text-orange-500" />
                         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Karty</p>
                       </div>
-                      <p className="text-xl font-bold text-gray-900">{cardSalesToday.toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
+                      <p className="text-xl font-bold text-orange-500">{cardSalesToday.toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
                     </div>
                   </div>
                 </div>
@@ -800,26 +800,26 @@ export default function Home() {
                   {/* Suma Sprzedaży (obrót) */}
                   <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white">
                     <div className="flex items-center gap-3">
-                      <TrendingUp className="h-4 w-4 text-gray-600" />
+                      <TrendingUp className="h-4 w-4 text-orange-500" />
                       <div>
                         <span className="text-sm font-medium text-gray-700">Suma Sprzedaży</span>
                         <span className="text-xs text-gray-500 block">(obrót)</span>
                       </div>
                     </div>
-                    <span className="text-lg font-bold text-gray-900">
+                    <span className="text-lg font-bold text-orange-500">
                       {totalSalesToday.toFixed(0)}<span className="text-xs font-normal text-gray-500 ml-1">zł</span>
                     </span>
                   </div>
 
                   {/* Zysk Netto */}
-                  <div className="border-2 border-gray-900 rounded-lg p-4 bg-gray-900 text-white">
+                  <div className="border-2 border-orange-500 rounded-lg p-4 bg-orange-500 text-white">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <DollarSign className="h-5 w-5" />
                         <span className="text-sm font-bold uppercase tracking-wide">Zysk Netto</span>
                       </div>
                       <div className="text-right">
-                        <p className={`text-2xl font-bold ${zyskNetto >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        <p className={`text-2xl font-bold ${zyskNetto >= 0 ? 'text-white' : 'text-orange-200'}`}>
                           {zyskNetto >= 0 ? '+' : ''}{zyskNetto.toFixed(0)}
                         </p>
                       </div>
@@ -853,7 +853,7 @@ export default function Home() {
                       addToast({ title: "Błąd", message: "Nie udało się sprawdzić stanu kasy. Spróbuj ponownie.", variant: "error" });
                     }
                   }}
-                  className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 rounded-lg"
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-3 rounded-lg"
                 >
                   <div className="flex items-center justify-center gap-3">
                     <Clock className="h-5 w-5" />
@@ -966,7 +966,7 @@ export default function Home() {
                   }
                 }}
                 disabled={isClosingDay}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="bg-orange-500 hover:bg-orange-600 text-white"
               >
                 {isClosingDay ? "Zamykanie..." : "Zamknij dzień"}
               </Button>
@@ -1028,7 +1028,7 @@ export default function Home() {
               <DialogClose className="px-4 py-2 text-sm font-medium rounded-lg border hover:bg-gray-50">Anuluj</DialogClose>
               <Button
                 onClick={handleAddCashTopUp}
-                className="bg-gray-900 hover:bg-gray-800 text-white"
+                className="bg-orange-500 hover:bg-orange-600 text-white"
               >
                 Dodaj zasilanie
               </Button>
@@ -1054,8 +1054,8 @@ export default function Home() {
               ])
             ].map((item) => (
               <Link key={item.href} href={item.href} className="group">
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-gray-300 hover:shadow transition-all flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-gray-900 text-white flex items-center justify-center">
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-orange-300 hover:shadow transition-all flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-orange-500 text-white flex items-center justify-center">
                     <item.icon className="h-5 w-5" />
                   </div>
                   <span className="font-medium text-sm text-gray-900">{item.label}</span>
@@ -1074,7 +1074,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-2 mb-4">
             {isEmployee ? (
               <div className="bg-gray-100 h-10 text-sm rounded-lg flex items-center gap-2 px-4">
-                <MapPin className="h-4 w-4 text-gray-600" />
+                <MapPin className="h-4 w-4 text-orange-500" />
                 <span className="truncate">{currentShopName || 'Twój sklep'}</span>
               </div>
             ) : (
@@ -1085,7 +1085,7 @@ export default function Home() {
                 ]}>
                   <SelectTrigger className="bg-gray-100 border-gray-200 h-10 text-sm rounded-lg flex-1">
                     <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-gray-600" />
+                      <MapPin className="h-4 w-4 text-orange-500" />
                       <span className="truncate">
                         {actionFilterShop === "all" ? "Wszystkie sklepy" : 
                          (shops.find(s => s.id === actionFilterShop)?.name || actionFilterShop)}
@@ -1106,7 +1106,7 @@ export default function Home() {
                 ]}>
                   <SelectTrigger className="bg-gray-100 border-gray-200 h-10 text-sm rounded-lg flex-1">
                     <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-gray-600" />
+                      <Users className="h-4 w-4 text-orange-500" />
                       <span className="truncate">
                         {actionFilterEmployee === "all" ? "Wszyscy pracownicy" : 
                          employees.find(e => e.id === actionFilterEmployee)?.name || actionFilterEmployee}
@@ -1153,8 +1153,8 @@ export default function Home() {
               return (
                 <div key={action.id || idx} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-gray-100 flex items-center justify-center">
-                      <Icon className="h-4 w-4 text-gray-600" />
+                    <div className="h-9 w-9 rounded-lg bg-orange-100 flex items-center justify-center">
+                      <Icon className="h-4 w-4 text-orange-500" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">{action.description || ''}</p>
