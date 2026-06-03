@@ -718,14 +718,14 @@ export default function Home() {
               {/* Main Stats */}
               <div className="space-y-4 py-4">
                 {/* Stan Kasy z Poprzedniego Dnia */}
-                <div className="border border-primary/10 rounded-2xl p-4 bg-accent/30">
+                <div className="border border-primary/10 rounded-2xl p-4 bg-accent/60">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Stan Kasy</p>
+                      <p className="text-xs font-bold uppercase tracking-wide text-foreground">Stan Kasy</p>
                       <p className="text-sm font-bold text-foreground">z Poprzedniego Dnia</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-black text-foreground">{stanKasyPoprzedniegoDnia.toFixed(0)}<span className="text-xs ml-1 text-muted-foreground">zł</span></p>
+                      <p className="text-2xl font-black text-foreground">{stanKasyPoprzedniegoDnia.toFixed(0)}<span className="text-xs ml-1 text-foreground/80">zł</span></p>
                     </div>
                   </div>
                 </div>
@@ -746,22 +746,22 @@ export default function Home() {
                 {/* Wpływy + Koszty */}
                 <div className="grid grid-cols-2 gap-3">
                   {/* Wpływy */}
-                  <div className="border border-primary/10 rounded-2xl p-4 bg-white">
+                  <div className="border border-primary/10 rounded-2xl p-4 bg-accent/50">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Wpływy</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-foreground">Wpływy</p>
                       </div>
-                      <p className="text-xl font-black text-primary">{(totalSalesToday + doladowaniaToday).toFixed(0)}<span className="text-xs ml-1 text-muted-foreground">zł</span></p>
+                      <p className="text-xl font-black text-primary">{(totalSalesToday + doladowaniaToday).toFixed(0)}<span className="text-xs ml-1 text-foreground/80">zł</span></p>
                     </div>
                   </div>
 
                   {/* Suma Kosztów */}
-                  <div className="border border-primary/10 rounded-2xl p-4 bg-white">
+                  <div className="border border-primary/10 rounded-2xl p-4 bg-accent/50">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Koszty</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-foreground">Koszty</p>
                       </div>
-                      <p className={`text-xl font-black ${totalCostsToday > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{totalCostsToday > 0 ? `-${totalCostsToday.toFixed(0)}` : '0'}<span className="text-xs ml-1 text-muted-foreground">zł</span></p>
+                      <p className={`text-xl font-black ${totalCostsToday > 0 ? 'text-red-600' : 'text-foreground/80'}`}>{totalCostsToday > 0 ? `-${totalCostsToday.toFixed(0)}` : '0'}<span className="text-xs ml-1 text-foreground/80">zł</span></p>
                     </div>
                   </div>
                 </div>
@@ -769,24 +769,24 @@ export default function Home() {
                 {/* Kasa + Karty */}
                 <div className="grid grid-cols-2 gap-3">
                   {/* Kasa - Gotówka */}
-                  <div className="border border-primary/10 rounded-2xl p-4 bg-white">
+                  <div className="border border-primary/10 rounded-2xl p-4 bg-accent/50">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Banknote className="h-4 w-4 text-primary" />
-                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Kasa</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-foreground">Kasa</p>
                       </div>
-                      <p className="text-xl font-black text-primary">{cashSalesToday.toFixed(0)}<span className="text-xs ml-1 text-muted-foreground">zł</span></p>
+                      <p className="text-xl font-black text-primary">{cashSalesToday.toFixed(0)}<span className="text-xs ml-1 text-foreground/80">zł</span></p>
                     </div>
                   </div>
 
                   {/* Karty */}
-                  <div className="border border-primary/10 rounded-2xl p-4 bg-white">
+                  <div className="border border-primary/10 rounded-2xl p-4 bg-accent/50">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <CreditCard className="h-4 w-4 text-primary" />
-                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Karty</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-foreground">Karty</p>
                       </div>
-                      <p className="text-xl font-black text-primary">{cardSalesToday.toFixed(0)}<span className="text-xs ml-1 text-muted-foreground">zł</span></p>
+                      <p className="text-xl font-black text-primary">{cardSalesToday.toFixed(0)}<span className="text-xs ml-1 text-foreground/80">zł</span></p>
                     </div>
                   </div>
                 </div>
@@ -798,16 +798,16 @@ export default function Home() {
                 <div className="space-y-3">
                   
                   {/* Suma Sprzedaży (obrót) */}
-                  <div className="flex items-center justify-between p-3 border border-primary/10 rounded-2xl bg-white">
+                  <div className="flex items-center justify-between p-3 border border-primary/10 rounded-2xl bg-accent/50">
                     <div className="flex items-center gap-3">
                       <TrendingUp className="h-4 w-4 text-primary" />
                       <div>
                         <span className="text-sm font-bold text-foreground">Suma Sprzedaży</span>
-                        <span className="text-xs text-muted-foreground block">(obrót)</span>
+                        <span className="text-xs text-foreground/80 block">(obrót)</span>
                       </div>
                     </div>
                     <span className="text-lg font-black text-primary">
-                      {totalSalesToday.toFixed(0)}<span className="text-xs font-normal text-muted-foreground ml-1">zł</span>
+                      {totalSalesToday.toFixed(0)}<span className="text-xs font-normal text-foreground/80 ml-1">zł</span>
                     </span>
                   </div>
 
