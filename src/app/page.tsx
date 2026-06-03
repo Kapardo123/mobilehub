@@ -662,32 +662,32 @@ export default function Home() {
   }
 
   return (
-    <div key={routeKey} className="flex flex-col min-h-screen bg-gray-100">
+    <div key={routeKey} className="flex flex-col min-h-screen bg-accent/20">
       <Navbar />
       
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full space-y-6">
         {/* Header Stats - Simple & Clear */}
         <section>
-          <Card className="bg-white shadow-sm">
+          <Card className="bg-white shadow-xl border-none rounded-3xl">
             <CardContent className="p-6 space-y-6">
               {/* Top Row: Date & Shop Selectors */}
               <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <CalendarIcon className="h-4 w-4" />
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CalendarIcon className="h-4 w-4 text-primary" />
                   <Input 
                     type="date"
                     value={today}
                     onChange={(e) => {
                       console.log('Zmieniono datę na:', e.target.value);
                     }}
-                    className="border-gray-200 h-9 text-sm focus-visible:ring-1 focus-visible:ring-offset-1"
+                    className="h-12 bg-accent/30 border-none rounded-xl text-foreground"
                   />
                 </div>
                 
                 <div className="w-full sm:w-auto flex-1 max-w-[200px]">
                   {currentUserRole === 'employee' ? (
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                      <MapPin className="h-4 w-4" />
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <MapPin className="h-4 w-4 text-primary" />
                       <span>{currentShopName || 'Brak sklepu'}</span>
                     </div>
                   ) : (
@@ -695,16 +695,16 @@ export default function Home() {
                       { value: "all", label: "Wszystkie punkty" },
                       ...shops.map(shop => ({ value: shop.id, label: shop.name }))
                     ]}>
-                      <SelectTrigger className="h-9 text-sm border-gray-200">
+                      <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl text-foreground">
                         <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
+                          <MapPin className="h-4 w-4 text-primary" />
                           <span>
                             {selectedShop === "all" ? "Wszystkie punkty" : 
                              (shops.find(s => s.id === selectedShop)?.name || selectedShop)}
                           </span>
                         </div>
                       </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200">
+                      <SelectContent className="bg-white border-none rounded-2xl">
                         <SelectItem value="all" className="text-sm">Wszystkie punkty</SelectItem>
                         {shops.map(shop => (
                           <SelectItem key={shop.id} value={shop.id} className="text-sm">{shop.name}</SelectItem>
@@ -718,14 +718,14 @@ export default function Home() {
               {/* Main Stats */}
               <div className="space-y-4 py-4">
                 {/* Stan Kasy z Poprzedniego Dnia */}
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div className="border border-primary/10 rounded-2xl p-4 bg-accent/30">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Stan Kasy</p>
-                      <p className="text-sm font-bold text-gray-900">z Poprzedniego Dnia</p>
+                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Stan Kasy</p>
+                      <p className="text-sm font-bold text-foreground">z Poprzedniego Dnia</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-gray-900">{stanKasyPoprzedniegoDnia.toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
+                      <p className="text-2xl font-black text-foreground">{stanKasyPoprzedniegoDnia.toFixed(0)}<span className="text-xs ml-1 text-muted-foreground">zł</span></p>
                     </div>
                   </div>
                 </div>
@@ -734,7 +734,7 @@ export default function Home() {
                 {currentUserRole === 'owner' && (
                   <Button
                     onClick={() => setIsCashTopUpDialogOpen(true)}
-                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-3 rounded-lg"
+                    className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-xl"
                   >
                     <div className="flex items-center justify-center gap-2">
                       <Banknote className="h-4 w-4" />
@@ -746,22 +746,22 @@ export default function Home() {
                 {/* Wpływy + Koszty */}
                 <div className="grid grid-cols-2 gap-3">
                   {/* Wpływy */}
-                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                  <div className="border border-primary/10 rounded-2xl p-4 bg-white">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Wpływy</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Wpływy</p>
                       </div>
-                      <p className="text-xl font-bold text-orange-500">{(totalSalesToday + doladowaniaToday).toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
+                      <p className="text-xl font-black text-primary">{(totalSalesToday + doladowaniaToday).toFixed(0)}<span className="text-xs ml-1 text-muted-foreground">zł</span></p>
                     </div>
                   </div>
 
                   {/* Suma Kosztów */}
-                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                  <div className="border border-primary/10 rounded-2xl p-4 bg-white">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Koszty</p>
+                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Koszty</p>
                       </div>
-                      <p className={`text-xl font-bold ${totalCostsToday > 0 ? 'text-red-600' : 'text-gray-500'}`}>{totalCostsToday > 0 ? `-${totalCostsToday.toFixed(0)}` : '0'}<span className="text-xs ml-1 text-gray-500">zł</span></p>
+                      <p className={`text-xl font-black ${totalCostsToday > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{totalCostsToday > 0 ? `-${totalCostsToday.toFixed(0)}` : '0'}<span className="text-xs ml-1 text-muted-foreground">zł</span></p>
                     </div>
                   </div>
                 </div>
@@ -769,57 +769,57 @@ export default function Home() {
                 {/* Kasa + Karty */}
                 <div className="grid grid-cols-2 gap-3">
                   {/* Kasa - Gotówka */}
-                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                  <div className="border border-primary/10 rounded-2xl p-4 bg-white">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Banknote className="h-4 w-4 text-orange-500" />
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Kasa</p>
+                        <Banknote className="h-4 w-4 text-primary" />
+                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Kasa</p>
                       </div>
-                      <p className="text-xl font-bold text-orange-500">{cashSalesToday.toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
+                      <p className="text-xl font-black text-primary">{cashSalesToday.toFixed(0)}<span className="text-xs ml-1 text-muted-foreground">zł</span></p>
                     </div>
                   </div>
 
                   {/* Karty */}
-                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                  <div className="border border-primary/10 rounded-2xl p-4 bg-white">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4 text-orange-500" />
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Karty</p>
+                        <CreditCard className="h-4 w-4 text-primary" />
+                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Karty</p>
                       </div>
-                      <p className="text-xl font-bold text-orange-500">{cardSalesToday.toFixed(0)}<span className="text-xs ml-1 text-gray-500">zł</span></p>
+                      <p className="text-xl font-black text-primary">{cardSalesToday.toFixed(0)}<span className="text-xs ml-1 text-muted-foreground">zł</span></p>
                     </div>
                   </div>
                 </div>
 
                 {/* Divider */}
-                <div className="h-px bg-gray-200 my-2" />
+                <div className="h-px bg-primary/10 my-2" />
 
                 {/* Suma Sprzedaży + Zysk Netto */}
                 <div className="space-y-3">
                   
                   {/* Suma Sprzedaży (obrót) */}
-                  <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white">
+                  <div className="flex items-center justify-between p-3 border border-primary/10 rounded-2xl bg-white">
                     <div className="flex items-center gap-3">
-                      <TrendingUp className="h-4 w-4 text-orange-500" />
+                      <TrendingUp className="h-4 w-4 text-primary" />
                       <div>
-                        <span className="text-sm font-medium text-gray-700">Suma Sprzedaży</span>
-                        <span className="text-xs text-gray-500 block">(obrót)</span>
+                        <span className="text-sm font-bold text-foreground">Suma Sprzedaży</span>
+                        <span className="text-xs text-muted-foreground block">(obrót)</span>
                       </div>
                     </div>
-                    <span className="text-lg font-bold text-orange-500">
-                      {totalSalesToday.toFixed(0)}<span className="text-xs font-normal text-gray-500 ml-1">zł</span>
+                    <span className="text-lg font-black text-primary">
+                      {totalSalesToday.toFixed(0)}<span className="text-xs font-normal text-muted-foreground ml-1">zł</span>
                     </span>
                   </div>
 
                   {/* Zysk Netto */}
-                  <div className="border-2 border-orange-500 rounded-lg p-4 bg-orange-500 text-white">
+                  <div className="border-2 border-primary rounded-2xl p-4 bg-primary text-white">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <DollarSign className="h-5 w-5" />
                         <span className="text-sm font-bold uppercase tracking-wide">Zysk Netto</span>
                       </div>
                       <div className="text-right">
-                        <p className={`text-2xl font-bold ${zyskNetto >= 0 ? 'text-white' : 'text-orange-200'}`}>
+                        <p className={`text-2xl font-black ${zyskNetto >= 0 ? 'text-white' : 'text-primary/80'}`}>
                           {zyskNetto >= 0 ? '+' : ''}{zyskNetto.toFixed(0)}
                         </p>
                       </div>
@@ -827,39 +827,45 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Przycisk Zamknij Dzień */}
-                <Button
-                  onClick={async () => {
-                    try {
-                      const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
-                      const shopId = activeEmployees[0]?.shopId || '';
-                      const userId = getSessionStorageSafe('userId', '');
+                {/* Przycisk Zamknij Dzień - tylko gdy wybrany konkretny sklep (nie "all") */}
+                {(currentUserRole !== 'employee' ? selectedShop !== 'all' : true) && (
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
+                        const userId = getSessionStorageSafe('userId', '');
+                        
+                        // Dla właściciela używaj wybranego sklepu, dla pracownika jego sklep
+                        const shopId = currentUserRole === 'employee' 
+                          ? activeEmployees[0]?.shopId || '' 
+                          : selectedShop;
 
-                      if (!shopId) {
-                        addToast({ title: "Brak sklepu", message: "Zaloguj się ponownie, aby zamknąć dzień.", variant: "error" });
-                        return;
+                        if (!shopId) {
+                          addToast({ title: "Brak sklepu", message: "Wybierz sklep, aby zamknąć dzień.", variant: "error" });
+                          return;
+                        }
+
+                        const closed = await cashRegisterService.isTodayClosed(shopId);
+                        setIsTodayClosed(closed);
+
+                        if (closed) {
+                          addToast({ title: "Dzień już zamknięty", message: "Dzisiejszy dzień został już rozliczony dla tego sklepu.", variant: "info" });
+                          return;
+                        }
+
+                        setIsCloseDayDialogOpen(true);
+                      } catch {
+                        addToast({ title: "Błąd", message: "Nie udało się sprawdzić stanu kasy. Spróbuj ponownie.", variant: "error" });
                       }
-
-                      const closed = await cashRegisterService.isTodayClosed(shopId);
-                      setIsTodayClosed(closed);
-
-                      if (closed) {
-                        addToast({ title: "Dzień już zamknięty", message: "Dzisiejszy dzień został już rozliczony.", variant: "info" });
-                        return;
-                      }
-
-                      setIsCloseDayDialogOpen(true);
-                    } catch {
-                      addToast({ title: "Błąd", message: "Nie udało się sprawdzić stanu kasy. Spróbuj ponownie.", variant: "error" });
-                    }
-                  }}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-3 rounded-lg"
-                >
-                  <div className="flex items-center justify-center gap-3">
-                    <Clock className="h-5 w-5" />
-                    <span>Zamknij Dzień</span>
-                  </div>
-                </Button>
+                    }}
+                    className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-xl"
+                  >
+                    <div className="flex items-center justify-center gap-3">
+                      <Clock className="h-5 w-5" />
+                      <span>Zamknij Dzień</span>
+                    </div>
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -867,50 +873,54 @@ export default function Home() {
 
         {/* Dialog potwierdzenia zamknięcia dnia */}
         <Dialog open={isCloseDayDialogOpen} onOpenChange={setIsCloseDayDialogOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-lg">Zamknąć dzień?</DialogTitle>
+          <DialogContent className="sm:max-w-md rounded-3xl border-none p-0 overflow-hidden">
+            <DialogHeader className="p-6 bg-primary text-white">
+              <DialogTitle className="text-xl font-black uppercase tracking-tight">Zamknąć dzień?</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3 py-2">
+            <div className="space-y-3 p-6">
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between p-2 bg-gray-50 rounded-lg">
-                  <span className="text-gray-500">Stan kasy</span>
-                  <span className="font-bold">{kasaDzis.toFixed(2)} zł</span>
+                <div className="flex justify-between p-3 bg-accent/30 rounded-xl">
+                  <span className="text-muted-foreground font-bold">Stan kasy</span>
+                  <span className="font-black text-foreground">{kasaDzis.toFixed(2)} zł</span>
                 </div>
-                <div className="flex justify-between p-2 bg-gray-50 rounded-lg">
-                  <span className="text-gray-500">Wpływy</span>
-                  <span className="font-bold">{(totalSalesToday + doladowaniaToday).toFixed(2)} zł</span>
+                <div className="flex justify-between p-3 bg-accent/30 rounded-xl">
+                  <span className="text-muted-foreground font-bold">Wpływy</span>
+                  <span className="font-black text-foreground">{(totalSalesToday + doladowaniaToday).toFixed(2)} zł</span>
                 </div>
-                <div className="flex justify-between p-2 bg-gray-50 rounded-lg">
-                  <span className="text-gray-500">Gotówka</span>
-                  <span className="font-bold">{cashSalesToday.toFixed(2)} zł</span>
+                <div className="flex justify-between p-3 bg-accent/30 rounded-xl">
+                  <span className="text-muted-foreground font-bold">Gotówka</span>
+                  <span className="font-black text-foreground">{cashSalesToday.toFixed(2)} zł</span>
                 </div>
-                <div className="flex justify-between p-2 bg-gray-50 rounded-lg">
-                  <span className="text-gray-500">Karty</span>
-                  <span className="font-bold">{cardSalesToday.toFixed(2)} zł</span>
+                <div className="flex justify-between p-3 bg-accent/30 rounded-xl">
+                  <span className="text-muted-foreground font-bold">Karty</span>
+                  <span className="font-black text-foreground">{cardSalesToday.toFixed(2)} zł</span>
                 </div>
-                <div className="flex justify-between p-2 bg-red-50 rounded-lg">
-                  <span className="text-red-500">Koszty</span>
-                  <span className="font-bold text-red-600">{totalCostsToday.toFixed(2)} zł</span>
+                <div className="flex justify-between p-3 bg-red-50 rounded-xl">
+                  <span className="text-red-600 font-bold">Koszty</span>
+                  <span className="font-black text-red-600">{totalCostsToday.toFixed(2)} zł</span>
                 </div>
-                <div className="flex justify-between p-2 bg-emerald-50 rounded-lg">
-                  <span className="text-emerald-600">Zysk</span>
-                  <span className="font-bold text-emerald-700">{zyskNetto >= 0 ? '+' : ''}{zyskNetto.toFixed(2)} zł</span>
+                <div className="flex justify-between p-3 bg-emerald-50 rounded-xl">
+                  <span className="text-emerald-600 font-bold">Zysk</span>
+                  <span className="font-black text-emerald-700">{zyskNetto >= 0 ? '+' : ''}{zyskNetto.toFixed(2)} zł</span>
                 </div>
               </div>
-              <p className="text-xs text-gray-400 text-center">
+              <p className="text-xs text-muted-foreground text-center font-bold">
                 Stan kasy zostanie zapisany i będzie dostępny następnego dnia.
               </p>
             </div>
-            <DialogFooter>
-              <DialogClose className="px-4 py-2 text-sm font-medium rounded-lg border hover:bg-gray-50">Anuluj</DialogClose>
+            <DialogFooter className="p-6 gap-3">
+              <DialogClose className="flex-1 px-4 py-3 text-sm font-black rounded-xl border border-primary/10 hover:bg-accent/30 text-foreground">Anuluj</DialogClose>
               <Button
                 onClick={async () => {
                   setIsClosingDay(true);
                   try {
                     const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
-                    const shopId = activeEmployees[0]?.shopId || '';
                     const userId = getSessionStorageSafe('userId', '');
+                    
+                    // Dla właściciela używaj wybranego sklepu, dla pracownika jego sklep
+                    const shopId = currentUserRole === 'employee' 
+                      ? activeEmployees[0]?.shopId || '' 
+                      : selectedShop;
 
                     await cashRegisterService.closeDay({
                       shopId,
@@ -924,7 +934,7 @@ export default function Home() {
 
                     addToast({
                       title: "Dzień zamknięty",
-                      message: `Stan kasy ${kasaDzis.toFixed(2)} zł zapisany pomyślnie.`,
+                      message: `Stan kasy ${kasaDzis.toFixed(2)} zł zapisany pomyślnie dla ${shops.find(s => s.id === shopId)?.name || 'sklepu'}.`,
                       variant: "success"
                     });
                     setIsTodayClosed(true);
@@ -934,8 +944,12 @@ export default function Home() {
                     console.warn('💡 RLS w Supabase blokuje INSERT - uruchom fix_cash_register_rls.sql w SQL Editor');
 
                     const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
-                    const shopId = activeEmployees[0]?.shopId || '';
                     const userId = getSessionStorageSafe('userId', '');
+                    
+                    // Dla właściciela używaj wybranego sklepu, dla pracownika jego sklep
+                    const shopId = currentUserRole === 'employee' 
+                      ? activeEmployees[0]?.shopId || '' 
+                      : selectedShop;
 
                     const closingData = {
                       id: `local_${Date.now()}`,
@@ -957,7 +971,7 @@ export default function Home() {
 
                     addToast({
                       title: "Zapisano lokalnie",
-                      message: `Dzień zamknięty w pamięci przeglądarki. Dane zostaną zsynchronizowane później.`,
+                      message: `Dzień zamknięty w pamięci przeglądarki dla ${shops.find(s => s.id === shopId)?.name || 'sklepu'}. Dane zostaną zsynchronizowane później.`,
                       variant: "info"
                     });
                     setIsCloseDayDialogOpen(false);
@@ -966,7 +980,7 @@ export default function Home() {
                   }
                 }}
                 disabled={isClosingDay}
-                className="bg-orange-500 hover:bg-orange-600 text-white"
+                className="flex-1 bg-primary hover:bg-primary/90 text-white font-black rounded-xl"
               >
                 {isClosingDay ? "Zamykanie..." : "Zamknij dzień"}
               </Button>
@@ -976,25 +990,25 @@ export default function Home() {
         
         {/* Dialog Zasilania Gotówką */}
         <Dialog open={isCashTopUpDialogOpen} onOpenChange={setIsCashTopUpDialogOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-3 text-lg">
-                <Banknote className="h-5 w-5 text-gray-600" />
+          <DialogContent className="sm:max-w-md rounded-3xl border-none p-0 overflow-hidden">
+            <DialogHeader className="p-6 bg-primary text-white">
+              <DialogTitle className="flex items-center gap-3 text-xl font-black uppercase tracking-tight">
+                <Banknote className="h-5 w-5" />
                 Zasilanie Gotówką
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 mt-4">
+            <div className="space-y-4 p-6">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Sklep</label>
+                <label className="text-sm font-black text-muted-foreground">Sklep</label>
                 <Select 
                   value={cashTopUpShopId}
                   onValueChange={(val) => setCashTopUpShopId(val || '')}
                   items={shops.map(shop => ({ value: shop.id, label: shop.name }))}
                 >
-                  <SelectTrigger className="h-10 border-gray-200">
+                  <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl text-foreground">
                     <SelectValue placeholder="Wybierz sklep" />
                   </SelectTrigger>
-                  <SelectContent className="border-gray-200">
+                  <SelectContent className="bg-white border-none rounded-2xl">
                     {shops.map(shop => (
                       <SelectItem key={shop.id} value={shop.id}>
                         {shop.name}
@@ -1004,31 +1018,31 @@ export default function Home() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Kwota (zł)</label>
+                <label className="text-sm font-black text-muted-foreground">Kwota (zł)</label>
                 <Input
                   type="number"
                   step="0.01"
                   value={cashTopUpAmount}
                   onChange={(e) => setCashTopUpAmount(e.target.value)}
                   placeholder="0.00"
-                  className="h-10 border-gray-200"
+                  className="h-12 bg-accent/30 border-none rounded-xl text-foreground"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Opis</label>
+                <label className="text-sm font-black text-muted-foreground">Opis</label>
                 <textarea
                   value={cashTopUpDescription}
                   onChange={(e) => setCashTopUpDescription(e.target.value)}
                   placeholder="np. Wpłata z banku..."
-                  className="w-full h-24 px-4 py-3 border border-gray-200 rounded-lg resize-none text-sm focus:ring-1 focus:ring-offset-1 outline-none"
+                  className="w-full h-24 px-4 py-3 bg-accent/30 border-none rounded-xl resize-none text-sm text-foreground focus:ring-2 focus:ring-primary outline-none"
                 />
               </div>
             </div>
-            <DialogFooter className="gap-3 mt-6">
-              <DialogClose className="px-4 py-2 text-sm font-medium rounded-lg border hover:bg-gray-50">Anuluj</DialogClose>
+            <DialogFooter className="p-6 gap-3">
+              <DialogClose className="flex-1 px-4 py-3 text-sm font-black rounded-xl border border-primary/10 hover:bg-accent/30 text-foreground">Anuluj</DialogClose>
               <Button
                 onClick={handleAddCashTopUp}
-                className="bg-orange-500 hover:bg-orange-600 text-white"
+                className="flex-1 bg-primary hover:bg-primary/90 text-white font-black rounded-xl"
               >
                 Dodaj zasilanie
               </Button>
@@ -1039,7 +1053,7 @@ export default function Home() {
         {/* Navigation Grid - Simple */}
         <section className="space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-sm font-medium text-gray-600">Panel Zarządzania</h2>
+            <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground">Panel Zarządzania</h2>
           </div>
           <div className="grid grid-cols-2 gap-3">
             {[
@@ -1054,11 +1068,11 @@ export default function Home() {
               ])
             ].map((item) => (
               <Link key={item.href} href={item.href} className="group">
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-orange-300 hover:shadow transition-all flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-orange-500 text-white flex items-center justify-center">
-                    <item.icon className="h-5 w-5" />
+                <div className="bg-white p-4 rounded-2xl shadow-xl border-none hover:shadow-2xl hover:scale-105 transition-all flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-2xl bg-primary text-white flex items-center justify-center">
+                    <item.icon className="h-6 w-6" />
                   </div>
-                  <span className="font-medium text-sm text-gray-900">{item.label}</span>
+                  <span className="font-black text-sm text-foreground">{item.label}</span>
                 </div>
               </Link>
             ))}
@@ -1066,16 +1080,16 @@ export default function Home() {
         </section>
 
         {/* Quick Access List - Simple */}
-        <section className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <section className="bg-white rounded-3xl p-6 shadow-xl border-none">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-medium text-gray-600">Ostatnie Akcje</h2>
+            <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground">Ostatnie Akcje</h2>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-2 mb-4">
             {isEmployee ? (
-              <div className="bg-gray-100 h-10 text-sm rounded-lg flex items-center gap-2 px-4">
-                <MapPin className="h-4 w-4 text-orange-500" />
-                <span className="truncate">{currentShopName || 'Twój sklep'}</span>
+              <div className="bg-accent/30 h-12 text-sm rounded-xl flex items-center gap-2 px-4">
+                <MapPin className="h-4 w-4 text-primary" />
+                <span className="truncate font-black text-foreground">{currentShopName || 'Twój sklep'}</span>
               </div>
             ) : (
               <>
@@ -1083,16 +1097,16 @@ export default function Home() {
                   { value: "all", label: "Wszystkie sklepy" },
                   ...shops.map(shop => ({ value: shop.id, label: shop.name }))
                 ]}>
-                  <SelectTrigger className="bg-gray-100 border-gray-200 h-10 text-sm rounded-lg flex-1">
+                  <SelectTrigger className="bg-accent/30 border-none h-12 text-sm rounded-xl flex-1 text-foreground">
                     <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-orange-500" />
-                      <span className="truncate">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      <span className="truncate font-black">
                         {actionFilterShop === "all" ? "Wszystkie sklepy" : 
                          (shops.find(s => s.id === actionFilterShop)?.name || actionFilterShop)}
                       </span>
                     </div>
                   </SelectTrigger>
-                  <SelectContent className="bg-white border-gray-200">
+                  <SelectContent className="bg-white border-none rounded-2xl">
                     <SelectItem value="all" className="text-sm">Wszystkie sklepy</SelectItem>
                     {shops.map(shop => (
                       <SelectItem key={shop.id} value={shop.id} className="text-sm">{shop.name}</SelectItem>
@@ -1104,16 +1118,16 @@ export default function Home() {
                   { value: "all", label: "Wszyscy pracownicy" },
                   ...employees.map(emp => ({ value: emp.id, label: emp.name }))
                 ]}>
-                  <SelectTrigger className="bg-gray-100 border-gray-200 h-10 text-sm rounded-lg flex-1">
+                  <SelectTrigger className="bg-accent/30 border-none h-12 text-sm rounded-xl flex-1 text-foreground">
                     <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-orange-500" />
-                      <span className="truncate">
+                      <Users className="h-4 w-4 text-primary" />
+                      <span className="truncate font-black">
                         {actionFilterEmployee === "all" ? "Wszyscy pracownicy" : 
                          employees.find(e => e.id === actionFilterEmployee)?.name || actionFilterEmployee}
                       </span>
                     </div>
                   </SelectTrigger>
-                  <SelectContent className="bg-white border-gray-200">
+                  <SelectContent className="bg-white border-none rounded-2xl">
                     <SelectItem value="all" className="text-sm">Wszyscy pracownicy</SelectItem>
                     {employees.map((emp) => (
                       <SelectItem key={emp.id} value={emp.id} className="text-sm">
