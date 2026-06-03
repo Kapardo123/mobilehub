@@ -61,6 +61,7 @@ export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const [routeKey, setRouteKey] = useState(0);
   const today = toISODateString();
+  const [selectedDate, setSelectedDate] = useState(today);
   
   // Zasilanie gotówką state
   const [isCashTopUpDialogOpen, setIsCashTopUpDialogOpen] = useState(false);
@@ -271,7 +272,6 @@ export default function Home() {
     const loadSalesFromSupabase = async () => {
       try {
         const shopId = getSessionStorageSafe("shopId", "");
-        const today = toISODateString();
         
         // Dla właściciela: używaj wybranego sklepu zamiast sessionStorage
         const userRole = getSessionStorageSafe("userRole", "");
@@ -279,18 +279,18 @@ export default function Home() {
           ? shopId 
           : (selectedShop === 'all' ? '' : selectedShop);
 
-        console.log('Strona główna: Ładowanie sprzedaży z Supabase, effectiveShopId:', effectiveShopId, ', today:', today);
+        console.log('Strona główna: Ładowanie sprzedaży z Supabase, effectiveShopId:', effectiveShopId, ', selectedDate:', selectedDate);
 
         let salesData: any[] = [];
         if (effectiveShopId) {
           const allSales = await salesService.getByShop(effectiveShopId);
-          salesData = allSales.filter(sale => sale.sale_date === today);
+          salesData = allSales.filter(sale => sale.sale_date === selectedDate);
         } else {
-          const todayDate = new Date(today);
-          const tomorrow = new Date(todayDate);
+          const selectedDateObj = new Date(selectedDate);
+          const tomorrow = new Date(selectedDateObj);
           tomorrow.setDate(tomorrow.getDate() + 1);
           salesData = await salesService.getByDateRange(
-            today,
+            selectedDate,
             toISODateString(tomorrow)
           );
         }
@@ -328,7 +328,7 @@ export default function Home() {
     };
 
     loadSalesFromSupabase();
-  }, [isMounted, selectedShop]);
+  }, [isMounted, selectedShop, selectedDate]);
 
   // Load costs from Supabase
   useEffect(() => {
@@ -337,7 +337,6 @@ export default function Home() {
     const loadCostsFromSupabase = async () => {
       try {
         const shopId = getSessionStorageSafe("shopId", "");
-        const today = toISODateString();
         
         // Dla właściciela: używaj wybranego sklepu zamiast sessionStorage
         const userRole = getSessionStorageSafe("userRole", "");
@@ -345,18 +344,18 @@ export default function Home() {
           ? shopId 
           : (selectedShop === 'all' ? '' : selectedShop);
 
-        console.log('Strona główna: Ładowanie kosztów z Supabase, effectiveShopId:', effectiveShopId, ', today:', today);
+        console.log('Strona główna: Ładowanie kosztów z Supabase, effectiveShopId:', effectiveShopId, ', selectedDate:', selectedDate);
 
         let costsData: any[] = [];
         if (effectiveShopId) {
           const allCosts = await costsService.getByShop(effectiveShopId);
-          costsData = allCosts.filter(cost => cost.cost_date === today);
+          costsData = allCosts.filter(cost => cost.cost_date === selectedDate);
         } else {
-          const todayDate = new Date(today);
-          const tomorrow = new Date(todayDate);
+          const selectedDateObj = new Date(selectedDate);
+          const tomorrow = new Date(selectedDateObj);
           tomorrow.setDate(tomorrow.getDate() + 1);
           costsData = await costsService.getByDateRange(
-            today,
+            selectedDate,
             toISODateString(tomorrow)
           );
         }
@@ -384,7 +383,7 @@ export default function Home() {
     };
 
     loadCostsFromSupabase();
-  }, [isMounted, selectedShop]);
+  }, [isMounted, selectedShop, selectedDate]);
 
 
   
@@ -420,14 +419,14 @@ export default function Home() {
         const shopId = activeEmployees[0]?.shopId || '';
         
         if (currentUserRole === 'employee') {
-          const previousDayState = await cashRegisterService.getPreviousDayState(shopId);
+          const previousDayState = await cashRegisterService.getPreviousDayState(shopId, selectedDate);
           setStanKasyPoprzedniegoDnia(previousDayState);
         } else {
           if (selectedShop === 'all') {
-            const totalPreviousDayState = await cashRegisterService.getTotalPreviousDayStateForAllShops();
+            const totalPreviousDayState = await cashRegisterService.getTotalPreviousDayStateForAllShops(selectedDate);
             setStanKasyPoprzedniegoDnia(totalPreviousDayState);
           } else {
-            const previousDayState = await cashRegisterService.getPreviousDayState(selectedShop);
+            const previousDayState = await cashRegisterService.getPreviousDayState(selectedShop, selectedDate);
             setStanKasyPoprzedniegoDnia(previousDayState);
           }
         }
@@ -437,7 +436,7 @@ export default function Home() {
     };
     
     loadCashState();
-  }, [selectedShop, currentUserRole, isMounted]);
+  }, [selectedShop, currentUserRole, isMounted, selectedDate]);
   
   console.log('=== OBLICZANIE ZYSKU - GŁÓWNA STRONA ===');
   console.log('User Role:', currentUserRole);
@@ -483,8 +482,8 @@ export default function Home() {
   console.log('Filtered sales (po sklepie):', filteredSales.length);
   console.log('Filtered costs (po sklepie):', filteredCosts.length);
   
-  // Koszty dzisiaj (BEZ doładowań gotówki!)
-  const todayCosts = filteredCosts.filter((c: any) => c.date === today);
+  // Koszty wybranego dnia (BEZ doładowań gotówki!)
+  const todayCosts = filteredCosts.filter((c: any) => c.date === selectedDate);
   const totalCostsToday = todayCosts
     .filter((c: any) => c.category !== 'gotowka')  // ← Wykluczamy doładowania!
     .reduce((sum: number, c: any) => {
@@ -686,12 +685,18 @@ export default function Home() {
                   <CalendarIcon className="h-4 w-4 text-primary" />
                   <Input 
                     type="date"
-                    value={today}
+                    value={selectedDate}
                     onChange={(e) => {
-                      console.log('Zmieniono datę na:', e.target.value);
+                      setSelectedDate(e.target.value);
                     }}
                     className="h-12 bg-accent/30 border-none rounded-xl text-foreground"
                   />
+                  <Button
+                    onClick={() => setSelectedDate(today)}
+                    className="h-12 bg-primary hover:bg-primary/90 text-white font-bold px-4 rounded-xl"
+                  >
+                    Dzisiaj
+                  </Button>
                 </div>
                 
                 <div className="w-full sm:w-auto flex-1 max-w-[200px]">

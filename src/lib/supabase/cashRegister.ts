@@ -51,8 +51,8 @@ export const cashRegisterService = {
     return data || null;
   },
 
-  async getPreviousDayState(shopId: string): Promise<number> {
-    const today = toISODateString();
+  async getPreviousDayState(shopId: string, referenceDate?: string): Promise<number> {
+    const today = referenceDate || toISODateString();
     
     const { data } = await supabase
       .from('cash_register_closings')
@@ -67,8 +67,8 @@ export const cashRegisterService = {
     return data?.closing_cash_amount || 0;
   },
 
-  async getTotalPreviousDayStateForAllShops(): Promise<number> {
-    const today = toISODateString();
+  async getTotalPreviousDayStateForAllShops(referenceDate?: string): Promise<number> {
+    const today = referenceDate || toISODateString();
     
     // Step 1: Get all unique shops that have closings
     const { data: allClosings, error } = await supabase
