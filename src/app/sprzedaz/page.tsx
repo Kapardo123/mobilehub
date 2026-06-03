@@ -845,7 +845,7 @@ export default function SprzedazPage() {
         console.log('📦 Pozycje sprzedaży:', JSON.stringify(itemsData, null, 2));
         
         // Zapisz do Supabase
-        const savedSale = await salesService.create(saleData, itemsData);
+        const savedSale = await salesService.create(saleData, itemsData as any);
         console.log('✅ Sprzedaż zapisana do bazy:', savedSale.id);
         
         // Aktualizuj stan lokalny
@@ -994,7 +994,7 @@ export default function SprzedazPage() {
         date: savedCost.cost_date,
         time: savedCost.cost_time || new Date(savedCost.created_at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }),
         category: savedCost.category,
-        amount: parseFloat(savedCost.amount),
+        amount: savedCost.amount,
         description: savedCost.description,
         shop: shopName,
         employeeId,

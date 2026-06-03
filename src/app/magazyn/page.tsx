@@ -666,7 +666,7 @@ export default function MagazynPage() {
       notes: item.notes || "",
       warranty: item.warranty || "",
       imei: item.imei || "",
-      taxType: item.taxType || "marza",
+      taxType: (item.taxType?.toLowerCase() === "vat" ? "VAT" : item.taxType?.toLowerCase() === "zwolniony" ? "zwolniony" : "marza") as "VAT" | "marza" | "zwolniony",
       purchaseDate: item.purchaseDate || "",
       sellingDate: item.sellingDate || "",
       statusSprzedany: item.statusSprzedany || false,

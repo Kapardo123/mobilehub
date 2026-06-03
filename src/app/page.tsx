@@ -132,7 +132,7 @@ export default function Home() {
         date: savedCost.cost_date,
         time: savedCost.cost_time || new Date(savedCost.created_at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }),
         category: savedCost.category,
-        amount: parseFloat(savedCost.amount),
+        amount: savedCost.amount,
         description: savedCost.description,
         shop: effectiveShopName,
         employeeId,
