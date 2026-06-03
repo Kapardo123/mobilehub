@@ -6,10 +6,13 @@ type InventoryInsert = Database['public']['Tables']['inventory']['Insert'];
 type InventoryUpdate = Database['public']['Tables']['inventory']['Update'];
 
 export const inventoryService = {
-  async getAll(): Promise<InventoryItem[]> {
+  async getAll(): Promise<any[]> {
     const { data, error } = await supabase
       .from('inventory')
-      .select('*')
+      .select(`
+        *,
+        shops (name)
+      `)
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
     

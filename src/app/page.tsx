@@ -35,6 +35,8 @@ import { CreditCard, Banknote, ArrowRight, DollarSign, Package, Wrench, Settings
 import { addAction, getActions, Action } from "./akcje/page";
 import { cashRegisterService } from "@/lib/supabase/cashRegister";
 import { shopsService } from "@/lib/supabase/shops";
+import { salesService } from "@/lib/supabase/sales";
+import { costsService } from "@/lib/supabase/costs";
 import { formatDatePL, formatTimePL, toISODateString, getCurrentTimePL } from "@/lib/dateFormat";
 
 export default function Home() {
@@ -56,6 +58,15 @@ export default function Home() {
   const [stanKasyPoprzedniegoDnia, setStanKasyPoprzedniegoDnia] = useState<number>(0);
   const [shops, setShops] = useState<{id: string; name: string}[]>([]);
   const { addToast } = useToast();
+  const [isMounted, setIsMounted] = useState(false);
+  const [routeKey, setRouteKey] = useState(0);
+  const today = toISODateString();
+  
+  // Zasilanie gotówką state
+  const [isCashTopUpDialogOpen, setIsCashTopUpDialogOpen] = useState(false);
+  const [cashTopUpAmount, setCashTopUpAmount] = useState<string>('');
+  const [cashTopUpDescription, setCashTopUpDescription] = useState<string>('');
+  const [cashTopUpShopId, setCashTopUpShopId] = useState<string>('');
 
   useEffect(() => {
     loadShops();
@@ -73,6 +84,105 @@ export default function Home() {
       console.error('Błąd podczas pobierania sklepów:', error);
     }
   };
+  
+  const handleAddCashTopUp = async () => {
+    if (!cashTopUpAmount || !cashTopUpDescription || !cashTopUpShopId) {
+      addToast({ message: "Wypełnij wszystkie pola (kwota, opis, sklep)", variant: "error" });
+      return;
+    }
+    
+    const employeeId = getSessionStorageSafe("userId", "");
+    const employeeName = getSessionStorageSafe("userName", "Pracownik");
+    
+    // Używamy sklepu wybranego w formularzu dialogowym
+    const effectiveShopId = cashTopUpShopId;
+    const effectiveShopName = shops.find(s => s.id === cashTopUpShopId)?.name || "Nieznany sklep";
+    
+    if (!effectiveShopId) {
+      addToast({ message: "❌ Błąd: Brak ID sklepu", variant: "error" });
+      return;
+    }
+    
+    if (!employeeId) {
+      addToast({ message: "❌ Błąd: Brak ID pracownika", variant: "error" });
+      return;
+    }
+    
+    try {
+      const costData = {
+        cost_date: toISODateString(),
+        cost_time: getCurrentTimePL(),
+        category: 'gotowka',
+        amount: parseFloat(cashTopUpAmount),
+        description: cashTopUpDescription,
+        payment_method: 'gotowka',
+        shop_id: effectiveShopId,
+        employee_id: employeeId
+      };
+      
+      console.log('📤 Dane do zapisu zasilania gotówką:', costData);
+      
+      const savedCost = await costsService.create(costData);
+      console.log('✅ Zasilanie zapisane pomyślnie:', savedCost);
+      
+      // Aktualizuj stan lokalny
+      const newCostForState: any = {
+        id: savedCost.id,
+        dbId: savedCost.id,
+        date: savedCost.cost_date,
+        time: savedCost.cost_time || new Date(savedCost.created_at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }),
+        category: savedCost.category,
+        amount: parseFloat(savedCost.amount),
+        description: savedCost.description,
+        shop: effectiveShopName,
+        employeeId,
+        employeeName,
+        paymentMethod: savedCost.payment_method
+      };
+      
+      setCosts(prev => [newCostForState, ...prev]);
+      
+      // Dodaj akcję
+      addAction({
+        action_type: 'koszt',
+        description: `Zasilanie gotówką: ${cashTopUpDescription}`,
+        actor_id: employeeId,
+        actor_name: employeeName,
+        shop_id: effectiveShopId,
+        shop_name: effectiveShopName,
+        details: `${cashTopUpAmount} zł`,
+        target_table: 'costs',
+        target_id: savedCost.id,
+        target_type: 'cost'
+      });
+      
+      addToast({ message: `✅ Zasilanie dodane: ${cashTopUpAmount} zł`, variant: "success" });
+      
+      // Reset formularza
+      setCashTopUpAmount('');
+      setCashTopUpDescription('');
+      setIsCashTopUpDialogOpen(false);
+      
+      // Odśwież dane (wywołaj zdarzenie)
+      window.dispatchEvent(new CustomEvent('costs_updated'));
+      
+    } catch (dbError: any) {
+      console.error('❌ Błąd zapisu zasilania:', dbError);
+      console.error('❌ Błąd (JSON):', JSON.stringify(dbError));
+      
+      let errorMessage = 'Nieznany błąd';
+      if (dbError?.code === '42501') errorMessage = 'Brak uprawnień (RLS)';
+      else if (dbError?.code === '23502') errorMessage = 'Brak wymaganych pól';
+      else if (dbError?.message && typeof dbError.message === 'string') errorMessage = dbError.message;
+      else if (dbError?.details && typeof dbError.details === 'string') errorMessage = dbError.details;
+      else if (Object.keys(dbError).length > 0) errorMessage = JSON.stringify(dbError);
+      
+      addToast({
+        message: `❌ Błąd zapisu zasilania: ${errorMessage}`,
+        variant: "error"
+      });
+    }
+  };
 
   useEffect(() => {
     const handleShopsUpdated = () => {
@@ -81,7 +191,30 @@ export default function Home() {
     
     window.addEventListener('shops_updated', handleShopsUpdated);
       return () => window.removeEventListener('shops_updated', handleShopsUpdated);
-    }, []);
+  }, []);
+
+  // Nasłuchuj zmian w sprzedaży i kosztach, aby odświeżyć dane
+  useEffect(() => {
+    const handleSalesUpdated = () => {
+      // Trigger re‑load of sales
+      setIsMounted(false);
+      setTimeout(() => setIsMounted(true), 50);
+    };
+
+    const handleCostsUpdated = () => {
+      // Trigger re‑load of costs
+      setIsMounted(false);
+      setTimeout(() => setIsMounted(true), 50);
+    };
+
+    window.addEventListener('sales_updated', handleSalesUpdated);
+    window.addEventListener('costs_updated', handleCostsUpdated);
+    
+    return () => {
+      window.removeEventListener('sales_updated', handleSalesUpdated);
+      window.removeEventListener('costs_updated', handleCostsUpdated);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -131,57 +264,128 @@ export default function Home() {
     setIsSessionChecked(true);
   }, []);
 
+  // Load sales from Supabase
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    
-    const loadData = () => {
-      const savedCosts = getLocalStorageSafe('sprzedaz_costs', []);
-      setCosts(savedCosts);
-      
-      const savedSales = getLocalStorageSafe('sprzedaz_sales', []);
-      setSales(savedSales);
-      
-      console.log('🔄 Odświeżono dane z localStorage');
-      console.log('Sales:', savedSales.length, 'pozycji');
-      console.log('Costs:', savedCosts.length, 'pozycji');
-    };
-    
-    // Ładuj dane na start
-    loadData();
-    
-    // Odświeżaj przy zmianach w localStorage (synchronizacja między zakładkami)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'sprzedaz_sales' || e.key === 'sprzedaz_costs') {
-        console.log('📡 Wykryto zmianę w localStorage:', e.key);
-        loadData();
+    if (typeof window === "undefined" || !isMounted) return;
+
+    const loadSalesFromSupabase = async () => {
+      try {
+        const shopId = getSessionStorageSafe("shopId", "");
+        const today = toISODateString();
+        
+        // Dla właściciela: używaj wybranego sklepu zamiast sessionStorage
+        const userRole = getSessionStorageSafe("userRole", "");
+        const effectiveShopId = userRole === 'employee' 
+          ? shopId 
+          : (selectedShop === 'all' ? '' : selectedShop);
+
+        console.log('Strona główna: Ładowanie sprzedaży z Supabase, effectiveShopId:', effectiveShopId, ', today:', today);
+
+        let salesData: any[] = [];
+        if (effectiveShopId) {
+          const allSales = await salesService.getByShop(effectiveShopId);
+          salesData = allSales.filter(sale => sale.sale_date === today);
+        } else {
+          const todayDate = new Date(today);
+          const tomorrow = new Date(todayDate);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          salesData = await salesService.getByDateRange(
+            today,
+            toISODateString(tomorrow)
+          );
+        }
+
+        const mappedSales = salesData.map((dbSale: any) => ({
+          id: dbSale.id,
+          dbId: dbSale.id,
+          ini: dbSale.employee?.initials || '???',
+          employeeName: dbSale.employee?.first_name + ' ' + dbSale.employee?.last_name || '',
+          employeeId: dbSale.employee_id,
+          shopName: dbSale.shop?.name || '',
+          shopId: dbSale.shop_id,
+          payment: dbSale.payment_method === 'gotowka' ? 'gotówka' : 'karta',
+          date: dbSale.sale_date,
+          time: dbSale.sale_time,
+          totalPrice: parseFloat(dbSale.total_amount) || 0,
+          totalProfit: parseFloat(dbSale.total_profit) || 0,
+          items: (dbSale.sale_items || []).map((item: any) => ({
+            id: item.id,
+            cat: item.category,
+            name: item.product_name,
+            price: parseFloat(item.unit_price) || 0,
+            profit: (parseFloat(item.unit_price) || 0) - (parseFloat(item.purchase_cost) || 0),
+            imei: item.imei || '',
+            taxType: item.tax_type,
+            comment: item.comment || ''
+          }))
+        }));
+
+        setSales(mappedSales);
+        console.log('✅ Strona główna: Załadowano', mappedSales.length, 'sprzedaży z Supabase');
+      } catch (error) {
+        console.error('Strona główna: Błąd ładowania sprzedaży:', error);
       }
     };
-    
-    // Custom event dla zmian w tej samej karcie przeglądarki
-    const handleDataUpdate = () => {
-      console.log('📡 Otrzymano sygnał aktualizacji danych');
-      loadData();
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('sales_data_updated', handleDataUpdate);
-    window.addEventListener('costs_data_updated', handleDataUpdate);
-    
-    // Odświeżaj co 5 sekundy (fallback)
-    const interval = setInterval(loadData, 5000);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('sales_data_updated', handleDataUpdate);
-      window.removeEventListener('costs_data_updated', handleDataUpdate);
-      clearInterval(interval);
-    };
-  }, []);
 
-  const today = toISODateString();
-  
-  const [isMounted, setIsMounted] = useState(false);
-  const [routeKey, setRouteKey] = useState(0);  // Klucz do wymuszenia re-rendera
+    loadSalesFromSupabase();
+  }, [isMounted, selectedShop]);
+
+  // Load costs from Supabase
+  useEffect(() => {
+    if (typeof window === "undefined" || !isMounted) return;
+
+    const loadCostsFromSupabase = async () => {
+      try {
+        const shopId = getSessionStorageSafe("shopId", "");
+        const today = toISODateString();
+        
+        // Dla właściciela: używaj wybranego sklepu zamiast sessionStorage
+        const userRole = getSessionStorageSafe("userRole", "");
+        const effectiveShopId = userRole === 'employee' 
+          ? shopId 
+          : (selectedShop === 'all' ? '' : selectedShop);
+
+        console.log('Strona główna: Ładowanie kosztów z Supabase, effectiveShopId:', effectiveShopId, ', today:', today);
+
+        let costsData: any[] = [];
+        if (effectiveShopId) {
+          const allCosts = await costsService.getByShop(effectiveShopId);
+          costsData = allCosts.filter(cost => cost.cost_date === today);
+        } else {
+          const todayDate = new Date(today);
+          const tomorrow = new Date(todayDate);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          costsData = await costsService.getByDateRange(
+            today,
+            toISODateString(tomorrow)
+          );
+        }
+
+        const mappedCosts = costsData.map((dbCost: any) => ({
+          id: dbCost.id,
+          dbId: dbCost.id,
+          date: dbCost.cost_date,
+          time: dbCost.cost_time || new Date(dbCost.created_at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }),
+          category: dbCost.category,
+          amount: parseFloat(dbCost.amount) || 0,
+          description: dbCost.description,
+          shop: dbCost.shop?.name || '',
+          employeeId: dbCost.employee_id,
+          employeeName: dbCost.employee?.first_name + ' ' + dbCost.employee?.last_name || '',
+          paymentMethod: dbCost.payment_method
+        }));
+
+        setCosts(mappedCosts);
+        console.log('✅ Strona główna: Załadowano', mappedCosts.length, 'kosztów z Supabase');
+      } catch (error) {
+        console.error('Strona główna: Błąd ładowania kosztów:', error);
+      }
+    };
+
+    loadCostsFromSupabase();
+  }, [isMounted, selectedShop]);
+
+
   
   useEffect(() => {
     setIsMounted(true);
@@ -214,13 +418,17 @@ export default function Home() {
         const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
         const shopId = activeEmployees[0]?.shopId || '';
         
-        const effectiveShopIdForLoad = currentUserRole === 'employee' 
-          ? shopId 
-          : (selectedShop === 'all' ? shopId : selectedShop);
-          
-        if (effectiveShopIdForLoad) {
-          const previousDayState = await cashRegisterService.getPreviousDayState(effectiveShopIdForLoad);
+        if (currentUserRole === 'employee') {
+          const previousDayState = await cashRegisterService.getPreviousDayState(shopId);
           setStanKasyPoprzedniegoDnia(previousDayState);
+        } else {
+          if (selectedShop === 'all') {
+            const totalPreviousDayState = await cashRegisterService.getTotalPreviousDayStateForAllShops();
+            setStanKasyPoprzedniegoDnia(totalPreviousDayState);
+          } else {
+            const previousDayState = await cashRegisterService.getPreviousDayState(selectedShop);
+            setStanKasyPoprzedniegoDnia(previousDayState);
+          }
         }
       } catch (error) {
         console.error('Błąd pobierania stanu kasy:', error);
@@ -234,8 +442,8 @@ export default function Home() {
   console.log('User Role:', currentUserRole);
   console.log('Shop ID:', currentShopId);
   console.log('Shop Name:', currentShopName);
-  console.log('Total sales in localStorage:', sales.length);
-  console.log('Total costs in localStorage:', costs.length);
+  console.log('Total sales in Supabase:', sales.length);
+  console.log('Total costs in Supabase:', costs.length);
   
   // Określ który sklep filtrować (zależnie od roli i wyboru w UI)
   const effectiveShopId = currentUserRole === 'employee' 
@@ -363,8 +571,8 @@ export default function Home() {
   const sumaTotal = kasaDzis + cardSalesToday;
   const dzienTotal = totalSalesToday - totalCostsToday;
   
-  // ✅ ZYSK NETTO = Zysk ze sprzedaży (marże) - TAKO JAK W PANELU SPRZEDAŻ!
-  const zyskNetto = totalProfitToday;
+  // ✅ ZYSK NETTO = Zysk ze sprzedaży (marże) - Koszty
+  const zyskNetto = totalProfitToday - totalCostsToday;
   
   console.log('');
   console.log('=== KOŃCOWY WYNIK ===');
@@ -420,6 +628,20 @@ export default function Home() {
     window.addEventListener('action_added', handleActionAdded as EventListener);
     return () => window.removeEventListener('action_added', handleActionAdded as EventListener);
   }, []);
+
+  // Reset Zasilanie form when dialog opens
+  useEffect(() => {
+    if (isCashTopUpDialogOpen) {
+      // Default to currently selected shop (or first shop if all selected)
+      if (selectedShop !== 'all') {
+        setCashTopUpShopId(selectedShop);
+      } else if (shops.length > 0) {
+        setCashTopUpShopId(shops[0].id);
+      }
+      setCashTopUpAmount('');
+      setCashTopUpDescription('');
+    }
+  }, [isCashTopUpDialogOpen, selectedShop, shops]);
 
   if (isSessionChecked && !hasValidSession) {
     return (
@@ -498,174 +720,217 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* Bilans Dnia - Premium Design */}
-              <div className="space-y-4 py-6">
+              {/* Bilans Dnia - Nowy, bardziej czytelny design z tooltipami */}
+              <div className="space-y-5 py-6">
                 
-                {/* Header Section: Main Balance + Costs */}
-                <div className="grid grid-cols-1 gap-3">
+                {/* Stan Kasy z Poprzedniego Dnia - Hero Card */}
+                <div 
+                  className="relative overflow-hidden bg-gradient-to-br from-emerald-900/40 via-slate-800/80 to-slate-900/90 border border-emerald-500/20 rounded-2xl p-6 shadow-lg shadow-black/20 cursor-help"
+                  title="Stan Kasy z Poprzedniego Dnia to kwota, która została zapisana podczas zamknięcia dnia wczoraj. To jest twój punkt wyjścia na dzisiejsze obliczenia."
+                >
+                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-emerald-500/20 rounded-full blur-3xl" />
+                  <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-emerald-400/10 rounded-full blur-3xl" />
 
-                  {/* Stan Kasy z Poprzedniego Dnia - Hero Card (NAJWYŻEJ) */}
-                  <div className="relative overflow-hidden bg-gradient-to-br from-slate-800/80 to-slate-900/90 border border-white/10 rounded-2xl p-5 shadow-lg shadow-black/20">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16" />
+                  <div className="relative flex items-start justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                          <DollarSign className="h-4 w-4 text-emerald-400" />
+                        </div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-white/50">Stan Kasy</p>
+                      </div>
+                      <p className="text-lg font-black text-white uppercase tracking-tight">z Poprzedniego Dnia</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-5xl font-black text-emerald-400 tabular-nums drop-shadow-[0_0_25px_rgba(52,211,153,0.4)]">{stanKasyPoprzedniegoDnia.toFixed(0)}</p>
+                      <p className="text-xs font-bold uppercase tracking-widest text-emerald-400/60 mt-1">zł</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Zasilanie Gotówką - Button (Only Owner) */}
+                {currentUserRole === 'owner' && (
+                  <Button
+                    onClick={() => setIsCashTopUpDialogOpen(true)}
+                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-sm py-4 rounded-xl shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <Banknote className="h-5 w-5" />
+                      <span className="tracking-widest uppercase">Zasilanie Gotówką</span>
+                    </div>
+                  </Button>
+                )}
 
+                {/* Wpływy + Koszty - w jednym wierszu */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Wpływy */}
+                  <div 
+                    className="relative overflow-hidden bg-gradient-to-br from-blue-500/15 via-blue-600/10 to-transparent border border-blue-500/20 rounded-2xl p-5 shadow-md hover:border-blue-500/30 transition-all cursor-help"
+                    title="Wpływy to suma wszystkich pieniędzy, które wpłynęły do sklepu dzisiaj: sprzedaż kartą oraz zasilanie gotówką."
+                  >
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl" />
                     <div className="relative flex items-start justify-between">
                       <div className="space-y-1">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40 leading-tight">Stan Kasy z</p>
-                        <p className="text-base font-black text-white uppercase tracking-tight">Poprzedniego Dnia</p>
+                        <div className="flex items-center gap-2">
+                          <ArrowRight className="h-4 w-4 text-blue-400" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-300">Wpływy</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-4xl font-black text-emerald-400 tabular-nums drop-shadow-[0_0_20px_rgba(52,211,153,0.3)]">{stanKasyPoprzedniegoDnia.toFixed(0)}</p>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/50 mt-0.5">zł</p>
-                      </div>
+                      <p className="text-3xl font-black text-blue-300 tabular-nums">{(totalSalesToday + doladowaniaToday).toFixed(0)}<span className="text-xs ml-1 text-blue-400/60">zł</span></p>
                     </div>
                   </div>
 
-                  {/* Suma Kosztów - Red Alert */}
-                  <div className="relative overflow-hidden bg-gradient-to-r from-red-500/15 via-red-500/10 to-transparent border border-red-500/25 rounded-2xl px-5 py-3">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-red-500 rounded-l-2xl" />
-                    <div className="flex items-center justify-between pl-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="h-7 w-7 rounded-lg bg-red-500/20 flex items-center justify-center">
+                  {/* Suma Kosztów */}
+                  <div 
+                    className="relative overflow-hidden bg-gradient-to-br from-red-500/15 via-red-600/10 to-transparent border border-red-500/20 rounded-2xl p-5 shadow-md hover:border-red-500/30 transition-all cursor-help"
+                    title="Suma Kosztów to wszystkie wydatki dzisiaj, bez zasilania gotówką. Należą do nich m.in. skupy, zaliczki i paczki."
+                  >
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full blur-2xl" />
+                    <div className="relative flex items-start justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
                           <DollarSign className="h-4 w-4 text-red-400" />
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300">Koszty</p>
                         </div>
-                        <span className="text-xs font-bold uppercase tracking-wider text-red-300">Suma Kosztów</span>
                       </div>
-                      <span className="text-xl font-black text-red-400 tabular-nums">{totalCostsToday > 0 ? `-${totalCostsToday.toFixed(0)} zł` : '0 zł'}</span>
+                      <p className={`text-3xl font-black tabular-nums ${totalCostsToday > 0 ? 'text-red-400' : 'text-red-300/60'}`}>{totalCostsToday > 0 ? `-${totalCostsToday.toFixed(0)}` : '0'}<span className="text-xs ml-1 text-red-400/60">zł</span></p>
                     </div>
                   </div>
                 </div>
 
-                {/* Dzień + Wpływy - Split Cards */}
+                {/* Kasa + Karty - Sposoby płatności */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white/[0.04] border border-white/8 hover:border-white/15 rounded-xl p-4 transition-all group">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CalendarIcon className="h-3.5 w-3.5 text-white/40 group-hover:text-white/60 transition-colors" />
-                      <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-white/50">Dzień</span>
-                    </div>
-                    <p className="text-2xl font-bold text-white tabular-nums">{dzienTotal.toFixed(0)}</p>
-                  </div>
-
-                  <div className="bg-white/[0.04] border border-white/8 hover:border-white/15 rounded-xl p-4 transition-all group">
-                    <div className="flex items-center gap-2 mb-2">
-                      <ArrowRight className="h-3.5 w-3.5 text-white/40 group-hover:text-white/60 transition-colors" />
-                      <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-white/50">Wpływy</span>
-                    </div>
-                    <p className="text-2xl font-bold text-white tabular-nums">{(cardSalesToday + doladowaniaToday).toFixed(0)}</p>
-                  </div>
-                </div>
-
-                {/* Kasa + Karty - Payment Methods */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-emerald-600/5 to-transparent border border-emerald-500/15 rounded-xl p-4 group hover:border-emerald-500/25 transition-all">
-                    <div className="absolute bottom-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all" />
-                    
-                    <div className="relative space-y-2">
+                  {/* Kasa - Gotówka */}
+                  <div 
+                    className="relative overflow-hidden bg-gradient-to-br from-emerald-500/15 via-emerald-600/10 to-transparent border border-emerald-500/20 rounded-2xl p-5 shadow-md hover:border-emerald-500/30 transition-all cursor-help"
+                    title="Kasa to suma sprzedaży gotówkowej dzisiaj. To kwota, którą powinieneś mieć w kasie (plus stan z wczoraj i zasilania)."
+                  >
+                    <div className="absolute bottom-0 right-0 w-20 h-20 bg-emerald-500/10 rounded-full blur-2xl" />
+                    <div className="relative space-y-3">
                       <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                          <Banknote className="h-3.5 w-3.5 text-emerald-400" />
+                        <div className="h-8 w-8 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                          <Banknote className="h-4 w-4 text-emerald-400" />
                         </div>
-                        <span className="text-[9px] font-black uppercase tracking-[0.15em] text-emerald-400/70">Kasa</span>
+                        <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300">Kasa</p>
                       </div>
-                      <p className="text-2xl font-black text-white tabular-nums">{cashSalesToday.toFixed(0)}</p>
-                      <div className="h-0.5 w-12 bg-emerald-500/20 rounded-full" />
+                      <p className="text-3xl font-black text-white tabular-nums">{cashSalesToday.toFixed(0)}<span className="text-xs ml-1 text-emerald-400/60">zł</span></p>
+                      <div className="h-1 w-24 bg-gradient-to-r from-emerald-500/40 to-transparent rounded-full" />
                     </div>
                   </div>
 
-                  <div className="relative overflow-hidden bg-gradient-to-br from-blue-500/10 via-blue-600/5 to-transparent border border-blue-500/15 rounded-xl p-4 group hover:border-blue-500/25 transition-all">
-                    <div className="absolute bottom-0 right-0 w-16 h-16 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all" />
-
-                    <div className="relative space-y-2">
+                  {/* Karty */}
+                  <div 
+                    className="relative overflow-hidden bg-gradient-to-br from-indigo-500/15 via-indigo-600/10 to-transparent border border-indigo-500/20 rounded-2xl p-5 shadow-md hover:border-indigo-500/30 transition-all cursor-help"
+                    title="Karty to suma sprzedaży kartą dzisiaj. Ta kwota trafi na twoje konto bankowe."
+                  >
+                    <div className="absolute bottom-0 right-0 w-20 h-20 bg-indigo-500/10 rounded-full blur-2xl" />
+                    <div className="relative space-y-3">
                       <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                          <CreditCard className="h-3.5 w-3.5 text-blue-400" />
+                        <div className="h-8 w-8 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+                          <CreditCard className="h-4 w-4 text-indigo-400" />
                         </div>
-                        <span className="text-[9px] font-black uppercase tracking-[0.15em] text-blue-400/70">Karty</span>
+                        <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-300">Karty</p>
                       </div>
-                      <p className="text-2xl font-black text-white tabular-nums">{cardSalesToday.toFixed(0)}</p>
-                      <div className="h-0.5 w-12 bg-blue-500/20 rounded-full" />
+                      <p className="text-3xl font-black text-white tabular-nums">{cardSalesToday.toFixed(0)}<span className="text-xs ml-1 text-indigo-400/60">zł</span></p>
+                      <div className="h-1 w-24 bg-gradient-to-r from-indigo-500/40 to-transparent rounded-full" />
                     </div>
                   </div>
                 </div>
 
                 {/* Divider */}
-                <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-2" />
+                <div className="h-px bg-gradient-to-r from-transparent via-white/15 to-transparent my-3" />
 
-                {/* SUMA + ZYSK - Final Results */}
-                <div className="space-y-3">
+                {/* Suma Sprzedaży + Zysk Netto */}
+                <div className="space-y-4">
                   
-                  {/* Suma Sprzedaży (ile klient zapłacił) */}
-                  <div className="flex items-center justify-between px-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold uppercase tracking-widest text-white/60">Suma Sprzedaży</span>
-                      <span className="text-[9px] font-normal text-white/30 italic">(obrót)</span>
+                  {/* Suma Sprzedaży (obrót) */}
+                  <div 
+                    className="flex items-center justify-between px-2 py-4 bg-white/5 rounded-xl border border-white/10 cursor-help"
+                    title="Suma Sprzedaży (obrót) to całkowita wartość wszystkich sprzedaży dzisiaj, zarówno gotówkowej jak i kartą."
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-xl bg-primary/20 flex items-center justify-center">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <span className="text-sm font-black uppercase tracking-widest text-white/80">Suma Sprzedaży</span>
+                        <span className="text-[10px] font-normal text-white/40 block italic mt-0.5">(obrót)</span>
+                      </div>
                     </div>
-                    <span className="text-xl font-black text-white/90 tabular-nums">
+                    <span className="text-2xl font-black text-white tabular-nums">
                       {totalSalesToday.toFixed(0)}
-                      <span className="text-sm font-normal text-white/40 ml-1">zł</span>
+                      <span className="text-sm font-normal text-white/50 ml-1.5">zł</span>
                     </span>
                   </div>
 
-                  {/* Zysk Netto - Grand Finale */}
-                  <div className="relative overflow-hidden bg-gradient-to-r from-emerald-600/20 via-green-500/15 to-emerald-500/20 border-2 border-emerald-500/30 rounded-2xl p-5 shadow-lg shadow-emerald-900/20">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(52,211,153,0.1)_0%,_transparent_70%)]" />
-                    <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent" />
+                  {/* Zysk Netto - Najważniejszy wskaźnik */}
+                  <div 
+                    className="relative overflow-hidden bg-gradient-to-r from-emerald-600/30 via-green-500/25 to-emerald-500/30 border-2 border-emerald-500/40 rounded-2xl p-6 shadow-xl shadow-emerald-900/30 cursor-help"
+                    title="Zysk Netto to suma marż ze wszystkich sprzedaży dzisiaj. To jest to, co faktycznie zarabiasz po odjęciu kosztów zakupu towarów."
+                  >
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(52,211,153,0.15)_0%,_transparent_70%)]" />
+                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400/70 to-transparent" />
                     
                     <div className="relative flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
-                          <DollarSign className="h-5 w-5 text-emerald-400" />
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shadow-lg shadow-emerald-900/20">
+                          <DollarSign className="h-6 w-6 text-emerald-400" />
                         </div>
                         <div>
-                          <span className="text-base font-black uppercase tracking-[0.2em] text-emerald-300">Zysk</span>
-                          <p className="text-[9px] font-normal text-emerald-400/50 mt-0.5">suma marż ze sprzedaży</p>
+                          <span className="text-lg font-black uppercase tracking-[0.25em] text-emerald-200">Zysk</span>
                         </div>
                       </div>
                       
                       <div className="text-right">
-                        <p className={`text-4xl font-black tabular-nums drop-shadow-[0_0_25px_rgba(52,211,153,0.5)] ${zyskNetto >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        <p className={`text-5xl font-black tabular-nums drop-shadow-[0_0_30px_rgba(52,211,153,0.5)] ${zyskNetto >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
                           {zyskNetto >= 0 ? '+' : ''}{zyskNetto.toFixed(0)}
                         </p>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-400/60 mt-0.5">zysk netto</p>
+                        <p className="text-sm font-bold uppercase tracking-[0.25em] text-emerald-300/70 mt-1.5">zysk netto</p>
                       </div>
                     </div>
                   </div>
                 </div>
+
+                {/* Divider przed przyciskiem */}
+                <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-4" />
+
+                {/* Przycisk Zamknij Dzień - teraz w środku panelu */}
+                <Button
+                  onClick={async () => {
+                    try {
+                      const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
+                      const shopId = activeEmployees[0]?.shopId || '';
+                      const userId = getSessionStorageSafe('userId', '');
+
+                      if (!shopId) {
+                        addToast({ title: "Brak sklepu", message: "Zaloguj się ponownie, aby zamknąć dzień.", variant: "error" });
+                        return;
+                      }
+
+                      const closed = await cashRegisterService.isTodayClosed(shopId);
+                      setIsTodayClosed(closed);
+
+                      if (closed) {
+                        addToast({ title: "Dzień już zamknięty", message: "Dzisiejszy dzień został już rozliczony.", variant: "info" });
+                        return;
+                      }
+
+                      setIsCloseDayDialogOpen(true);
+                    } catch {
+                      addToast({ title: "Błąd", message: "Nie udało się sprawdzić stanu kasy. Spróbuj ponownie.", variant: "error" });
+                    }
+                  }}
+                  className="w-full bg-gradient-to-r from-primary via-primary/90 to-primary/80 hover:from-primary/90 hover:via-primary/80 hover:to-primary/70 text-white font-black text-lg py-5 rounded-3xl shadow-2xl shadow-primary/30 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                >
+                  <div className="flex items-center justify-center gap-4">
+                    <Clock className="h-7 w-7" />
+                    <span className="tracking-widest uppercase">Zamknij Dzień</span>
+                  </div>
+                </Button>
               </div>
             </CardContent>
           </Card>
         </section>
-
-        {/* Przycisk Zamknij Dzień - Pod Zyskiem Netto */}
-        <Button
-          onClick={async () => {
-            try {
-              const activeEmployees = JSON.parse(sessionStorage.getItem('activeEmployees') || '[]');
-              const shopId = activeEmployees[0]?.shopId || '';
-              const userId = getSessionStorageSafe('userId', '');
-
-              if (!shopId) {
-                addToast({ title: "Brak sklepu", message: "Zaloguj się ponownie, aby zamknąć dzień.", variant: "error" });
-                return;
-              }
-
-              const closed = await cashRegisterService.isTodayClosed(shopId);
-              setIsTodayClosed(closed);
-
-              if (closed) {
-                addToast({ title: "Dzień już zamknięty", message: "Dzisiejszy dzień został już rozliczony.", variant: "info" });
-                return;
-              }
-
-              setIsCloseDayDialogOpen(true);
-            } catch {
-              addToast({ title: "Błąd", message: "Nie udało się sprawdzić stanu kasy. Spróbuj ponownie.", variant: "error" });
-            }
-          }}
-          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold text-sm py-4 rounded-2xl shadow-xl shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] mt-4"
-        >
-          <Clock className="h-5 w-5 mr-2" />
-          Zamknij Dzień - Zapisz Stan Kasy
-        </Button>
 
         {/* Dialog potwierdzenia zamknięcia dnia */}
         <Dialog open={isCloseDayDialogOpen} onOpenChange={setIsCloseDayDialogOpen}>
@@ -681,7 +946,7 @@ export default function Home() {
                 </div>
                 <div className="flex justify-between p-2 bg-gray-50 rounded-lg">
                   <span className="text-gray-500">Wpływy</span>
-                  <span className="font-bold">{totalSalesToday.toFixed(2)} zł</span>
+                  <span className="font-bold">{(totalSalesToday + doladowaniaToday).toFixed(2)} zł</span>
                 </div>
                 <div className="flex justify-between p-2 bg-gray-50 rounded-lg">
                   <span className="text-gray-500">Gotówka</span>
@@ -771,6 +1036,68 @@ export default function Home() {
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 {isClosingDay ? "Zamykanie..." : "Zamknij dzień"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Dialog Zasilania Gotówką */}
+        <Dialog open={isCashTopUpDialogOpen} onOpenChange={setIsCashTopUpDialogOpen}>
+          <DialogContent className="sm:max-w-md rounded-3xl border-none shadow-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3 text-xl">
+                <Banknote className="h-6 w-6 text-purple-600" />
+                Zasilanie Gotówką
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Sklep</label>
+                <Select 
+                  value={cashTopUpShopId}
+                  onValueChange={(val) => setCashTopUpShopId(val || '')}
+                  items={shops.map(shop => ({ value: shop.id, label: shop.name }))}
+                >
+                  <SelectTrigger className="h-12 rounded-xl bg-accent/30 border-none font-bold text-sm">
+                    <SelectValue placeholder="Wybierz sklep" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {shops.map(shop => (
+                      <SelectItem key={shop.id} value={shop.id}>
+                        {shop.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Kwota (zł)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={cashTopUpAmount}
+                  onChange={(e) => setCashTopUpAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="h-12 rounded-xl bg-accent/30 border-none font-bold text-lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Opis</label>
+                <textarea
+                  value={cashTopUpDescription}
+                  onChange={(e) => setCashTopUpDescription(e.target.value)}
+                  placeholder="np. Wpłata z banku..."
+                  className="w-full h-24 px-4 py-3 rounded-xl bg-accent/30 border-none resize-none font-medium text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-3 mt-6">
+              <DialogClose className="px-4 py-2 text-sm font-medium rounded-lg border hover:bg-gray-50">Anuluj</DialogClose>
+              <Button
+                onClick={handleAddCashTopUp}
+                className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg transition-all active:scale-95"
+              >
+                Dodaj zasilanie
               </Button>
             </DialogFooter>
           </DialogContent>

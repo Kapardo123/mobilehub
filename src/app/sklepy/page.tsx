@@ -75,17 +75,30 @@ export default function SklepyPage() {
       console.log('Pobrano sklepy z bazy:', shopsData);
       
       const shopsWithEmployees = await Promise.all(shopsData.map(async (shop) => {
-        const { count } = await supabase
+        // Join with users table, exclude owners, deleted, and inactive users
+        const { data: userShops, error } = await supabase
           .from('user_shops')
-          .select('*', { count: 'exact', head: true })
+          .select('user_id, users!inner(role, first_name, last_name, deleted_at, is_active)')
           .eq('shop_id', shop.id)
           .is('unassigned_at', null);
+        
+        console.log(`Sklep: ${shop.name}, userShops:`, userShops, 'error:', error);
+        
+        const employeeCount = userShops?.filter((us: any) => {
+          return (
+            us.users?.role !== 'owner' &&
+            !us.users?.deleted_at &&
+            us.users?.is_active
+          );
+        }).length || 0;
+        
+        console.log(`Sklep: ${shop.name}, employeeCount:`, employeeCount);
         
         return {
           id: shop.id,
           name: shop.name,
           address: shop.address || 'Brak adresu',
-          employees: count || 0,
+          employees: employeeCount,
           is_active: shop.is_active
         };
       }));
@@ -151,7 +164,7 @@ export default function SklepyPage() {
             id: createdShop.id,
             name: createdShop.name,
             address: createdShop.address || newShop.address,
-            employees: owners.length,
+            employees: 0,
             is_active: createdShop.is_active
           };
 

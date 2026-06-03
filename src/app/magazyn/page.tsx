@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils";
 import { useLocalStorage, useSessionStorage, getLocalStorageSafe, getSessionStorageSafe } from "@/lib/storage";
 import { formatDatePL, getCurrentDatePL, getCurrentTimePL, toISODateString } from "@/lib/dateFormat";
 import { inventoryService } from "@/lib/supabase/inventory";
+import { costsService } from "@/lib/supabase/costs";
 import {
   Select,
   SelectContent,
@@ -229,7 +230,8 @@ export default function MagazynPage() {
     { name: "Inne", category: "serwis", stock: 0, price: "", alert: false },
   ];
 
-  const [inventory, setInventory] = useLocalStorage<InventoryItem[]>('magazyn_inventory', getDefaultInventory() as InventoryItem[]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const categories = useMemo(() => [
     { id: "telefon", label: "Telefony", count: inventory.filter((i: typeof inventory[0]) => i.category === "telefon").length, icon: Smartphone, color: "text-primary", bg: "bg-accent/50", isLink: false, href: undefined },
@@ -265,34 +267,6 @@ export default function MagazynPage() {
   }, [isMounted]);
 
   useEffect(() => {
-    if (!isMounted) return;
-    const defaultItems = getDefaultInventory();
-    const existingNames = inventory.map(item => item.name);
-    const missingItems = defaultItems.filter(
-      item => !existingNames.includes(item.name)
-    );
-    if (missingItems.length > 0) {
-      setInventory([...inventory, ...missingItems] as InventoryItem[]);
-    }
-  }, [isMounted]);
-
-  useEffect(() => {
-    if (!isMounted || typeof window === "undefined") return;
-    
-    const currentShop = getSessionStorageSafe("shopName", "Kaufland Włocławek");
-    const needsMigration = inventory.some(item => item.category === "telefon" && !item.shop);
-    if (needsMigration) {
-      const updatedInventory = inventory.map(item => {
-        if (item.category === "telefon" && !item.shop) {
-          return { ...item, shop: currentShop };
-        }
-        return item;
-      });
-      setInventory(updatedInventory);
-    }
-  }, [isMounted, inventory]);
-
-  useEffect(() => {
     if (!isMounted || !isSessionChecked || typeof window === "undefined") return;
     
     console.log('Magazyn: Sprawdzanie autentykacji - isMounted:', isMounted, 'isSessionChecked:', isSessionChecked, 'userRole:', userRole);
@@ -309,52 +283,48 @@ export default function MagazynPage() {
     if (!isMounted || !userRole || typeof window === "undefined") return;
 
     const loadInventoryFromSupabase = async () => {
+      setIsLoading(true);
       try {
         const shopId = getSessionStorageSafe("shopId", "");
-        console.log('Magazyn: Ładowanie danych z Supabase, shopId:', shopId);
+        console.log('Magazyn: Ładowanie wszystkich danych z Supabase (bez filtrowania po sklepie), shopId:', shopId);
 
-        let supabaseData;
-        if (shopId) {
-          supabaseData = await inventoryService.getByShop(shopId);
-        } else {
-          supabaseData = await inventoryService.getAll();
-        }
+        // Zawsze ładuj wszystkie dane z magazynu, niezależnie od sklepu
+        const supabaseData = await inventoryService.getAll();
 
         console.log('Magazyn: Pobrano', supabaseData.length, 'pozycji z Supabase');
 
-        if (supabaseData.length > 0) {
-          const mappedItems = supabaseData.map(item => ({
-            id: item.id,
-            name: item.name || '',
-            category: item.category || 'telefon',
-            stock: item.stock_quantity || 1,
-            price: item.selling_price ? `${item.selling_price} zł` : '',
-            alert: item.is_low_stock || false,
-            imei: item.imei || '',
-            battery: item.battery_health || '',
-            color: item.color || '',
-            condition: item.condition === 'nowy' ? 'Nowy' : item.condition === 'uzywany' ? 'Używany' : 'Używany',
-            memory: item.memory || '',
-            brand: item.brand || '',
-            model: item.model || '',
-            purchasePrice: item.purchase_price?.toString() || '',
-            taxType: item.tax_type === 'VAT' ? 'VAT' : 'marza',
-            purchaseDate: item.purchase_date || '',
-            warranty: item.warranty_months ? `${item.warranty_months} m-cy` : '',
-            setIncludes: item.set_includes || '',
-            notes: item.notes || '',
-            statusSprzedany: item.is_sold || false,
-            dataSprzedazy: item.sold_at || '',
-            shop: ''
-          }));
+        const mappedItems = supabaseData.map(item => ({
+          id: item.id,
+          name: item.name || '',
+          category: item.category || 'telefon',
+          stock: item.stock_quantity || 1,
+          price: item.selling_price ? `${item.selling_price} zł` : '',
+          alert: item.is_low_stock || false,
+          imei: item.imei || '',
+          battery: item.battery_health || '',
+          color: item.color || '',
+          condition: item.condition === 'nowy' ? 'Nowy' : item.condition === 'uzywany' ? 'Używany' : 'Używany',
+          memory: item.memory || '',
+          brand: item.brand || '',
+          model: item.model || '',
+          purchasePrice: item.purchase_price?.toString() || '',
+          taxType: item.tax_type === 'VAT' ? 'VAT' : 'marza',
+          purchaseDate: item.purchase_date || '',
+          warranty: item.warranty_months ? `${item.warranty_months} m-cy` : '',
+          setIncludes: item.set_includes || '',
+          notes: item.notes || '',
+          statusSprzedany: item.is_sold || false,
+          dataSprzedazy: item.sold_at || '',
+          shop: item.shops?.name || ''
+        }));
 
-          setInventory(mappedItems as any);
-          localStorage.setItem('magazyn_inventory', JSON.stringify(mappedItems));
-          window.dispatchEvent(new CustomEvent('magazyn_updated'));
-          console.log('Magazyn: ✅ Zaktualizowano magazyn danymi z Supabase');
-        }
+        setInventory(mappedItems as any);
+        window.dispatchEvent(new CustomEvent('magazyn_updated'));
+        console.log('Magazyn: ✅ Zaktualizowano magazyn danymi z Supabase');
       } catch (error) {
         console.error('Magazyn: Błąd ładowania z Supabase:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -438,79 +408,129 @@ export default function MagazynPage() {
     return items;
   }, [inventory, selectedCategory, searchQuery, sortBy]);
 
-  const handleAddItem = () => {
-    if (!newItem.category) return;
+  const handleAddItem = async () => {
+    console.log('handleAddItem wywołane');
+    console.log('newItem:', newItem);
+    
+    if (!newItem.category) {
+      console.log('Brak category');
+      return;
+    }
     
     const phoneName = newItem.category === "telefon" 
       ? `${newItem.brand} ${newItem.model}`.trim()
       : newItem.name;
       
-    if (!phoneName) return;
+    console.log('phoneName:', phoneName);
+    if (!phoneName) {
+      console.log('Brak phoneName');
+      return;
+    }
 
-    const baseItem = {
-      name: phoneName,
-      category: newItem.category,
-      price: newItem.sellingPrice ? `${newItem.sellingPrice} zł` : "0 zł",
-      alert: false,
-      stock: newItem.category === "telefon" ? 1 : (newItem.stock ? parseInt(newItem.stock) : 0),
-      purchasePrice: newItem.purchasePrice || "",
-      sellingDate: newItem.sellingDate || "",
-      statusSprzedany: false,
-      dataSprzedazy: "",
-      addedBy: (() => {
-        const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForItem);
-        return selectedEmp?.name || (userRole === "owner" ? "Właściciel" : (getSessionStorageSafe("userName", "") || "Pracownik"));
-      })(),
-      addedDate: toISODateString(),
-      shop: (() => {
-        const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForItem);
-        return selectedEmp?.shop || getSessionStorageSafe("shopName", "Kaufland Włocławek");
-      })(),
-    };
-
-    const item = newItem.category === "telefon"
-      ? {
-          ...baseItem,
-          brand: newItem.brand,
-          model: newItem.model,
-          memory: newItem.memory,
-          battery: newItem.batteryHealth ? `${newItem.batteryHealth}%` : "",
-          color: newItem.color,
-          condition: newItem.condition,
-          imei: newItem.imei,
-          taxType: newItem.taxType,
-          purchaseDate: newItem.purchaseDate,
-          warranty: newItem.warranty,
-          setIncludes: newItem.setIncludes,
-          notes: newItem.notes,
-        }
-      : baseItem;
-
-    setInventory([...inventory, item as any]);
+    setIsLoading(true);
     
-    if (newItem.category === "telefon" && newItem.purchasePrice && parseFloat(newItem.purchasePrice) > 0) {
+    try {
       const selectedEmp = activeEmployees.find((e: any) => e.id === selectedEmployeeForItem);
-      const employeeName = selectedEmp?.name || getSessionStorageSafe("userName", "Pracownik");
-      const employeeId = selectedEmp?.id || getSessionStorageSafe("userId", "unknown");
-      const shopName = selectedEmp?.shop || getSessionStorageSafe("shopName", "Kaufland Włocławek");
+      const shopId = getSessionStorageSafe("shopId", "");
+      const employeeId = selectedEmp?.id || getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000");
       
-      const cost: Cost = {
-        id: Math.random().toString(36).substr(2, 9),
-        date: toISODateString(),
-        time: getCurrentTimePL(),
-        category: 'skup',
-        amount: parseFloat(newItem.purchasePrice),
-        description: `Skup: ${phoneName}`,
-        shop: shopName,
-        employeeId,
-        employeeName,
-        paymentMethod: 'gotowka'
+      console.log('shopId:', shopId);
+      console.log('employeeId:', employeeId);
+      
+      const warrantyMonths = newItem.warranty ? parseInt(newItem.warranty) : null;
+      
+      const dbItem = {
+        name: phoneName,
+        category: newItem.category as 'telefon' | 'akcesoria' | 'usluga' | 'serwis',
+        stock_quantity: newItem.category === "telefon" ? 1 : (newItem.stock ? parseInt(newItem.stock) : 0),
+        purchase_price: newItem.purchasePrice ? parseFloat(newItem.purchasePrice) : null,
+        selling_price: newItem.sellingPrice ? parseFloat(newItem.sellingPrice) : null,
+        is_sold: false,
+        brand: newItem.brand || null,
+        model: newItem.model || null,
+        memory: newItem.memory || null,
+        color: newItem.color || null,
+        condition: newItem.condition === "nowy" ? "nowy" : "uzywany" as const,
+        battery_health: newItem.batteryHealth ? `${newItem.batteryHealth}%` : null,
+        imei: newItem.imei || null,
+        tax_type: newItem.taxType as 'VAT' | 'marza' | 'zwolniony',
+        purchase_date: newItem.purchaseDate || null,
+        warranty_months: warrantyMonths,
+        set_includes: newItem.setIncludes || null,
+        notes: newItem.notes || null,
+        shop_id: shopId,
+        added_by: employeeId
       };
       
-      const existingCosts = getLocalStorageSafe('sprzedaz_costs', []);
-      localStorage.setItem('sprzedaz_costs', JSON.stringify([cost, ...existingCosts]));
+      console.log('dbItem do zapisu w Supabase:', dbItem);
+
+      const savedItem = await inventoryService.create(dbItem);
       
-      addToast({ message: `Koszt skupu dodany: ${newItem.purchasePrice} zł`, variant: "success" });
+      // Automatically add cost entry if purchase price exists and category is telefon
+      if (dbItem.category === 'telefon' && dbItem.purchase_price) {
+        const costData = {
+          cost_date: dbItem.purchase_date || toISODateString(),
+          cost_time: getCurrentTimePL(),
+          category: 'skup',
+          amount: dbItem.purchase_price,
+          description: `Skup: ${phoneName}${dbItem.imei ? ` (IMEI: ${dbItem.imei})` : ''}`,
+          payment_method: 'gotowka',
+          shop_id: shopId,
+          employee_id: employeeId
+        };
+        await costsService.create(costData);
+      }
+      
+      const mappedItem = {
+        id: savedItem.id,
+        name: savedItem.name,
+        category: savedItem.category,
+        stock: savedItem.stock_quantity,
+        price: savedItem.selling_price ? `${savedItem.selling_price} zł` : "",
+        alert: savedItem.is_low_stock,
+        imei: savedItem.imei || "",
+        battery: savedItem.battery_health || "",
+        color: savedItem.color || "",
+        condition: savedItem.condition === "nowy" ? "Nowy" : "Używany",
+        memory: savedItem.memory || "",
+        brand: savedItem.brand || "",
+        model: savedItem.model || "",
+        purchasePrice: savedItem.purchase_price?.toString() || "",
+        taxType: savedItem.tax_type === "VAT" ? "VAT" : "marza",
+        purchaseDate: savedItem.purchase_date || "",
+        warranty: savedItem.warranty_months ? `${savedItem.warranty_months} m-cy` : "",
+        setIncludes: savedItem.set_includes || "",
+        notes: savedItem.notes || "",
+        statusSprzedany: savedItem.is_sold,
+        dataSprzedazy: savedItem.sold_at || "",
+        shop: ""
+      };
+
+      setInventory([mappedItem as any, ...inventory]);
+      window.dispatchEvent(new CustomEvent('magazyn_updated'));
+      
+      addToast({
+        title: "Dodano przedmiot",
+        description: `${mappedItem.name} został dodany do magazynu`,
+        variant: "success"
+      });
+    } catch (error: any) {
+      console.error('Błąd dodawania przedmiotu:');
+      console.error('error:', error);
+      console.error('typeof error:', typeof error);
+      console.error('JSON.stringify(error):', JSON.stringify(error));
+      let errorMsg = "Nie udało się dodać przedmiotu do magazynu";
+      if (error?.message) errorMsg += `: ${error.message}`;
+      if (error?.code) errorMsg += ` (kod: ${error.code})`;
+      if (error?.details) errorMsg += ` | Szczegóły: ${error.details}`;
+      if (error?.hint) errorMsg += ` | Wskazówka: ${error.hint}`;
+      addToast({
+        title: "Błąd",
+        description: errorMsg,
+        variant: "error"
+      });
+    } finally {
+      setIsLoading(false);
     }
     
     setNewItem({
@@ -536,47 +556,45 @@ export default function MagazynPage() {
       dataSprzedazy: "",
     });
     setIsAddDialogOpen(false);
-    addToast({
-      title: "Dodano przedmiot",
-      description: `${item.name} został dodany do magazynu`,
-      variant: "success"
-    });
   };
 
   const handleDeleteItem = async (itemIndex: number) => {
     const item = filteredItems[itemIndex];
     const itemName = item.name;
-
-    const newInventory = inventory.filter((invItem) => {
-      if (item.imei && invItem.imei === item.imei) return false;
-      if (item.name === invItem.name && item.category === invItem.category && item.price === invItem.price) return false;
-      return true;
-    });
-
-    setInventory(newInventory);
-    window.dispatchEvent(new CustomEvent('magazyn_updated'));
-
-    // Usuń też z Supabase (soft delete) jeśli przedmiot ma id
-    if (item.id) {
-      try {
-        await inventoryService.softDelete(item.id);
-        console.log('Magazyn: ✅ Usunięto z Supabase:', itemName);
-      } catch (err) {
-        console.error('Magazyn: ❌ Błąd usuwania z Supabase:', err);
-        addToast({
-          title: "Usunięto lokalnie",
-          description: `${itemName} usunięto z magazynu, ale wystąpił błąd synchronizacji z bazą`,
-          variant: "error"
-        });
-        return;
-      }
+    
+    if (!item.id) {
+      addToast({
+        title: "Błąd",
+        description: "Nie można usunąć przedmiotu bez identyfikatora",
+        variant: "error"
+      });
+      return;
     }
 
-    addToast({
-      title: "Usunięto przedmiot",
-      description: `${itemName} został usunięty z magazynu`,
-      variant: "error"
-    });
+    setIsLoading(true);
+
+    try {
+      await inventoryService.softDelete(item.id);
+      
+      const newInventory = inventory.filter((invItem) => invItem.id !== item.id);
+      setInventory(newInventory);
+      window.dispatchEvent(new CustomEvent('magazyn_updated'));
+
+      addToast({
+        title: "Usunięto przedmiot",
+        description: `${itemName} został usunięty z magazynu`,
+        variant: "success"
+      });
+    } catch (err) {
+      console.error('Magazyn: ❌ Błąd usuwania z Supabase:', err);
+      addToast({
+        title: "Błąd",
+        description: "Nie udało się usunąć przedmiotu z magazynu",
+        variant: "error"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleEditItem = (itemIndex: number) => {
@@ -615,49 +633,96 @@ export default function MagazynPage() {
     setIsEditDialogOpen(true);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editingIndex === null || !editItem.name) return;
+    
+    const originalItem = inventory[editingIndex];
+    if (!originalItem.id) {
+      addToast({
+        title: "Błąd",
+        description: "Nie można zaktualizować przedmiotu bez identyfikatora",
+        variant: "error"
+      });
+      return;
+    }
 
-    const baseItem = {
-      name: editItem.name,
-      category: editItem.category,
-      price: editItem.sellingPrice ? `${editItem.sellingPrice} zł` : "0 zł",
-      alert: false,
-      stock: editItem.stock ? parseInt(editItem.stock) : 0,
-      purchasePrice: editItem.purchasePrice || "",
-      sellingDate: editItem.sellingDate || "",
-      statusSprzedany: editItem.statusSprzedany,
-      dataSprzedazy: editItem.dataSprzedazy || "",
-    };
+    setIsLoading(true);
+    
+    try {
+      const warrantyMonths = editItem.warranty ? parseInt(editItem.warranty) : null;
+      
+      const updates = {
+        name: editItem.name,
+        category: editItem.category as 'telefon' | 'akcesoria' | 'usluga' | 'serwis',
+        stock_quantity: editItem.stock ? parseInt(editItem.stock) : 0,
+        purchase_price: editItem.purchasePrice ? parseFloat(editItem.purchasePrice) : null,
+        selling_price: editItem.sellingPrice ? parseFloat(editItem.sellingPrice) : null,
+        is_sold: editItem.statusSprzedany,
+        sold_at: editItem.dataSprzedazy || null,
+        brand: editItem.brand || null,
+        model: editItem.model || null,
+        memory: editItem.memory || null,
+        color: editItem.color || null,
+        condition: editItem.condition === "nowy" ? "nowy" : "uzywany" as const,
+        battery_health: editItem.batteryHealth ? `${editItem.batteryHealth}%` : null,
+        imei: editItem.imei || null,
+        tax_type: editItem.taxType as 'VAT' | 'marza' | 'zwolniony',
+        purchase_date: editItem.purchaseDate || null,
+        warranty_months: warrantyMonths,
+        set_includes: editItem.setIncludes || null,
+        notes: editItem.notes || null
+      };
 
-    const updatedItem = editItem.category === "telefon"
-      ? {
-          ...baseItem,
-          brand: editItem.brand,
-          model: editItem.model,
-          memory: editItem.memory,
-          battery: editItem.batteryHealth ? `${editItem.batteryHealth}%` : "",
-          color: editItem.color,
-          condition: editItem.condition,
-          imei: editItem.imei,
-          taxType: editItem.taxType,
-          purchaseDate: editItem.purchaseDate,
-          warranty: editItem.warranty,
-          setIncludes: editItem.setIncludes,
-          notes: editItem.notes,
-        }
-      : baseItem;
+      const savedItem = await inventoryService.update(originalItem.id, updates);
+      
+      const mappedItem = {
+        ...originalItem,
+        id: savedItem.id,
+        name: savedItem.name,
+        category: savedItem.category,
+        stock: savedItem.stock_quantity,
+        price: savedItem.selling_price ? `${savedItem.selling_price} zł` : "",
+        alert: savedItem.is_low_stock,
+        imei: savedItem.imei || "",
+        battery: savedItem.battery_health || "",
+        color: savedItem.color || "",
+        condition: savedItem.condition === "nowy" ? "Nowy" : "Używany",
+        memory: savedItem.memory || "",
+        brand: savedItem.brand || "",
+        model: savedItem.model || "",
+        purchasePrice: savedItem.purchase_price?.toString() || "",
+        taxType: savedItem.tax_type === "VAT" ? "VAT" : "marza",
+        purchaseDate: savedItem.purchase_date || "",
+        warranty: savedItem.warranty_months ? `${savedItem.warranty_months} m-cy` : "",
+        setIncludes: savedItem.set_includes || "",
+        notes: savedItem.notes || "",
+        statusSprzedany: savedItem.is_sold,
+        dataSprzedazy: savedItem.sold_at || ""
+      };
 
-    const newInventory = [...inventory];
-    newInventory[editingIndex] = updatedItem as any;
-    setInventory(newInventory);
+      const newInventory = [...inventory];
+      newInventory[editingIndex] = mappedItem as any;
+      setInventory(newInventory);
+      window.dispatchEvent(new CustomEvent('magazyn_updated'));
+      
+      addToast({
+        title: "Zapisano zmiany",
+        description: `${mappedItem.name} został zaktualizowany`,
+        variant: "success"
+      });
+    } catch (error) {
+      console.error('Błąd zapisywania zmian:', error);
+      addToast({
+        title: "Błąd",
+        description: "Nie udało się zaktualizować przedmiotu",
+        variant: "error"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+    
     setIsEditDialogOpen(false);
     setEditingIndex(null);
-    addToast({
-      title: "Zapisano zmiany",
-      description: `${updatedItem.name} został zaktualizowany`,
-      variant: "success"
-    });
   };
 
   const copyToClipboard = (text: string) => {
@@ -682,7 +747,7 @@ export default function MagazynPage() {
             <h1 className="text-xl font-bold tracking-tight text-foreground">Magazyn</h1>
           </div>
 
-            {isMounted && userRole === "owner" && (
+            {isMounted && userRole && (
               <>
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogContent className="sm:max-w-[500px] rounded-3xl border-none p-0 overflow-hidden max-h-[80vh] flex flex-col">
@@ -972,13 +1037,54 @@ export default function MagazynPage() {
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsAddUslugaDialogOpen(false)} className="rounded-xl">Anuluj</Button>
                     <Button 
-                      onClick={() => {
-                        if (newItem.name.trim()) {
-                          setInventory([...inventory, { name: newItem.name, category: "usluga", stock: 0, price: "", alert: false }]);
-                          setNewItem({...newItem, name: ""});
-                          setIsAddUslugaDialogOpen(false);
+                      onClick={async () => {
+                        if (!newItem.name.trim()) return;
+                        
+                        setIsLoading(true);
+                        
+                        try {
+                          const shopId = getSessionStorageSafe("shopId", "");
+                          const employeeId = getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000");
+                          
+                          const dbItem = {
+                            name: newItem.name.trim(),
+                            category: "usluga" as const,
+                            stock_quantity: 0,
+                            is_sold: false,
+                            shop_id: shopId,
+                            added_by: employeeId,
+                            is_low_stock: false,
+                            stock_alert_threshold: 0,
+                            tax_type: "zwolniony" as const
+                          };
+                          
+                          const savedItem = await inventoryService.create(dbItem);
+                          
+                          const mappedItem = {
+                            id: savedItem.id,
+                            name: savedItem.name,
+                            category: savedItem.category,
+                            stock: savedItem.stock_quantity,
+                            price: "",
+                            alert: false,
+                            statusSprzedany: false,
+                            dataSprzedazy: "",
+                            shop: ""
+                          };
+                          
+                          setInventory([mappedItem as any, ...inventory]);
+                          window.dispatchEvent(new CustomEvent('magazyn_updated'));
+                          
                           addToast({ message: "Dodano usługę", variant: "success" });
+                        } catch (error) {
+                          console.error('Błąd dodawania usługi:', error);
+                          addToast({ message: "Nie udało się dodać usługi", variant: "error" });
+                        } finally {
+                          setIsLoading(false);
                         }
+                        
+                        setNewItem({...newItem, name: ""});
+                        setIsAddUslugaDialogOpen(false);
                       }}
                       className="rounded-xl bg-secondary hover:bg-secondary/90 text-white"
                     >
@@ -1010,13 +1116,54 @@ export default function MagazynPage() {
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsAddSerwisDialogOpen(false)} className="rounded-xl">Anuluj</Button>
                     <Button 
-                      onClick={() => {
-                        if (newItem.name.trim()) {
-                          setInventory([...inventory, { name: newItem.name, category: "serwis", stock: 0, price: "", alert: false }]);
-                          setNewItem({...newItem, name: ""});
-                          setIsAddSerwisDialogOpen(false);
+                      onClick={async () => {
+                        if (!newItem.name.trim()) return;
+                        
+                        setIsLoading(true);
+                        
+                        try {
+                          const shopId = getSessionStorageSafe("shopId", "");
+                          const employeeId = getSessionStorageSafe("userId", "00000000-0000-0000-0000-000000000000");
+                          
+                          const dbItem = {
+                            name: newItem.name.trim(),
+                            category: "serwis" as const,
+                            stock_quantity: 0,
+                            is_sold: false,
+                            shop_id: shopId,
+                            added_by: employeeId,
+                            is_low_stock: false,
+                            stock_alert_threshold: 0,
+                            tax_type: "zwolniony" as const
+                          };
+                          
+                          const savedItem = await inventoryService.create(dbItem);
+                          
+                          const mappedItem = {
+                            id: savedItem.id,
+                            name: savedItem.name,
+                            category: savedItem.category,
+                            stock: savedItem.stock_quantity,
+                            price: "",
+                            alert: false,
+                            statusSprzedany: false,
+                            dataSprzedazy: "",
+                            shop: ""
+                          };
+                          
+                          setInventory([mappedItem as any, ...inventory]);
+                          window.dispatchEvent(new CustomEvent('magazyn_updated'));
+                          
                           addToast({ message: "Dodano serwis", variant: "success" });
+                        } catch (error) {
+                          console.error('Błąd dodawania serwisu:', error);
+                          addToast({ message: "Nie udało się dodać serwisu", variant: "error" });
+                        } finally {
+                          setIsLoading(false);
                         }
+                        
+                        setNewItem({...newItem, name: ""});
+                        setIsAddSerwisDialogOpen(false);
                       }}
                       className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white"
                     >
@@ -1026,10 +1173,7 @@ export default function MagazynPage() {
                 </div>
               </DialogContent>
             </Dialog>
-          </>
-          )}
 
-        {isMounted && userRole === "owner" && (
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogContent className="sm:max-w-[550px] rounded-3xl border-none p-0 overflow-hidden max-h-[85vh] flex flex-col">
               <DialogHeader className="p-8 bg-gradient-to-br from-primary to-primary/80 text-white relative shrink-0">
@@ -1318,7 +1462,10 @@ export default function MagazynPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        )}
+          </>
+          )}
+
+
       </div>
 
         <div className="flex items-center gap-2 px-1">
@@ -1392,7 +1539,7 @@ export default function MagazynPage() {
           ))}
         </div>
 
-        {isMounted && userRole === "owner" && selectedCategory === "usluga" && (
+        {isMounted && userRole && selectedCategory === "usluga" && (
           <div className="flex justify-end">
             <Button size="sm" className="h-9 rounded-xl bg-gradient-to-r from-secondary to-secondary/80 hover:from-secondary/90 hover:to-secondary/70 text-white text-xs font-semibold tracking-tight shadow-sm transition-all duration-300" onClick={() => setIsAddUslugaDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />
@@ -1401,7 +1548,7 @@ export default function MagazynPage() {
           </div>
         )}
 
-        {isMounted && userRole === "owner" && selectedCategory === "serwis" && (
+        {isMounted && userRole && selectedCategory === "serwis" && (
           <div className="flex justify-end">
             <Button size="sm" className="h-9 rounded-xl bg-gradient-to-r from-secondary to-secondary/80 hover:from-secondary/90 hover:to-secondary/70 text-white text-xs font-semibold tracking-tight shadow-sm transition-all duration-300" onClick={() => setIsAddSerwisDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />
@@ -1410,18 +1557,68 @@ export default function MagazynPage() {
           </div>
         )}
 
-        {isMounted && userRole === "owner" && selectedCategory === "telefon" && (
+        {isMounted && userRole && selectedCategory === "telefon" && (
           <div className="flex justify-end">
-            <Button size="sm" className="h-9 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white text-xs font-semibold tracking-tight shadow-sm shadow-primary/20 transition-all duration-300" onClick={() => setIsAddDialogOpen(true)}>
+            <Button size="sm" className="h-9 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white text-xs font-semibold tracking-tight shadow-sm shadow-primary/20 transition-all duration-300" onClick={() => {
+              console.log('Przycisk Dodaj telefon kliknięty, selectedCategory:', selectedCategory);
+              setNewItem({
+                name: "",
+                category: selectedCategory, // Ustawiamy kategorię na wybraną
+                stock: "",
+                purchasePrice: "",
+                sellingPrice: "",
+                brand: "",
+                model: "",
+                memory: "",
+                batteryHealth: "",
+                condition: "używany",
+                color: "",
+                setIncludes: "",
+                notes: "",
+                warranty: "",
+                imei: "",
+                taxType: "marza",
+                purchaseDate: toISODateString(),
+                sellingDate: "",
+                statusSprzedany: false,
+                dataSprzedazy: "",
+              });
+              setIsAddDialogOpen(true);
+            }}>
               <Plus className="h-4 w-4 mr-1" />
               Dodaj telefon
             </Button>
           </div>
         )}
 
-        {isMounted && userRole === "owner" && selectedCategory === "akcesoria" && (
+        {isMounted && userRole && selectedCategory === "akcesoria" && (
           <div className="flex justify-end">
-            <Button size="sm" className="h-9 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white text-xs font-semibold tracking-tight shadow-sm shadow-primary/20 transition-all duration-300" onClick={() => setIsAddDialogOpen(true)}>
+            <Button size="sm" className="h-9 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white text-xs font-semibold tracking-tight shadow-sm shadow-primary/20 transition-all duration-300" onClick={() => {
+              console.log('Przycisk Dodaj akcesoria kliknięty, selectedCategory:', selectedCategory);
+              setNewItem({
+                name: "",
+                category: selectedCategory, // Ustawiamy kategorię na wybraną
+                stock: "",
+                purchasePrice: "",
+                sellingPrice: "",
+                brand: "",
+                model: "",
+                memory: "",
+                batteryHealth: "",
+                condition: "używany",
+                color: "",
+                setIncludes: "",
+                notes: "",
+                warranty: "",
+                imei: "",
+                taxType: "marza",
+                purchaseDate: toISODateString(),
+                sellingDate: "",
+                statusSprzedany: false,
+                dataSprzedazy: "",
+              });
+              setIsAddDialogOpen(true);
+            }}>
               <Plus className="h-4 w-4 mr-1" />
               Dodaj akcesoria
             </Button>
@@ -1508,7 +1705,7 @@ export default function MagazynPage() {
                   <span className="text-sm font-bold text-foreground tracking-tight min-w-[60px] text-right">{item.price}</span>
                 )}
                 
-                {!item.statusSprzedany && userRole === "owner" && (
+                {!item.statusSprzedany && userRole && (
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
                       onClick={() => handleEditItem(index)}

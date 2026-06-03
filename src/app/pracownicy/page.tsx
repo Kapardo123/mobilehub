@@ -87,26 +87,31 @@ export default function PracownicyPage() {
       }
       
       if (data && data.length > 0) {
-        const formattedEmployees = data.map(user => {
-          const shopNames = user.shops && Array.isArray(user.shops) && user.shops.length > 0 
-            ? user.shops.map((s: any) => s.shop_name)
-            : ["Brak przypisanego sklepu"];
-          
-          console.log(`Pracownik: ${user.first_name} ${user.last_name}, sklepy:`, shopNames);
-          
-          return {
-            id: user.id,
-            name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Pracownik',
-            role: user.role === 'owner' ? 'Właściciel' : 
-                  user.role === 'admin' ? 'Administrator' : 
-                  user.role === 'employee' ? 'Pracownik' : user.role,
-            initials: user.initials || '??',
-            shops: shopNames,
-            status: user.is_active ? "Online" : "Offline",
-            login: user.login || '',
-            password: `PIN ${user.password_hash?.substring(0, 6) || '******'}`
-          };
-        });
+        console.log('Wszyscy użytkownicy z bazy:', data);
+        
+        const formattedEmployees = data
+          .filter(user => user.role !== 'owner')  // Filter out owners
+          .map(user => {
+            const shopNames = user.shops && Array.isArray(user.shops) && user.shops.length > 0 
+              ? user.shops.map((s: any) => s.shop_name)
+              : ["Brak przypisanego sklepu"];
+            
+            console.log(`Pracownik: ${user.first_name} ${user.last_name}, sklepy:`, shopNames);
+            
+            return {
+              id: user.id,
+              name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Pracownik',
+              role: user.role === 'admin' ? 'Administrator' : 
+                    user.role === 'employee' ? 'Pracownik' : user.role,
+              initials: user.initials || '??',
+              shops: shopNames,
+              status: user.is_active ? "Online" : "Offline",
+              login: user.login || '',
+              password: `PIN ${user.password_hash?.substring(0, 6) || '******'}`
+            };
+          });
+        
+        console.log('Formatted employees:', formattedEmployees);
         
         setEmployees(formattedEmployees);
         console.log('Ustawiono pracowników:', formattedEmployees.length);
@@ -168,9 +173,7 @@ export default function PracownicyPage() {
         login: newEmployee.login,
         password_hash: newEmployee.password,
         email: `${newEmployee.login.toLowerCase()}@test.com`,
-        role: (newEmployee.role === 'pracownik' ? 'employee' :
-              newEmployee.role === 'wlasciciel' ? 'owner' :
-              newEmployee.role) as 'owner' | 'employee' | 'admin',
+        role: 'employee' as const,
         is_active: true,
         deleted_at: null
       });
@@ -219,7 +222,7 @@ export default function PracownicyPage() {
       const employee = {
         id: createdUser.id,
         name: newEmployee.name,
-        role: newEmployee.role.charAt(0).toUpperCase() + newEmployee.role.slice(1),
+        role: "Pracownik",
         initials: initials,
         shops: [shopLabel],
         status: "Offline",
@@ -458,8 +461,7 @@ export default function PracownicyPage() {
                         value={newEmployee.role}
                         onValueChange={(val) => val && setNewEmployee({ ...newEmployee, role: val })}
                         items={[
-                          { value: "pracownik", label: "Pracownik" },
-                          { value: "wlasciciel", label: "Właściciel" }
+                          { value: "pracownik", label: "Pracownik" }
                         ]}
                       >
                         <UISelectTrigger className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase text-foreground">
@@ -467,7 +469,6 @@ export default function PracownicyPage() {
                         </UISelectTrigger>
                         <UISelectContent className="rounded-2xl">
                           <UISelectItem value="pracownik">Pracownik</UISelectItem>
-                          <UISelectItem value="wlasciciel">Właściciel</UISelectItem>
                         </UISelectContent>
                       </UISelect>
                     </div>

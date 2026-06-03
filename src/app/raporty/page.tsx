@@ -26,7 +26,8 @@ import {
   Smartphone,
   Package,
   Wrench,
-  Settings
+  Settings,
+  Banknote
 } from "lucide-react";
 
 interface SaleItem {
@@ -111,6 +112,7 @@ export default function RaportyPage() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
   const [costs, setCosts] = useState<any[]>([]);
+  const [cashTopUps, setCashTopUps] = useState<any[]>([]);
   const [showPurchasedPhones, setShowPurchasedPhones] = useState<string | null>(null);
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
   const [visiblePhoneCount, setVisiblePhoneCount] = useState(5);
@@ -124,11 +126,14 @@ export default function RaportyPage() {
 
   const [shopsList, setShopsList] = useState<any[]>([]);
   
+  // Generate dynamic shops list from database
   const shops = [
     { id: "all", label: "Wszystkie sklepy", uuid: null },
-    { id: "kaufland-wloclawek", label: "Kaufland Włocławek", uuid: null },
-    { id: "riviera-gdynia", label: "Riviera Gdynia", uuid: null },
-    { id: "dominikanska-wroclaw", label: "Dominikańska Wrocław", uuid: null }
+    ...shopsList.map(shop => ({
+      id: shop.id, // Use shop UUID directly
+      label: shop.name,
+      uuid: shop.id
+    }))
   ];
 
   useEffect(() => {
@@ -379,7 +384,7 @@ export default function RaportyPage() {
               imei: item.imei || undefined
             };
           }),
-          shop: shops.find(s => s.id === sale.shop_id)?.label || 'Nieznany sklep'
+          shop: sale.shop?.name || shopsList.find(s => s.id === sale.shop_id)?.name || 'Nieznany sklep'
           };
         });
         
@@ -414,7 +419,13 @@ export default function RaportyPage() {
         const dbCosts = await costsService.getByDateRange(costsStartDate, costsEndDate, effectiveShopUuid);
         
         console.log(`💰 Pobrano ${dbCosts.length} kosztów z bazy`);
-        setCosts(dbCosts);
+        
+        // Split into regular costs and cash top-ups
+        const regularCosts = dbCosts.filter(cost => cost.category?.toLowerCase() !== 'gotowka');
+        const cashTopUpsFromDB = dbCosts.filter(cost => cost.category?.toLowerCase() === 'gotowka');
+        
+        setCosts(regularCosts);
+        setCashTopUps(cashTopUpsFromDB);
         
         console.log('📦 Pobrano magazyn:', inventory.length > 0 ? inventory.length : 0, 'pozycji');
         
@@ -457,16 +468,23 @@ export default function RaportyPage() {
       
       let shopMatch = true;
       if (shopIdForUI && shopIdForUI !== 'all' && shopIdForUI !== '') {
-        const shopName = shopIdForUI === 'kaufland-wloclawek' ? 'Kaufland Włocławek' : 
-                         shopIdForUI === 'riviera-gdynia' ? 'Riviera Gdynia' : 
-                         shopIdForUI === 'dominikanska-wroclaw' ? 'Dominikańska Wrocław' : 
-                         shopIdForUI; // Dla employee: użyj bezpośrednio nazwy
-        shopMatch = sale.shop === shopName || sale.shop?.includes(shopName);
+        if (isEmployee) {
+          // For employee: match by shop name
+          shopMatch = sale.shop === currentShopName || sale.shop?.includes(currentShopName);
+        } else {
+          // For owner: match by shop UUID or shop name
+          const selectedShopData = shopsList.find(s => s.id === selectedShop);
+          if (selectedShopData) {
+            shopMatch = (sale as any).shop_id === selectedShop || 
+                       sale.shop === selectedShopData.name || 
+                       sale.shop?.includes(selectedShopData.name);
+          }
+        }
       }
       
       return saleMonth === selectedMonth && saleYear === selectedYear && shopMatch;
     });
-  }, [sales, selectedMonth, selectedYear, shopIdForUI]);
+  }, [sales, selectedMonth, selectedYear, shopIdForUI, isEmployee, currentShopName, selectedShop, shopsList]);
 
   // Generate report data for shops tab
   const reportData = useMemo(() => {
@@ -486,7 +504,14 @@ export default function RaportyPage() {
       });
       
       const profit = daySales.reduce((sum: number, sale: Sale) => sum + sale.items.reduce((s: number, item: SaleItem) => s + item.profit, 0), 0);
-      const revenue = daySales.reduce((sum: number, sale: Sale) => sum + sale.items.reduce((s: number, item: SaleItem) => s + item.price, 0), 0);
+      let revenue = daySales.reduce((sum: number, sale: Sale) => sum + sale.items.reduce((s: number, item: SaleItem) => s + item.price, 0), 0);
+      
+      // Add cash top-ups to revenue
+      const dayCashTopUps = cashTopUps.filter(topUp => {
+        const topUpDate = new Date(topUp.cost_date);
+        return topUpDate.getDate() === day;
+      });
+      revenue += dayCashTopUps.reduce((sum: number, topUp: any) => sum + Number(topUp.amount), 0);
       
       // Pobierz koszty dla tego konkretnego dnia
       const dayCosts = costs.filter(cost => {
@@ -509,7 +534,7 @@ export default function RaportyPage() {
         isWeekend
       };
     });
-  }, [filteredSales, selectedMonth, selectedYear, costs]);
+  }, [filteredSales, selectedMonth, selectedYear, costs, cashTopUps]);
 
   // Helper function to get week number
   const getWeekNumber = (date: Date) => {
@@ -549,11 +574,16 @@ export default function RaportyPage() {
         
         let shopMatch = true;
         if (shopIdForUI && shopIdForUI !== 'all' && shopIdForUI !== '') {
-          const shopName = shopIdForUI === 'kaufland-wloclawek' ? 'Kaufland Włocławek' : 
-                           shopIdForUI === 'riviera-gdynia' ? 'Riviera Gdynia' : 
-                           shopIdForUI === 'dominikanska-wroclaw' ? 'Dominikańska Wrocław' : 
-                           shopIdForUI;
-          shopMatch = employeeShops.includes(shopName) || employeeShops.some((s: string) => s.includes(shopName));
+          if (isEmployee) {
+            // For employee: match by shop name
+            shopMatch = employeeShops.includes(currentShopName) || employeeShops.some((s: string) => s.includes(currentShopName));
+          } else {
+            // For owner: match by shop name from selected shop
+            const selectedShopData = shopsList.find(s => s.id === selectedShop);
+            if (selectedShopData) {
+              shopMatch = employeeShops.includes(selectedShopData.name) || employeeShops.some((s: string) => s.includes(selectedShopData.name));
+            }
+          }
         }
         
         if (shopMatch) {
@@ -693,23 +723,23 @@ export default function RaportyPage() {
     // Calculate skup (purchase) stats from inventory
     if (inventory.length > 0) {
       inventory.forEach((item: any) => {
-        if (item.category === "telefon" && item.addedBy) {
+        if (item.category === "telefon" && item.added_by) {
           // Find employee by name or initials
           const employee = employees.find((e: any) => 
-            e.name === item.addedBy || 
-            e.initials === item.addedBy ||
-            `${e.name} (${e.initials})` === item.addedBy
+            e.name === item.added_by || 
+            e.initials === item.added_by ||
+            `${e.name} (${e.initials})` === item.added_by
           );
           
           if (employee) {
             const empData = employeeMap.get(employee.id);
             if (empData) {
               empData.skupStats.telefonySkupCount += 1;
-              const purchasePrice = parseInt(item.purchasePrice) || 0;
+              const purchasePrice = parseInt(item.purchase_price) || 0;
               empData.skupStats.telefonySkupTotal += purchasePrice;
               
               // Count phones still in stock (not sold)
-              if (!item.statusSprzedany) {
+              if (!item.status_sprzedany) {
                 empData.skupStats.telefonyNaStanie += 1;
               }
             }
@@ -722,7 +752,7 @@ export default function RaportyPage() {
     console.log('✅ Wygenerowano raport dla', result.length, 'pracowników:', result.map(e => ({ name: e.name, salesTotal: e.salesTotal })));
     
     return result;
-  }, [employees, filteredSales, shopIdForUI, inventory, isEmployee, currentUserId]);
+  }, [employees, filteredSales, shopIdForUI, inventory, isEmployee, currentUserId, selectedShop, shopsList]);
 
   const totals = useMemo(() => {
     return reportData.reduce((acc, curr) => ({
@@ -855,65 +885,119 @@ export default function RaportyPage() {
         </div>
 
         {activeTab === 'sklepy' ? (
-          /* SHOPS VIEW - EXCEL TABLE */
-          <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden border border-primary/5">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table className="border-collapse">
-                  <TableHeader>
-                    <TableRow className="bg-secondary hover:bg-secondary border-none">
-                      <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-14 border-r border-white/5">Dzień</TableHead>
-                      <TableHead className="text-white font-black uppercase text-[10px] tracking-widest border-r border-white/5">L.P.</TableHead>
-                      <TableHead className="text-white font-black uppercase text-[10px] tracking-widest text-center bg-primary/20 border-r border-white/5">Zysk ({months[selectedMonth].toLowerCase()})</TableHead>
-                      <TableHead className="text-white font-black uppercase text-[10px] tracking-widest text-right border-r border-white/5">Wpływ</TableHead>
-                      <TableHead className="text-white font-black uppercase text-[10px] tracking-widest text-right border-r border-white/5">Koszta</TableHead>
-                      <TableHead className="text-white font-black uppercase text-[10px] tracking-widest text-right">{selectedYear}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reportData.map((day, i) => (
-                      <TableRow 
-                        key={i} 
-                        className={cn(
-                          "border-b border-primary/5 hover:bg-accent/30 transition-colors",
-                          day.dayName === "niedziela" ? "bg-accent/10" : "",
-                          day.costs < -1000 ? "bg-red-50/50" : "",
-                          day.profit > 1500 ? "bg-primary/5" : ""
-                        )}
-                      >
-                        <TableCell className="font-bold text-muted-foreground text-xs py-3 border-r border-primary/5">{day.dayName}</TableCell>
-                        <TableCell className="font-black text-foreground text-xs border-r border-primary/5">{day.fullDate}</TableCell>
-                        <TableCell className="text-center font-black text-primary bg-accent/30 border-r border-primary/5">
-                          {isMounted ? (day.profit > 0 ? day.profit : 0) : 0}
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-foreground border-r border-primary/5">{isMounted ? day.revenue : 0}</TableCell>
-                        <TableCell className={cn(
-                          "text-right font-black border-r border-primary/5",
-                          day.costs < 0 ? "text-red-500" : "text-muted-foreground"
-                        )}>
-                          {isMounted ? (day.costs !== 0 ? day.costs : 0) : 0}
-                        </TableCell>
-                        <TableCell className="text-right font-black text-foreground bg-accent/10">
-                          {isMounted ? day.cumulative : 0}
+          <div className="space-y-6">
+            {/* SHOPS VIEW - EXCEL TABLE */}
+            <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden border border-primary/5">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table className="border-collapse">
+                    <TableHeader>
+                      <TableRow className="bg-secondary hover:bg-secondary border-none">
+                        <TableHead className="text-white font-black uppercase text-[10px] tracking-widest h-14 border-r border-white/5">Dzień</TableHead>
+                        <TableHead className="text-white font-black uppercase text-[10px] tracking-widest border-r border-white/5">L.P.</TableHead>
+                        <TableHead className="text-white font-black uppercase text-[10px] tracking-widest text-center bg-primary/20 border-r border-white/5">Zysk ({months[selectedMonth].toLowerCase()})</TableHead>
+                        <TableHead className="text-white font-black uppercase text-[10px] tracking-widest text-right border-r border-white/5">Wpływ</TableHead>
+                        <TableHead className="text-white font-black uppercase text-[10px] tracking-widest text-right border-r border-white/5">Koszta</TableHead>
+                        <TableHead className="text-white font-black uppercase text-[10px] tracking-widest text-right">{selectedYear}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reportData.map((day, i) => (
+                        <TableRow 
+                          key={i} 
+                          className={cn(
+                            "border-b border-primary/5 hover:bg-accent/30 transition-colors",
+                            day.dayName === "niedziela" ? "bg-accent/10" : "",
+                            day.costs < -1000 ? "bg-red-50/50" : "",
+                            day.profit > 1500 ? "bg-primary/5" : ""
+                          )}
+                        >
+                          <TableCell className="font-bold text-muted-foreground text-xs py-3 border-r border-primary/5">{day.dayName}</TableCell>
+                          <TableCell className="font-black text-foreground text-xs border-r border-primary/5">{day.fullDate}</TableCell>
+                          <TableCell className="text-center font-black text-primary bg-accent/30 border-r border-primary/5">
+                            {isMounted ? (day.profit > 0 ? day.profit : 0) : 0}
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-foreground border-r border-primary/5">{isMounted ? day.revenue : 0}</TableCell>
+                          <TableCell className={cn(
+                            "text-right font-black border-r border-primary/5",
+                            day.costs < 0 ? "text-red-500" : "text-muted-foreground"
+                          )}>
+                            {isMounted ? (day.costs !== 0 ? day.costs : 0) : 0}
+                          </TableCell>
+                          <TableCell className="text-right font-black text-foreground bg-accent/10">
+                            {isMounted ? day.cumulative : 0}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      
+                      {/* Summary Row */}
+                      <TableRow className="bg-secondary hover:bg-secondary border-none">
+                        <TableCell colSpan={2} className="text-white font-black uppercase text-[10px] tracking-widest py-6 text-right border-r border-white/5">Suma Miesiąca:</TableCell>
+                        <TableCell className="text-center text-primary font-black text-lg bg-primary/10 border-r border-white/5">{isMounted ? totals.profit : 0}</TableCell>
+                        <TableCell className="text-right text-white font-black text-lg border-r border-white/5">{isMounted ? totals.revenue : 0}</TableCell>
+                        <TableCell className="text-right text-red-400 font-black text-lg border-r border-white/5">{isMounted ? totals.costs : 0}</TableCell>
+                        <TableCell className="text-right text-primary font-black text-xl bg-white/5">
+                          {isMounted ? (reportData[reportData.length - 1]?.cumulative || 0) : 0}
                         </TableCell>
                       </TableRow>
-                    ))}
-                    
-                    {/* Summary Row */}
-                    <TableRow className="bg-secondary hover:bg-secondary border-none">
-                      <TableCell colSpan={2} className="text-white font-black uppercase text-[10px] tracking-widest py-6 text-right border-r border-white/5">Suma Miesiąca:</TableCell>
-                      <TableCell className="text-center text-primary font-black text-lg bg-primary/10 border-r border-white/5">{isMounted ? totals.profit : 0}</TableCell>
-                      <TableCell className="text-right text-white font-black text-lg border-r border-white/5">{isMounted ? totals.revenue : 0}</TableCell>
-                      <TableCell className="text-right text-red-400 font-black text-lg border-r border-white/5">{isMounted ? totals.costs : 0}</TableCell>
-                      <TableCell className="text-right text-primary font-black text-xl bg-white/5">
-                        {isMounted ? (reportData[reportData.length - 1]?.cumulative || 0) : 0}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* CASH TOP-UPS TABLE - COMPACT */}
+            {cashTopUps.length > 0 && (
+              <Card className="border-none shadow-lg bg-white rounded-3xl overflow-hidden border border-purple-100">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-8 w-8 rounded-xl bg-purple-100 flex items-center justify-center">
+                      <Banknote className="h-4 w-4 text-purple-600" />
+                    </div>
+                    <h3 className="font-black text-foreground uppercase text-xs tracking-widest">Doładowania Gotówką</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <Table className="border-collapse">
+                      <TableHeader>
+                        <TableRow className="bg-purple-50 hover:bg-purple-50 border-none">
+                          <TableHead className="text-purple-700 font-black uppercase text-[9px] tracking-widest h-10 border-b border-purple-100">Data</TableHead>
+                          <TableHead className="text-purple-700 font-black uppercase text-[9px] tracking-widest h-10 border-b border-purple-100">Sklep</TableHead>
+                          <TableHead className="text-purple-700 font-black uppercase text-[9px] tracking-widest h-10 border-b border-purple-100 text-right">Kwota</TableHead>
+                          <TableHead className="text-purple-700 font-black uppercase text-[9px] tracking-widest h-10 border-b border-purple-100">Opis</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cashTopUps.map((topUp, i) => (
+                          <TableRow key={i} className="border-b border-purple-50 hover:bg-purple-50/50 transition-colors">
+                            <TableCell className="text-xs py-2 font-medium text-muted-foreground">
+                              {new Date(topUp.cost_date).toLocaleDateString('pl-PL')}
+                            </TableCell>
+                            <TableCell className="text-xs py-2 font-bold text-foreground">
+                              {topUp.shop?.name || shopsList.find(s => s.id === topUp.shop_id)?.name || 'Nieznany'}
+                            </TableCell>
+                            <TableCell className="text-xs py-2 font-black text-purple-600 text-right">
+                              {Number(topUp.amount).toFixed(0)} zł
+                            </TableCell>
+                            <TableCell className="text-xs py-2 text-muted-foreground truncate max-w-[200px]">
+                              {topUp.description || 'Brak opisu'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {/* Summary for cash top-ups */}
+                        <TableRow className="bg-purple-50">
+                          <TableCell colSpan={2} className="text-purple-700 font-black uppercase text-[9px] tracking-widest py-3 text-right">Suma:</TableCell>
+                          <TableCell className="text-purple-700 font-black text-sm text-right py-3">
+                            {cashTopUps.reduce((sum, t) => sum + Number(t.amount), 0).toFixed(0)} zł
+                          </TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         ) : (
           /* EMPLOYEES VIEW */
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">

@@ -69,6 +69,7 @@ import { salesService } from "@/lib/supabase/sales";
 import { invoicesService, invoiceItemsService } from "@/lib/supabase/invoices";
 import { customersService } from "@/lib/supabase/customers";
 import { inventoryService } from "@/lib/supabase/inventory";
+import { costsService } from "@/lib/supabase/costs";
 import { formatDatePL, getCurrentDatePL, getCurrentTimePL, toISODateString } from "@/lib/dateFormat";
 
 export default function SprzedazPage() {
@@ -381,49 +382,55 @@ export default function SprzedazPage() {
     setEmployees(saved);
   }, []);
 
+  // Load costs from Supabase
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const savedCosts = getLocalStorageSafe('sprzedaz_costs', []);
-    setCosts(savedCosts);
-  }, []);
+    if (typeof window === "undefined" || !isMounted) return;
 
-  useEffect(() => {
-    const loadWarehousePhones = () => {
-      if (typeof window === "undefined") return;
-      const inventory = getLocalStorageSafe('magazyn_inventory', []);
+    const loadCostsFromSupabase = async () => {
       try {
-        const availablePhones = inventory.filter((item: any) => 
-          item.category === "telefon" && !item.statusSprzedany
-        );
-        const availableUslugi = inventory.filter((item: any) => 
-          item.category === "usluga"
-        );
-        const availableSerwisy = inventory.filter((item: any) => 
-          item.category === "serwis"
-        );
-        const availableAkcesoria = inventory.filter((item: any) => 
-          item.category === "akcesoria"
-        );
-        setWarehousePhones(availablePhones);
-        setWarehouseUslugi(availableUslugi);
-        setWarehouseSerwisy(availableSerwisy);
-        setWarehouseAkcesoria(availableAkcesoria);
-      } catch {
-        setWarehousePhones([]);
-        setWarehouseUslugi([]);
-        setWarehouseSerwisy([]);
-        setWarehouseAkcesoria([]);
+        const shopId = getSessionStorageSafe("shopId", "");
+        console.log('Sprzedaż: Ładowanie kosztów z Supabase, shopId:', shopId, ', selectedDate:', selectedDate);
+
+        let costsData: any[] = [];
+        if (shopId) {
+          const allCosts = await costsService.getByShop(shopId);
+          costsData = allCosts.filter(cost => cost.cost_date === selectedDate);
+        } else {
+          const today = new Date(selectedDate);
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          costsData = await costsService.getByDateRange(
+            selectedDate,
+            toISODateString(tomorrow)
+          );
+        }
+
+        const mappedCosts = costsData.map((dbCost: any) => ({
+          id: dbCost.id,
+          dbId: dbCost.id,
+          date: dbCost.cost_date,
+          time: dbCost.cost_time || new Date(dbCost.created_at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }),
+          category: dbCost.category,
+          amount: parseFloat(dbCost.amount) || 0,
+          description: dbCost.description,
+          shop: dbCost.shop?.name || '',
+          employeeId: dbCost.employee_id,
+          employeeName: dbCost.employee?.first_name + ' ' + dbCost.employee?.last_name || '',
+          paymentMethod: dbCost.payment_method
+        }));
+
+        setCosts(mappedCosts);
+        console.log('✅ Załadowano', mappedCosts.length, 'kosztów z Supabase');
+      } catch (error) {
+        console.error('Sprzedaż: Błąd ładowania kosztów:', error);
+        addToast({ message: 'Błąd ładowania kosztów', variant: 'error' });
       }
     };
-    
-    if (typeof window !== "undefined") {
-      loadWarehousePhones();
-      window.addEventListener('magazyn_updated', loadWarehousePhones);
-    }
-    return () => {
-      if (typeof window !== "undefined") window.removeEventListener('magazyn_updated', loadWarehousePhones);
-    }
-  }, []);
+
+    loadCostsFromSupabase();
+  }, [isMounted, selectedDate, selectedShopUuid]);
+
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -463,73 +470,47 @@ export default function SprzedazPage() {
       try {
         const shopId = getSessionStorageSafe("shopId", "");
         const shopName = getSessionStorageSafe("shopName", "Kaufland Włocławek");
-        console.log('Sprzedaż: Ładowanie magazynu z Supabase, shopId:', shopId);
+        console.log('Sprzedaż: Ładowanie wszystkich danych magazynu z Supabase (bez filtrowania po sklepie), shopId:', shopId);
 
-        // 1) Najpierw pokaż to co jest w localStorage (synchronizowane z magazynem)
-        const localInventory = getLocalStorageSafe('magazyn_inventory', []);
-        if (localInventory.length > 0) {
-          console.log('Sprzedaż: 📦 Załadowano z localStorage:', localInventory.length, 'pozycji');
-          applyInventoryData(localInventory, shopName);
-        }
+        // Zawsze ładuj wszystkie dane z magazynu, niezależnie od sklepu
+        const supabaseData: any[] = await inventoryService.getAll();
+        console.log('Sprzedaż: ✅ Pobrano', supabaseData.length, 'pozycji z Supabase');
 
-        // 2) W tle pobierz najnowsze dane z Supabase
-        let supabaseData: any[] = [];
-        try {
-          if (shopId) {
-            supabaseData = await inventoryService.getByShop(shopId);
-          } else {
-            supabaseData = await inventoryService.getAll();
-          }
-          console.log('Sprzedaż: ✅ Pobrano', supabaseData.length, 'pozycji z Supabase');
-        } catch (supabaseError) {
-          console.error('Sprzedaż: ❌ Błąd Supabase:', supabaseError);
-          return; // zachowaj dane z localStorage
-        }
-
-        // 3) Mapuj dane z Supabase i aktualizuj stan + localStorage
-        if (supabaseData.length > 0) {
-          const mappedItems = supabaseData.map((item: any) => ({
-            id: item.id,
-            name: item.name || '',
-            category: item.category || 'telefon',
-            stock: item.stock_quantity || 1,
-            price: item.selling_price ? `${item.selling_price} zł` : '',
-            alert: item.is_low_stock || false,
-            imei: item.imei || '',
-            battery: item.battery_health || '',
-            color: item.color || '',
-            condition: item.condition === 'nowy' ? 'Nowy' : 'Używany',
-            memory: item.memory || '',
-            brand: item.brand || '',
-            model: item.model || '',
-            purchasePrice: item.purchase_price?.toString() || '',
-            taxType: item.tax_type === 'VAT' ? 'VAT' : 'marza',
-            purchaseDate: item.purchase_date || '',
-            warranty: item.warranty_months ? `${item.warranty_months} m-cy` : '',
-            setIncludes: item.set_includes || '',
-            notes: item.notes || '',
-            statusSprzedany: item.is_sold || false,
-            dataSprzedazy: item.sold_at || '',
-            shop: ''
-          }));
-          applyInventoryData(mappedItems, shopName);
-          localStorage.setItem('magazyn_inventory', JSON.stringify(mappedItems));
-        } else {
-          console.log('Sprzedaż: ⚠️ Brak danych w Supabase - używam localStorage (jeśli jest)');
-        }
+        const mappedItems = supabaseData.map((item: any) => ({
+          id: item.id,
+          name: item.name || '',
+          category: item.category || 'telefon',
+          stock: item.stock_quantity || 1,
+          price: item.selling_price ? `${item.selling_price} zł` : '',
+          alert: item.is_low_stock || false,
+          imei: item.imei || '',
+          battery: item.battery_health || '',
+          color: item.color || '',
+          condition: item.condition === 'nowy' ? 'Nowy' : 'Używany',
+          memory: item.memory || '',
+          brand: item.brand || '',
+          model: item.model || '',
+          purchasePrice: item.purchase_price?.toString() || '',
+          taxType: item.tax_type === 'VAT' ? 'VAT' : 'marza',
+          purchaseDate: item.purchase_date || '',
+          warranty: item.warranty_months ? `${item.warranty_months} m-cy` : '',
+          setIncludes: item.set_includes || '',
+          notes: item.notes || '',
+          statusSprzedany: item.is_sold || false,
+          dataSprzedazy: item.sold_at || '',
+          shop: ''
+        }));
+        applyInventoryData(mappedItems, shopName);
       } catch (error) {
         console.error('Sprzedaż: Błąd ładowania magazynu:', error);
+        addToast({ message: 'Błąd ładowania magazynu', variant: 'error' });
       }
     };
 
     // Nasłuchuj zmian w magazynie (dodanie/edycja/usunięcie w /magazyn)
     const onMagazynUpdated = () => {
-      console.log('Sprzedaż: 🔄 Otrzymano event magazyn_updated - przeładowuję');
-      const localInventory = getLocalStorageSafe('magazyn_inventory', []);
-      const shopName = getSessionStorageSafe("shopName", "Kaufland Włocławek");
-      if (localInventory.length > 0) {
-        applyInventoryData(localInventory, shopName);
-      }
+      console.log('Sprzedaż: 🔄 Otrzymano event magazyn_updated - przeładowuję z Supabase');
+      loadInventoryFromSupabase();
     };
     window.addEventListener('magazyn_updated', onMagazynUpdated);
 
@@ -540,20 +521,67 @@ export default function SprzedazPage() {
     };
   }, [isMounted]);
 
-  // Load sales from localStorage
+  // Load sales from Supabase
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const savedSales = getLocalStorageSafe('sprzedaz_sales', []);
-    console.log('=== ŁADOWANIE SPRZEDAŻY Z LOCALSTORAGE ===');
-    console.log('Znaleziono sprzedaży:', savedSales.length);
+    if (typeof window === "undefined" || !isMounted) return;
 
-    if (savedSales.length > 0) {
-      setSales(savedSales);
-      console.log('✅ Załadowano sprzedaże z localStorage');
-    } else {
-      console.log('ℹ️ Brak zapisanych sprzedaży w localStorage - używam domyślnych danych demo');
-    }
-  }, []);
+    const loadSalesFromSupabase = async () => {
+      try {
+        const shopId = getSessionStorageSafe("shopId", "");
+        console.log('Sprzedaż: Ładowanie sprzedaży z Supabase, shopId:', shopId, ', selectedDate:', selectedDate);
+
+        let salesData: any[] = [];
+        if (shopId) {
+          // Pobierz sprzedaże dla danego sklepu i wybranego dnia
+          const allSales = await salesService.getByShop(shopId);
+          salesData = allSales.filter(sale => sale.sale_date === selectedDate);
+        } else {
+          // Pobierz wszystkie sprzedaże dla wybranego dnia
+          const today = new Date(selectedDate);
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          salesData = await salesService.getByDateRange(
+            selectedDate,
+            toISODateString(tomorrow)
+          );
+        }
+
+        // Mapuj dane z Supabase do formatu używanego w komponencie
+        const mappedSales = salesData.map((dbSale: any) => ({
+          id: dbSale.id,
+          dbId: dbSale.id,
+          ini: dbSale.employee?.initials || '???',
+          employeeName: dbSale.employee?.first_name + ' ' + dbSale.employee?.last_name || '',
+          employeeId: dbSale.employee_id,
+          shopName: dbSale.shop?.name || '',
+          shopId: dbSale.shop_id,
+          payment: dbSale.payment_method === 'gotowka' ? 'gotówka' : 'karta',
+          date: dbSale.sale_date,
+          time: dbSale.sale_time,
+          totalPrice: parseFloat(dbSale.total_amount) || 0,
+          totalProfit: parseFloat(dbSale.total_profit) || 0,
+          items: (dbSale.sale_items || []).map((item: any) => ({
+            id: item.id,
+            cat: item.category,
+            name: item.product_name,
+            price: parseFloat(item.unit_price) || 0,
+            profit: (parseFloat(item.unit_price) || 0) - (parseFloat(item.purchase_cost) || 0),
+            imei: item.imei || '',
+            taxType: item.tax_type,
+            comment: item.comment || ''
+          }))
+        }));
+
+        setSales(mappedSales);
+        console.log('✅ Załadowano', mappedSales.length, 'sprzedaży z Supabase');
+      } catch (error) {
+        console.error('Sprzedaż: Błąd ładowania sprzedaży:', error);
+        addToast({ message: 'Błąd ładowania sprzedaży', variant: 'error' });
+      }
+    };
+
+    loadSalesFromSupabase();
+  }, [isMounted, selectedDate, selectedShopUuid]);
 
   useEffect(() => {
     if (editingId && selectedSaleForEdit) {
@@ -745,7 +773,7 @@ export default function SprzedazPage() {
     if (cartItems.length === 0) return;
     
     if (editingId) {
-      // Edycja istniejącej sprzedaży
+      // Edycja istniejącej sprzedaży (tylko lokalnie - Supabase nie obsługuje edycji w tym kodzie)
       setSales(prev => prev.map(sale => 
         sale.id === editingId 
           ? { 
@@ -758,138 +786,131 @@ export default function SprzedazPage() {
       ));
       addToast({ message: "Sprzedaż zaktualizowana", variant: "success" });
     } else {
-      // Nowa sprzedaż
-      const newSale: SaleGroup = {
-        id: Math.random().toString(36).substr(2, 9),
-        ini: newEntry.ini || "PZ",
-        payment: newEntry.payment,
-        date: toISODateString(),
-        time: getCurrentTimePL(),
-        items: cartItems
-      };
-      
-      setSales(prev => [newSale, ...prev]);
-      
+      // Nowa sprzedaż - tylko do Supabase
       const employees = activeEmployees || [];
       const selectedEmp = employees.find((e: any) => e.id === selectedEmployeeForSale);
       const employeeName = selectedEmp?.name || getSessionStorageSafe("userName", "Pracownik");
-      const employeeId = selectedEmp?.id || getSessionStorageSafe("userId", "unknown");
+      const employeeId = selectedEmp?.id || getSessionStorageSafe("userId", "");
       const shopName = getSessionStorageSafe("shopName", "Sklep");
-      const shopId = getSessionStorageSafe("shopId", "unknown");
+      const shopId = getSessionStorageSafe("shopId", "");
       
-      const saleWithEmployee = {
-        ...newSale,
-        ini: selectedEmp?.initials || newEntry.ini || "PZ",
-        employeeName,
-        employeeId,
-        shopName,
-        shopId
-      };
-      
-      const existingSales = getLocalStorageSafe('sprzedaz_sales', []);
-      localStorage.setItem('sprzedaz_sales', JSON.stringify([saleWithEmployee, ...existingSales]));
-      
-      let dbSaleId: string | null = null;
-      
-      // Zapisz sprzedaż do bazy danych Supabase (tylko jeśli mamy poprawne UUID)
-      const isValidUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-      const hasValidShopId = shopId && shopId !== 'unknown' && shopId !== '' && isValidUUID(shopId);
-      const hasValidEmployeeId = employeeId && employeeId !== 'unknown' && employeeId !== '' && isValidUUID(employeeId);
-      
-      if (hasValidShopId && hasValidEmployeeId) {
-        try {
-          const totalAmount = cartItems.reduce((sum, item) => sum + item.price, 0);
-          const totalProfit = cartItems.reduce((sum, item) => sum + item.profit, 0);
-          const now = new Date();
-          
-          const paymentMethodMap: { [key: string]: string } = {
-            'gotówka': 'gotowka',
-            'gotowka': 'gotowka',
-            'karta': 'karta',
-            'przelew': 'karta'
-          };
-          
-          const dbPaymentMethod = paymentMethodMap[newEntry.payment] || 'gotowka';
-          
-          const saleData = {
-            sale_date: toISODateString(now),
-            sale_time: getCurrentTimePL(),
-            payment_method: dbPaymentMethod,
-            total_amount: totalAmount,
-            total_profit: totalProfit,
-            status: 'completed',
-            shop_id: shopId,
-            employee_id: employeeId
-          };
-          
-          const itemsData = cartItems.map((item, index) => ({
-            sale_id: newSale.id,
-            product_name: item.name,
-            category: item.cat,
-            unit_price: item.price,
-            quantity: 1,
-            purchase_cost: item.price - item.profit,
-            imei: item.imei || null,
-            tax_type: item.taxType || 'zwolniony',
-            comment: item.comment || null,
-            sort_order: index
-          }));
-          
-          console.log('📦 Pozycje sprzedaży:', JSON.stringify(itemsData, null, 2));
-          
-          const savedSale = await salesService.create(saleData, itemsData);
-          console.log('✅ Sprzedaż zapisana do bazy:', savedSale.id);
-          dbSaleId = savedSale.id;
-          
-          const updatedSales = getLocalStorageSafe('sprzedaz_sales', []);
-          const saleIndex = updatedSales.findIndex((s: any) => s.id === newSale.id);
-          if (saleIndex >= 0) {
-            updatedSales[saleIndex].id = savedSale.id;
-            updatedSales[saleIndex].dbId = savedSale.id;
-            localStorage.setItem('sprzedaz_sales', JSON.stringify(updatedSales));
-          }
-        } catch (dbError: any) {
-          console.error('❌ Błąd zapisu do bazy:', dbError);
-          
-          let errorMessage = 'Nieznany błąd';
-          if (dbError?.code === '42501') errorMessage = 'Brak uprawnień (RLS)';
-          else if (dbError?.code === '23505') errorMessage = 'Duplikat danych';
-          else if (dbError?.code === '23502') errorMessage = 'Brak wymaganych pól';
-          else if (dbError?.code === '22P02') errorMessage = 'Nieprawidłowy format ID';
-          else if (dbError?.message && typeof dbError.message === 'string') errorMessage = dbError.message;
-          else if (typeof dbError === 'string') errorMessage = dbError;
-          
-          addToast({
-            message: `⚠️ Sprzedaż zapisana lokalnie (błąd: ${errorMessage})`,
-            variant: "info"
-          });
-        }
-      } else {
-        addToast({ 
-          message: '✅ Sprzedaż dodana (lokalnie - skonfiguruj sklep/pracownika)', 
-          variant: "info" 
-        });
+      // Sprawdź czy mamy poprawne dane
+      if (!shopId) {
+        addToast({ message: "❌ Błąd: Brak ID sklepu", variant: "error" });
+        return;
       }
       
-      window.dispatchEvent(new Event('sales_data_updated'));
+      if (!employeeId) {
+        addToast({ message: "❌ Błąd: Brak ID pracownika", variant: "error" });
+        return;
+      }
       
-      addToast({ message: `Sprzedaż dodana (${newSale.items.length} pozycji)`, variant: "success" });
-      
-      const validActorId = hasValidEmployeeId ? employeeId : null;
-      const validShopId = hasValidShopId ? shopId : null;
-      
-      addAction({
-        action_type: "sprzedaz",
-        description: `Sprzedaż: ${cartItems.map(item => item.name).join(", ")}`,
-        actor_id: validActorId,
-        actor_name: employeeName,
-        shop_id: validShopId,
-        shop_name: shopName,
-        details: `${cartItems.length} pozycji | ${newEntry.payment} | Suma: ${newSale.items.reduce((sum, item) => sum + item.price, 0).toFixed(2)} zł`,
-        target_table: 'sales',
-        target_id: dbSaleId || newSale.id,
-        target_type: 'sale'
-      });
+      try {
+        const totalAmount = cartItems.reduce((sum, item) => sum + item.price, 0);
+        const totalProfit = cartItems.reduce((sum, item) => sum + item.profit, 0);
+        const now = new Date();
+        
+        const paymentMethodMap: { [key: string]: string } = {
+          'gotówka': 'gotowka',
+          'gotowka': 'gotowka',
+          'karta': 'karta',
+          'przelew': 'karta'
+        };
+        
+        const dbPaymentMethod = paymentMethodMap[newEntry.payment] || 'gotowka';
+        
+        const saleData = {
+          sale_date: toISODateString(now),
+          sale_time: getCurrentTimePL(),
+          payment_method: dbPaymentMethod,
+          total_amount: totalAmount,
+          total_profit: totalProfit,
+          status: 'completed',
+          shop_id: shopId,
+          employee_id: employeeId
+        };
+        
+        const itemsData = cartItems.map((item, index) => ({
+          product_name: item.name,
+          category: item.cat,
+          unit_price: item.price,
+          quantity: 1,
+          purchase_cost: item.price - item.profit,
+          imei: item.imei || null,
+          tax_type: item.taxType || 'zwolniony',
+          comment: item.comment || null,
+          sort_order: index
+        }));
+        
+        console.log('📦 Pozycje sprzedaży:', JSON.stringify(itemsData, null, 2));
+        
+        // Zapisz do Supabase
+        const savedSale = await salesService.create(saleData, itemsData);
+        console.log('✅ Sprzedaż zapisana do bazy:', savedSale.id);
+        
+        // Aktualizuj stan lokalny
+        const newSaleForState: any = {
+          id: savedSale.id,
+          dbId: savedSale.id,
+          ini: selectedEmp?.initials || newEntry.ini || '???',
+          employeeName,
+          employeeId,
+          shopName,
+          shopId,
+          payment: newEntry.payment,
+          date: toISODateString(now),
+          time: getCurrentTimePL(),
+          totalPrice: totalAmount,
+          totalProfit: totalProfit,
+          items: cartItems
+        };
+        
+        setSales(prev => [newSaleForState, ...prev]);
+        
+        // Dodaj akcję
+        addAction({
+          action_type: "sprzedaz",
+          description: `Sprzedaż: ${cartItems.map(item => item.name).join(", ")}`,
+          actor_id: employeeId,
+          actor_name: employeeName,
+          shop_id: shopId,
+          shop_name: shopName,
+          details: `${cartItems.length} pozycji | ${newEntry.payment} | Suma: ${totalAmount.toFixed(2)} zł`,
+          target_table: 'sales',
+          target_id: savedSale.id,
+          target_type: 'sale'
+        });
+        
+        addToast({ message: `✅ Sprzedaż dodana (${cartItems.length} pozycji)`, variant: "success" });
+        
+        // Jeśli sprzedano telefon, wyślij event
+        const soldPhone = cartItems.find(item => item.cat === 'telefon' && item.imei);
+        if (soldPhone && soldPhone.imei) {
+          window.dispatchEvent(new CustomEvent('phone_sold', { 
+            detail: { 
+              imei: soldPhone.imei, 
+              dataSprzedazy: getCurrentDatePL() 
+            } 
+          }));
+        }
+        
+      } catch (dbError: any) {
+        console.error('❌ Błąd zapisu do bazy:', dbError);
+        
+        let errorMessage = 'Nieznany błąd';
+        if (dbError?.code === '42501') errorMessage = 'Brak uprawnień (RLS)';
+        else if (dbError?.code === '23505') errorMessage = 'Duplikat danych';
+        else if (dbError?.code === '23502') errorMessage = 'Brak wymaganych pól';
+        else if (dbError?.code === '22P02') errorMessage = 'Nieprawidłowy format ID';
+        else if (dbError?.message && typeof dbError.message === 'string') errorMessage = dbError.message;
+        else if (typeof dbError === 'string') errorMessage = dbError;
+        
+        addToast({
+          message: `❌ Błąd zapisu sprzedaży: ${errorMessage}`,
+          variant: "error"
+        });
+        return;
+      }
     }
     
     setCartItems([]);
@@ -925,7 +946,7 @@ export default function SprzedazPage() {
     setPurchasePriceFromWarehouse(0);
   };
 
-  const handleAddCost = () => {
+  const handleAddCost = async () => {
     if (!newCost.amount || !newCost.description) {
       addToast({ message: "Wypełnij kwotę i opis", variant: "error" });
       return;
@@ -934,39 +955,91 @@ export default function SprzedazPage() {
     const employees = activeEmployees || [];
     const selectedEmp = employees.find((e: any) => e.id === selectedEmployeeForSale);
     const employeeName = selectedEmp?.name || getSessionStorageSafe("userName", "Pracownik");
-    const employeeId = selectedEmp?.id || getSessionStorageSafe("userId", "unknown");
+    const employeeId = selectedEmp?.id || getSessionStorageSafe("userId", "");
+    const shopId = getSessionStorageSafe("shopId", "");
+    const shopName = getSessionStorageSafe("shopName", "Sklep");
     
-    const cost: Cost = {
-      id: Math.random().toString(36).substr(2, 9),
-      date: toISODateString(),
-      time: getCurrentTimePL(),
-      category: newCost.category,
-      amount: parseFloat(newCost.amount),
-      description: newCost.description,
-      shop: selectedShop,
-      employeeId,
-      employeeName,
-      paymentMethod: newCost.paymentMethod
-    };
+    // Sprawdź czy mamy poprawne dane
+    if (!shopId) {
+      addToast({ message: "❌ Błąd: Brak ID sklepu", variant: "error" });
+      return;
+    }
     
-    setCosts(prev => [cost, ...prev]);
-    localStorage.setItem('sprzedaz_costs', JSON.stringify([cost, ...costs]));
+    if (!employeeId) {
+      addToast({ message: "❌ Błąd: Brak ID pracownika", variant: "error" });
+      return;
+    }
     
-    window.dispatchEvent(new Event('costs_data_updated'));
+    try {
+      const costData = {
+        cost_date: toISODateString(),
+        cost_time: getCurrentTimePL(),
+        category: newCost.category,
+        amount: parseFloat(newCost.amount),
+        description: newCost.description,
+        payment_method: newCost.paymentMethod,
+        shop_id: shopId,
+        employee_id: employeeId
+      };
+      
+      console.log('📤 Dane do zapisu kosztu:', costData);
+      
+      const savedCost = await costsService.create(costData);
+      console.log('✅ Koszt zapisany pomyślnie:', savedCost);
+      
+      // Aktualizuj stan lokalny
+      const newCostForState: any = {
+        id: savedCost.id,
+        dbId: savedCost.id,
+        date: savedCost.cost_date,
+        time: savedCost.cost_time || new Date(savedCost.created_at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }),
+        category: savedCost.category,
+        amount: parseFloat(savedCost.amount),
+        description: savedCost.description,
+        shop: shopName,
+        employeeId,
+        employeeName,
+        paymentMethod: savedCost.payment_method
+      };
+      
+      setCosts(prev => [newCostForState, ...prev]);
+      
+      // Dodaj akcję
+      addAction({
+        action_type: 'koszt',
+        description: `Koszt (${newCost.category}): ${newCost.description}`,
+        actor_id: employeeId,
+        actor_name: employeeName,
+        shop_id: shopId,
+        shop_name: shopName,
+        details: `${newCost.amount} zł | ${newCost.paymentMethod}`,
+        target_table: 'costs',
+        target_id: savedCost.id,
+        target_type: 'cost'
+      });
+      
+      addToast({ message: `✅ Koszt dodany: ${newCost.amount} zł`, variant: "success" });
+      
+    } catch (dbError: any) {
+      console.error('❌ Błąd zapisu kosztu do bazy:', dbError);
+      console.error('❌ Błąd (JSON):', JSON.stringify(dbError));
+      console.error('❌ Typ błędu:', typeof dbError);
+      console.error('❌ Kody:', dbError?.code, dbError?.details, dbError?.hint);
+      
+      let errorMessage = 'Nieznany błąd';
+      if (dbError?.code === '42501') errorMessage = 'Brak uprawnień (RLS)';
+      else if (dbError?.code === '23502') errorMessage = 'Brak wymaganych pól';
+      else if (dbError?.message && typeof dbError.message === 'string') errorMessage = dbError.message;
+      else if (dbError?.details && typeof dbError.details === 'string') errorMessage = dbError.details;
+      else if (Object.keys(dbError).length > 0) errorMessage = JSON.stringify(dbError);
+      
+      addToast({
+        message: `❌ Błąd zapisu kosztu: ${errorMessage}`,
+        variant: "error"
+      });
+      return;
+    }
     
-    addAction({
-      action_type: 'koszt',
-      description: `Koszt (${newCost.category}): ${newCost.description}`,
-      actor_id: employeeId,
-      actor_name: employeeName,
-      shop_id: selectedShopUuid || selectedShop,  // UUID jeśli dostępne, inaczej nazwa
-      shop_name: selectedShop,
-      details: `${newCost.amount} zł | ${newCost.paymentMethod}`,
-      target_table: 'costs',
-      target_type: 'cost'
-    });
-    
-    addToast({ message: `Koszt dodany: ${newCost.amount} zł`, variant: "success" });
     setNewCost({
       category: 'zaliczka',
       amount: '',
@@ -976,20 +1049,27 @@ export default function SprzedazPage() {
     setIsCostDialogOpen(false);
   };
 
-  const removeCost = (id: string) => {
+  const removeCost = async (id: string) => {
     const cost = costs.find(c => c.id === id);
-    setCosts(prev => prev.filter(c => c.id !== id));
-    const updated = costs.filter(c => c.id !== id);
-    localStorage.setItem('sprzedaz_costs', JSON.stringify(updated));
-    if (cost) addToast({ message: `Usunięto koszt: ${cost.description}`, variant: "info" });
+    if (!cost) return;
+    
+    try {
+      await costsService.delete(id);
+      setCosts(prev => prev.filter(c => c.id !== id));
+      addToast({ message: `✅ Usunięto koszt: ${cost.description}`, variant: "success" });
+    } catch (error) {
+      console.error('❌ Błąd usuwania kosztu:', error);
+      addToast({ message: "❌ Błąd usuwania kosztu", variant: "error" });
+    }
   };
 
-  const removePosition = (id: string) => {
+  const removePosition = async (id: string) => {
     const sale = sales.find(s => s.id === id);
+    if (!sale) return;
+    
+    // Sprzedaże nie są usuwane z Supabase w tym kodzie - tylko lokalnie
     setSales(prev => prev.filter(s => s.id !== id));
-    const updatedSales = sales.filter(s => s.id !== id);
-    localStorage.setItem('sprzedaz_sales', JSON.stringify(updatedSales));
-    if (sale) addToast({ message: `Usunięto sprzedaż (${sale.items.length} pozycji)`, variant: "info" });
+    addToast({ message: `Usunięto sprzedaż (${sale.items.length} pozycji)`, variant: "info" });
   };
 
   const generateCSV = (data: typeof flattenedSales) => {
@@ -1142,7 +1222,7 @@ export default function SprzedazPage() {
               
               <div className="flex items-center gap-3">
                 <div className="flex gap-1 bg-white p-1 rounded-xl shadow-sm border border-primary/10">
-                  {['all', 'zaliczka', 'paczki', 'gotowka'].map(cat => (
+                  {['all', 'zaliczka', 'paczki'].map(cat => (
                     <button
                       key={cat}
                       onClick={() => setCostFilterCategory(cat)}
@@ -1168,12 +1248,11 @@ export default function SprzedazPage() {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {[
                 { label: '📱 Skupy', value: costs.filter(c => c.category === 'skup').reduce((sum, c) => sum + c.amount, 0), color: 'bg-blue-50 border-blue-200', subtitle: 'Automatycznie z magazynu' },
                 { label: '💰 Zaliczki', value: costs.filter(c => c.category === 'zaliczka').reduce((sum, c) => sum + c.amount, 0), color: 'bg-yellow-50 border-yellow-200' },
                 { label: '📦 Paczki', value: costs.filter(c => c.category === 'paczki').reduce((sum, c) => sum + c.amount, 0), color: 'bg-green-50 border-green-200' },
-                { label: '💵 Gotówka', value: costs.filter(c => c.category === 'gotowka').reduce((sum, c) => sum + c.amount, 0), color: 'bg-purple-50 border-purple-200' },
               ].map((item, idx) => (
                 <Card key={idx} className={`${item.color} border`}>
                   <CardContent className="p-4">
@@ -1282,23 +1361,20 @@ export default function SprzedazPage() {
                   <div className="space-y-2">
                     <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Kategoria</Label>
                     <UISelect 
-                      value={newCost.category} 
-                      onValueChange={(val) => setNewCost(prev => ({ ...prev, category: val as Cost['category'] }))}
-                      items={[
-                        { value: 'zaliczka', label: '💰 Zaliczka' },
-                        { value: 'paczki', label: '📦 Paczki' },
-                        { value: 'gotowka', label: '💵 Zasilanie gotówką' }
-                      ]}
-                    >
-                      <UISelectTrigger className="h-12 rounded-xl bg-accent/30 border-none font-bold text-sm">
-                        <UISelectValue placeholder="Wybierz kategorię" />
-                      </UISelectTrigger>
-                      <UISelectContent className="rounded-xl">
-                        <UISelectItem value="zaliczka">💰 Zaliczka</UISelectItem>
-                        <UISelectItem value="paczki">📦 Paczki</UISelectItem>
-                        <UISelectItem value="gotowka">💵 Zasilanie gotówką</UISelectItem>
-                      </UISelectContent>
-                    </UISelect>
+                    value={newCost.category} 
+                    onValueChange={(val) => setNewCost(prev => ({ ...prev, category: val as Cost['category'] }))}
+                    items={[
+                      { value: 'zaliczka', label: '💰 Zaliczka' },
+                      { value: 'paczki', label: '📦 Paczki' }
+                    ]}>
+                    <UISelectTrigger className="h-12 rounded-xl bg-accent/30 border-none font-bold text-sm">
+                      <UISelectValue placeholder="Wybierz kategorię" />
+                    </UISelectTrigger>
+                    <UISelectContent className="rounded-xl">
+                      <UISelectItem value="zaliczka">💰 Zaliczka</UISelectItem>
+                      <UISelectItem value="paczki">📦 Paczki</UISelectItem>
+                    </UISelectContent>
+                  </UISelect>
                   </div>
 
                   <div className="space-y-2">

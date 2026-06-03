@@ -67,6 +67,36 @@ export const cashRegisterService = {
     return data?.closing_cash_amount || 0;
   },
 
+  async getTotalPreviousDayStateForAllShops(): Promise<number> {
+    const today = toISODateString();
+    
+    // Step 1: Get all unique shops that have closings
+    const { data: allClosings, error } = await supabase
+      .from('cash_register_closings')
+      .select('shop_id, closing_cash_amount, closing_date')
+      .lt('closing_date', today)
+      .is('deleted_at', null)
+      .order('closing_date', { ascending: false });
+    
+    if (error || !allClosings) return 0;
+    
+    // Step 2: For each shop, get the last closing's cash amount
+    const lastClosingPerShop = new Map<string, number>();
+    for (const closing of allClosings) {
+      if (!lastClosingPerShop.has(closing.shop_id)) {
+        lastClosingPerShop.set(closing.shop_id, closing.closing_cash_amount || 0);
+      }
+    }
+    
+    // Step 3: Sum them all up
+    let total = 0;
+    for (const amount of lastClosingPerShop.values()) {
+      total += amount;
+    }
+    
+    return total;
+  },
+
   async getByDateRange(
     shopId: string,
     startDate: string,
