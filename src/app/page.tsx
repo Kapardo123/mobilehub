@@ -492,19 +492,13 @@ export default function Home() {
       return sum + amount;
     }, 0);
 
-  console.log('🔍 todayCosts:', todayCosts);
   // Koszty zapłacone gotówką (np. skup telefonów) - do odejmowania od kasy!
   const cashCostsToday = todayCosts
-    .filter((c: any) => {
-      console.log('  >> checking cost:', c, 'paymentMethod:', c.paymentMethod);
-      return c.paymentMethod === 'gotowka' && c.category !== 'gotowka';
-    })
+    .filter((c: any) => c.paymentMethod === 'gotowka' && c.category !== 'gotowka')
     .reduce((sum: number, c: any) => {
       const amount = typeof c.amount === 'number' ? c.amount : parseFloat(c.amount) || 0;
-      console.log('  >> adding cash cost amount:', amount, 'sum becomes:', sum + amount);
       return sum + amount;
     }, 0);
-  console.log('💰 cashCostsToday:', cashCostsToday);
 
   // Doładowania (zasilanie gotówką) - osobno, nie wliczane do kosztów!
   const doladowaniaToday = todayCosts
