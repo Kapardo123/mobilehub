@@ -120,7 +120,7 @@ export default function MagazynPage() {
     model: "",
     memory: "",
     batteryHealth: "",
-    condition: "używany",
+    condition: "uzywany" as const,
     color: "",
     setIncludes: "",
     notes: "",
@@ -171,7 +171,7 @@ export default function MagazynPage() {
     model: "",
     memory: "",
     batteryHealth: "",
-    condition: "używany",
+    condition: "uzywany" as const,
     color: "",
     setIncludes: "",
     notes: "",
@@ -450,7 +450,7 @@ export default function MagazynPage() {
         model: newItem.model || null,
         memory: newItem.memory || null,
         color: newItem.color || null,
-        condition: newItem.condition === "nowy" ? "nowy" : "uzywany" as const,
+        condition: (newItem.condition === "nowy" || newItem.condition === "Nowy") ? "nowy" : "uzywany" as const,
         battery_health: newItem.batteryHealth ? `${newItem.batteryHealth}%` : null,
         imei: newItem.imei || null,
         tax_type: newItem.taxType as 'VAT' | 'marza' | 'zwolniony',
@@ -543,7 +543,7 @@ export default function MagazynPage() {
       model: "",
       memory: "",
       batteryHealth: "",
-      condition: "używany",
+      condition: "uzywany",
       color: "",
       setIncludes: "",
       notes: "",
@@ -618,7 +618,7 @@ export default function MagazynPage() {
       model: item.model || "",
       memory: item.memory || "",
       batteryHealth: item.battery ? item.battery.replace("%", "") : "",
-      condition: item.condition || "używany",
+      condition: item.condition || "uzywany",
       color: item.color || "",
       setIncludes: item.setIncludes || "",
       notes: item.notes || "",
@@ -846,14 +846,14 @@ export default function MagazynPage() {
                           <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Stan</Label>
                           <Select value={editItem.condition} onValueChange={(val) => val && setEditItem({...editItem, condition: val})} items={[
                             { value: "nowy", label: "Nowy" },
-                            { value: "używany", label: "Używany" }
+                            { value: "uzywany", label: "Używany" }
                           ]}>
                             <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl">
                               <SelectValue placeholder="Wybierz..." />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="nowy">Nowy</SelectItem>
-                              <SelectItem value="używany">Używany</SelectItem>
+                              <SelectItem value="uzywany">Używany</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1254,14 +1254,14 @@ export default function MagazynPage() {
                         <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Stan</Label>
                         <Select value={newItem.condition} onValueChange={(val) => val && setNewItem({...newItem, condition: val})} items={[
                           { value: "nowy", label: "Nowy" },
-                          { value: "używany", label: "Używany" }
+                          { value: "uzywany", label: "Używany" }
                         ]}>
                           <SelectTrigger className="h-12 bg-accent/30 border-none rounded-xl">
                             <SelectValue placeholder="Wybierz..." />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="nowy">Nowy</SelectItem>
-                            <SelectItem value="używany">Używany</SelectItem>
+                            <SelectItem value="uzywany">Używany</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1432,7 +1432,7 @@ export default function MagazynPage() {
                           model: "",
                           memory: "",
                           batteryHealth: "",
-                          condition: "używany",
+                          condition: "uzywany",
                           color: "",
                           setIncludes: "",
                           notes: "",
@@ -1571,7 +1571,7 @@ export default function MagazynPage() {
                 model: "",
                 memory: "",
                 batteryHealth: "",
-                condition: "używany",
+                condition: "uzywany",
                 color: "",
                 setIncludes: "",
                 notes: "",
@@ -1605,7 +1605,7 @@ export default function MagazynPage() {
                 model: "",
                 memory: "",
                 batteryHealth: "",
-                condition: "używany",
+                condition: "uzywany",
                 color: "",
                 setIncludes: "",
                 notes: "",
@@ -1659,11 +1659,11 @@ export default function MagazynPage() {
                         <span className={cn(
                           "text-[10px] font-bold px-1 py-0.5 rounded border",
                           item.condition.toLowerCase() === "nowy" && "bg-emerald-50 text-emerald-700 border-emerald-200",
-                          item.condition.toLowerCase() === "używany" && "bg-amber-50 text-amber-700 border-amber-200",
-                          !["nowy", "używany"].includes(item.condition.toLowerCase()) && "bg-gray-50 text-gray-700 border-gray-200"
+                          item.condition.toLowerCase() === "uzywany" && "bg-amber-50 text-amber-700 border-amber-200",
+                          !["nowy", "uzywany"].includes(item.condition.toLowerCase()) && "bg-gray-50 text-gray-700 border-gray-200"
                         )}>
                           {item.condition.toLowerCase() === "nowy" ? "✨" :
-                           item.condition.toLowerCase() === "używany" ? "🔄" : "•"}
+                           item.condition.toLowerCase() === "uzywany" ? "🔄" : "•"}
                         </span>
                       )}
                       {item.memory && (
