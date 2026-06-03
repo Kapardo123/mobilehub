@@ -491,6 +491,14 @@ export default function Home() {
       return sum + amount;
     }, 0);
 
+  // Koszty zapłacone gotówką (np. skup telefonów) - do odejmowania od kasy!
+  const cashCostsToday = todayCosts
+    .filter((c: any) => c.paymentMethod === 'gotowka' && c.category !== 'gotowka')
+    .reduce((sum: number, c: any) => {
+      const amount = typeof c.amount === 'number' ? c.amount : parseFloat(c.amount) || 0;
+      return sum + amount;
+    }, 0);
+
   // Doładowania (zasilanie gotówką) - osobno, nie wliczane do kosztów!
   const doladowaniaToday = todayCosts
     .filter((c: any) => c.category === 'gotowka')
@@ -561,13 +569,14 @@ export default function Home() {
   console.log('');
   console.log('📊 KOSZTY I DOŁADOWANIA:');
   console.log('   Total Costs:', totalCostsToday.toFixed(2));
+  console.log('   Cash Costs:', cashCostsToday.toFixed(2));
   console.log('   Doładowania:', doladowaniaToday.toFixed(2));
   
   // Stan kasy z poprzedniego dnia (pobierany z bazy danych)
   // const stanKasyPoprzedniegoDnia = 2698; // Stara wersja - teraz z bazy
   
-  // Prawdziwe obliczenia
-  const kasaDzis = stanKasyPoprzedniegoDnia + cashSalesToday + doladowaniaToday;
+  // Prawdziwe obliczenia - odejmujemy koszty gotówkowe (np. skup telefonów)!
+  const kasaDzis = stanKasyPoprzedniegoDnia + cashSalesToday + doladowaniaToday - cashCostsToday;
   const sumaTotal = kasaDzis + cardSalesToday;
   const dzienTotal = totalSalesToday - totalCostsToday;
   
