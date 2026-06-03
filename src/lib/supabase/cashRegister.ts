@@ -137,6 +137,7 @@ export const cashRegisterService = {
     totalCashSales?: number;
     totalCardSales?: number;
     totalCosts?: number;
+    totalCashCosts?: number; // Nowe: tylko koszty zapłacone gotówką!
     totalDoladowania?: number;
     notes?: string;
     createdBy?: string;
@@ -146,10 +147,11 @@ export const cashRegisterService = {
     const lastClosing = await this.getLastClosing(params.shopId);
     const openingCash = lastClosing?.closing_cash_amount || 0;
     
+    // Obliczamy expectedAmount tylko odejmując KOSZTY GOTÓWKOWE!
     const expectedAmount = openingCash + 
       (params.totalCashSales || 0) + 
       (params.totalDoladowania || 0) - 
-      (params.totalCosts || 0);
+      (params.totalCashCosts || params.totalCosts || 0); // Jeśli nie ma totalCashCosts, użyj totalCosts dla wstecznej zgodności
     
     const closingCashAmount = params.closingCashAmount || expectedAmount;
     const difference = closingCashAmount - expectedAmount;

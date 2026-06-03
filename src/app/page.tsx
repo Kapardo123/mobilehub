@@ -937,6 +937,7 @@ export default function Home() {
                       totalCashSales: cashSalesToday,
                       totalCardSales: cardSalesToday,
                       totalCosts: totalCostsToday,
+                      totalCashCosts: cashCostsToday, // Przekazujemy tylko koszty gotówkowe!
                       totalDoladowania: doladowaniaToday,
                       createdBy: userId
                     });
