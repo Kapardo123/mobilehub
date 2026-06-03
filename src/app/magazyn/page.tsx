@@ -110,7 +110,28 @@ export default function MagazynPage() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
   const [previewItem, setPreviewItem] = useState<InventoryItem | null>(null);
-  const [editItem, setEditItem] = useState({
+  const [editItem, setEditItem] = useState<{
+    name: string;
+    category: "telefon" | "akcesoria" | "usluga" | "serwis";
+    stock: string;
+    purchasePrice: string;
+    sellingPrice: string;
+    brand: string;
+    model: string;
+    memory: string;
+    batteryHealth: string;
+    condition: "nowy" | "uzywany";
+    color: string;
+    setIncludes: string;
+    notes: string;
+    warranty: string;
+    imei: string;
+    taxType: "VAT" | "marza" | "zwolniony";
+    purchaseDate: string;
+    sellingDate: string;
+    statusSprzedany: boolean;
+    dataSprzedazy: string;
+  }>({
     name: "",
     category: "telefon",
     stock: "",
@@ -120,7 +141,7 @@ export default function MagazynPage() {
     model: "",
     memory: "",
     batteryHealth: "",
-    condition: "uzywany" as const,
+    condition: "uzywany",
     color: "",
     setIncludes: "",
     notes: "",
@@ -161,7 +182,28 @@ export default function MagazynPage() {
       setSelectedEmployeeForItem(singleEmployee.id);
     }
   }, []);
-  const [newItem, setNewItem] = useState({
+  const [newItem, setNewItem] = useState<{
+    name: string;
+    category: "telefon" | "akcesoria" | "usluga" | "serwis";
+    stock: string;
+    purchasePrice: string;
+    sellingPrice: string;
+    brand: string;
+    model: string;
+    memory: string;
+    batteryHealth: string;
+    condition: "nowy" | "uzywany";
+    color: string;
+    setIncludes: string;
+    notes: string;
+    warranty: string;
+    imei: string;
+    taxType: "VAT" | "marza" | "zwolniony";
+    purchaseDate: string;
+    sellingDate: string;
+    statusSprzedany: boolean;
+    dataSprzedazy: string;
+  }>({
     name: "",
     category: "akcesoria",
     stock: "",
@@ -171,7 +213,7 @@ export default function MagazynPage() {
     model: "",
     memory: "",
     batteryHealth: "",
-    condition: "uzywany" as const,
+    condition: "uzywany",
     color: "",
     setIncludes: "",
     notes: "",
@@ -450,7 +492,7 @@ export default function MagazynPage() {
         model: newItem.model || null,
         memory: newItem.memory || null,
         color: newItem.color || null,
-        condition: (newItem.condition === "nowy" || newItem.condition === "Nowy") ? "nowy" : "uzywany" as const,
+        condition: newItem.condition,
         battery_health: newItem.batteryHealth ? `${newItem.batteryHealth}%` : null,
         imei: newItem.imei || null,
         tax_type: newItem.taxType as 'VAT' | 'marza' | 'zwolniony',
@@ -618,7 +660,7 @@ export default function MagazynPage() {
       model: item.model || "",
       memory: item.memory || "",
       batteryHealth: item.battery ? item.battery.replace("%", "") : "",
-      condition: item.condition || "uzywany",
+      condition: (item.condition?.toLowerCase() === "nowy" ? "nowy" : "uzywany") as "nowy" | "uzywany",
       color: item.color || "",
       setIncludes: item.setIncludes || "",
       notes: item.notes || "",
@@ -663,7 +705,7 @@ export default function MagazynPage() {
         model: editItem.model || null,
         memory: editItem.memory || null,
         color: editItem.color || null,
-        condition: editItem.condition === "nowy" ? "nowy" : "uzywany" as const,
+        condition: editItem.condition,
         battery_health: editItem.batteryHealth ? `${editItem.batteryHealth}%` : null,
         imei: editItem.imei || null,
         tax_type: editItem.taxType as 'VAT' | 'marza' | 'zwolniony',
