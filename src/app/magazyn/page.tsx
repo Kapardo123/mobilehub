@@ -521,6 +521,7 @@ export default function MagazynPage() {
           employee_id: employeeId
         };
         await costsService.create(costData);
+        window.dispatchEvent(new CustomEvent('costs_updated'));
       }
       
       const mappedItem = {
