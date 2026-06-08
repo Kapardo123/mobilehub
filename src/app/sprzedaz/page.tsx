@@ -96,6 +96,7 @@ export default function SprzedazPage() {
     price: number;
     profit: number;
     imei?: string;
+    inventoryId?: string | number;
     taxType?: string;
     comment?: string;
   }
@@ -281,6 +282,7 @@ export default function SprzedazPage() {
     ini: "",
     imei: "",
     warehousePhoneId: null as number | null,
+    inventoryId: null as string | number | null,
     taxType: "marza" as "VAT" | "marza",
     comment: ""
   });
@@ -595,6 +597,7 @@ export default function SprzedazPage() {
         ini: selectedSaleForEdit.ini,
         imei: "",
         warehousePhoneId: null,
+        inventoryId: null,
         taxType: "marza",
         comment: ""
       });
@@ -726,7 +729,14 @@ export default function SprzedazPage() {
     .reduce((sum, c) => sum + c.amount, 0);
   
   const totalAmount = totalSalesAmount + totalDoladowania;
-  const totalProfit = totalSalesProfit - totalCosts;
+  const totalProfit = totalSalesAmount - totalCosts;
+
+  const totalCashSales = filteredSales
+    .filter((sale) => sale.payment === 'gotówka')
+    .reduce((sum, sale) => sum + sale.totalPrice, 0);
+  const totalCardSales = filteredSales
+    .filter((sale) => sale.payment === 'karta')
+    .reduce((sum, sale) => sum + sale.totalPrice, 0);
 
   const addPosition = () => {
     if (!newEntry.name || !newEntry.price) return;
@@ -740,6 +750,7 @@ export default function SprzedazPage() {
       price: priceVal,
       profit: profitVal,
       imei: newEntry.imei,
+      inventoryId: newEntry.inventoryId || undefined,
       taxType: newEntry.category === "telefon" ? newEntry.taxType : undefined,
       comment: newEntry.comment
     };
@@ -764,6 +775,7 @@ export default function SprzedazPage() {
       ini: newEntry.ini,
       imei: "",
       warehousePhoneId: null,
+      inventoryId: null,
       taxType: "marza",
       comment: ""
     });
@@ -883,16 +895,80 @@ export default function SprzedazPage() {
         
         addToast({ message: `✅ Sprzedaż dodana (${cartItems.length} pozycji)`, variant: "success" });
         
-        // Jeśli sprzedano telefon, wyślij event
-        const soldPhone = cartItems.find(item => item.cat === 'telefon' && item.imei);
-        if (soldPhone && soldPhone.imei) {
-          window.dispatchEvent(new CustomEvent('phone_sold', { 
-            detail: { 
-              imei: soldPhone.imei, 
-              dataSprzedazy: getCurrentDatePL() 
-            } 
-          }));
+        // ✅ Oznacz telefony jako sprzedane w magazynie
+        let markedCount = 0;
+        let skippedCount = 0;
+        
+        const soldPhones = cartItems.filter(item => item.cat === 'telefon');
+        console.log('🔍 Sprzedaż: Szukam', soldPhones.length, 'telefonów do oznaczenia jako sprzedane...');
+        console.log('🔍 cartItems:', JSON.stringify(soldPhones, null, 2));
+        
+        for (const phone of soldPhones) {
+          try {
+            let invItem = null;
+            
+            // 1. Najpierw spróbuj znaleźć po inventoryId (bezpośredni odnośnik do bazy)
+            if (phone.inventoryId) {
+              try {
+                invItem = await inventoryService.getById(String(phone.inventoryId));
+                console.log('✅ Znaleziono po inventoryId:', phone.inventoryId);
+              } catch (e) {
+                console.warn('⚠️ Nie udało się znaleźć po inventoryId, próba po IMEI...');
+              }
+            }
+            
+            // 2. Jeśli nie znaleziono po ID, spróbuj po IMEI
+            if (!invItem && phone.imei) {
+              invItem = await inventoryService.getByIMEI(phone.imei as string, shopId);
+              if (invItem) console.log('✅ Znaleziono po IMEI:', phone.imei);
+            }
+            
+            // 3. Jeśli wciąż nie znaleziono, spróbuj po nazwie (ostateczny fallback)
+            if (!invItem) {
+              try {
+                const allItems: any[] = await inventoryService.getAll();
+                invItem = allItems.find((item: any) => 
+                  item.name === phone.name && 
+                  !item.is_sold && 
+                  item.category === 'telefon'
+                );
+                if (invItem) console.log('✅ Znaleziono po nazwie:', phone.name);
+              } catch (e) {
+                console.warn('⚠️ Błąd podczas wyszukiwania po nazwie:', e);
+              }
+            }
+            
+            if (invItem && !invItem.is_sold) {
+              await inventoryService.markAsSold(
+                String(invItem.id),
+                savedSale.id,
+                toISODateString(now)
+              );
+              markedCount++;
+              console.log('✅ Telefon oznaczony jako sprzedany:', phone.name, phone.imei ? `(IMEI: ${phone.imei})` : '');
+              window.dispatchEvent(new CustomEvent('phone_sold', {
+                detail: { 
+                  imei: phone.imei, 
+                  name: phone.name,
+                  dataSprzedazy: toISODateString(now) 
+                }
+              }));
+            } else if (invItem?.is_sold) {
+              skippedCount++;
+              console.warn('⚠️ Telefon już był oznaczony jako sprzedany:', phone.name);
+            } else {
+              skippedCount++;
+              console.warn('⚠️ Nie udało się znaleźć telefonu w magazynie:', phone.name, 'IMEI:', phone.imei, 'inventoryId:', phone.inventoryId);
+            }
+          } catch (invError: any) {
+            console.error('❌ Błąd podczas oznaczania telefonu:', phone.name, invError);
+          }
         }
+        
+        // Odśwież listę telefonów w panelu bocznym (wysyłam zdarzenie, na które sprzedaż słucha)
+        window.dispatchEvent(new CustomEvent('magazyn_updated'));
+        
+        console.log(`✅ Oznaczono ${markedCount} telefonów jako sprzedanych${skippedCount > 0 ? ` (pominięto: ${skippedCount})` : ''}`);
         
       } catch (dbError: any) {
         console.error('❌ Błąd zapisu do bazy:', dbError);
@@ -923,6 +999,7 @@ export default function SprzedazPage() {
       ini: "",
       imei: "",
       warehousePhoneId: null,
+      inventoryId: null,
       taxType: "marza",
       comment: ""
     });
@@ -2306,7 +2383,7 @@ export default function SprzedazPage() {
                           variant="ghost" 
                           size="sm" 
                           onClick={() => {
-                            setNewEntry({...newEntry, name: "", imei: "", warehousePhoneId: null, price: "", profit: "", taxType: "marza"});
+                            setNewEntry({...newEntry, name: "", imei: "", warehousePhoneId: null, inventoryId: null, price: "", profit: "", taxType: "marza"});
                             setPurchasePriceFromWarehouse(0);
                           }}
                           className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-lg"
@@ -2680,6 +2757,7 @@ export default function SprzedazPage() {
                         price: priceNum,
                         profit: profitVal.toString(),
                         warehousePhoneId: idx,
+                        inventoryId: phone.id,
                         taxType: phone.taxType || "marza"
                       });
                       setIsPhoneSelectOpen(false);
@@ -2973,7 +3051,7 @@ export default function SprzedazPage() {
         isSidebarOpen ? "translate-x-0" : "translate-x-full"
       )}>
         <div className="flex items-center justify-between mb-2">
-          <img src="/logo.png" alt="Logo" className="h-8 w-auto brightness-0 invert" />
+          <img src="/logo.png" alt="Logo" className="h-8 w-auto object-contain" />
           <div className="flex items-center gap-4">
             <div className="h-10 w-10 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-black text-sm">
               {newEntry.ini || "PZ"}
@@ -3116,32 +3194,32 @@ export default function SprzedazPage() {
         {/* Stats Summary */}
         <div className="space-y-6 bg-white/5 p-6 rounded-2xl border border-white/5 flex-1 overflow-y-auto">
           <div className="space-y-1">
-            <p className="text-primary/60 text-[10px] font-black uppercase tracking-widest">gotówka na koniec dnia</p>
-            <p className="text-xl font-black text-white">0 <span className="text-xs text-primary">zł</span></p>
+            <p className="text-primary/60 text-[10px] font-black uppercase tracking-widest">gotówka</p>
+            <p className="text-xl font-black text-white">{totalCashSales} <span className="text-xs text-primary">zł</span></p>
           </div>
 
           <div className="space-y-1">
-            <p className="text-primary/60 text-[10px] font-black uppercase tracking-widest">karty na koniec dnia</p>
-            <p className="text-xl font-black text-white">0 <span className="text-xs text-primary">zł</span></p>
+            <p className="text-primary/60 text-[10px] font-black uppercase tracking-widest">karty</p>
+            <p className="text-xl font-black text-white">{totalCardSales} <span className="text-xs text-primary">zł</span></p>
           </div>
 
           <div className="space-y-1 pt-4 border-t border-white/10">
-            <p className="text-primary/60 text-[10px] font-black uppercase tracking-widest">bilans dnia</p>
-            <p className={cn("text-2xl font-black", totalProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
-              {totalProfit < 0 ? `- ${Math.abs(totalProfit)}` : totalProfit} <span className="text-xs text-primary">zł</span>
+            <p className="text-primary/60 text-[10px] font-black uppercase tracking-widest">wpływy brutto</p>
+            <p className="text-2xl font-black text-emerald-400">
+              {totalAmount} <span className="text-xs text-primary">zł</span>
             </p>
           </div>
 
           <div className="space-y-4 pt-4 border-t border-slate-700">
             <div className="space-y-1">
-              <p className="text-orange-400/60 text-[10px] font-black uppercase tracking-widest">wpływy brutto</p>
+              <p className="text-orange-400/60 text-[10px] font-black uppercase tracking-widest">doładowania</p>
               <p className="text-xl font-black text-white">
-                {totalAmount < 0 ? `- ${Math.abs(totalAmount)}` : totalAmount} <span className="text-xs text-orange-400">zł</span>
+                {totalDoladowania} <span className="text-xs text-orange-400">zł</span>
               </p>
             </div>
 
             <div className="space-y-1">
-              <p className="text-orange-400/60 text-[10px] font-black uppercase tracking-widest">suma zysków</p>
+              <p className="text-orange-400/60 text-[10px] font-black uppercase tracking-widest">zysk netto</p>
               <p className={cn(
                 "text-xl font-black",
                 totalProfit >= 0 ? "text-emerald-400" : "text-red-400"

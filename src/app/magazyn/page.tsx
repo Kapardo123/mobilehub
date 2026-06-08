@@ -371,6 +371,16 @@ export default function MagazynPage() {
     };
 
     loadInventoryFromSupabase();
+
+    const onPhoneSold = (e: any) => {
+      console.log('Magazyn: 🔔 Otrzymano phone_sold - IMEI:', e?.detail?.imei, '- odświeżam listę');
+      loadInventoryFromSupabase();
+    };
+    window.addEventListener('phone_sold', onPhoneSold);
+
+    return () => {
+      window.removeEventListener('phone_sold', onPhoneSold);
+    };
   }, [isMounted, userRole]);
 
   const filteredItems = useMemo(() => {

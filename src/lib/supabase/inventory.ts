@@ -97,6 +97,47 @@ export const inventoryService = {
     return data || [];
   },
 
+  async getByIMEI(imei: string, shopId?: string): Promise<InventoryItem | null> {
+    let queryBuilder = supabase
+      .from('inventory')
+      .select('*')
+      .is('deleted_at', null)
+      .eq('imei', imei)
+      .eq('is_sold', false);
+    
+    if (shopId) {
+      queryBuilder = queryBuilder.eq('shop_id', shopId);
+    }
+    
+    const { data, error } = await queryBuilder.maybeSingle();
+    
+    if (error) {
+      console.warn('Błąd wyszukiwania po IMEI:', error);
+      return null;
+    }
+    return data;
+  },
+
+  async markAsSold(id: string, saleId?: string, saleDate?: string): Promise<InventoryItem | null> {
+    const { data, error } = await supabase
+      .from('inventory')
+      .update({
+        is_sold: true,
+        sold_at: saleDate || new Date().toISOString(),
+        related_sale_id: saleId || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.warn('Błąd oznaczania telefonu jako sprzedanego:', error);
+      return null;
+    }
+    return data;
+  },
+
   async search(query: string, shopId?: string): Promise<InventoryItem[]> {
     let queryBuilder = supabase
       .from('inventory')

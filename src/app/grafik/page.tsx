@@ -297,6 +297,9 @@ export default function GrafikPage() {
   const [endHour, setEndHour] = useState("17");
   const [endMinute, setEndMinute] = useState("00");
   const [isSaving, setIsSaving] = useState(false);
+  const [activePicker, setActivePicker] = useState<'start' | 'end'>('start');
+  const [pickerMode, setPickerMode] = useState<'hour' | 'minute'>('hour');
+  const [minutePage, setMinutePage] = useState(0);
 
   const openDialog = (dayDate: number) => {
     if (!isOwner && !isEmployee) return;
@@ -308,6 +311,9 @@ export default function GrafikPage() {
     setStartMinute("00");
     setEndHour("17");
     setEndMinute("00");
+    setActivePicker('start');
+    setPickerMode('hour');
+    setMinutePage(0);
     setShowAddForm(false);
     setIsDialogOpen(true);
   };
@@ -738,84 +744,202 @@ export default function GrafikPage() {
                         </Select>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-[11px] text-gray-500">Od</Label>
-                          <div className="flex items-center gap-1">
-                            <Select value={startHour} onValueChange={(v) => setStartHour(v || "09")}>
-                              <SelectTrigger className="h-9 flex-1 text-sm font-semibold px-2 min-w-0">
-                                {startHour}
-                              </SelectTrigger>
-                              <SelectContent className="max-h-48">
-                                {Array.from({ length: 24 }, (_, i) => (
-                                  <SelectItem key={i} value={String(i).padStart(2, '0')}>
-                                    {String(i).padStart(2, '0')}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <span className="text-gray-400 font-bold text-sm shrink-0">:</span>
-                            <Select value={startMinute} onValueChange={(v) => setStartMinute(v || "00")}>
-                              <SelectTrigger className="h-9 w-[52px] text-sm font-semibold px-1.5">
-                                {startMinute}
-                              </SelectTrigger>
-                              <SelectContent className="max-h-48">
-                                {Array.from({ length: 60 }, (_, i) => (
-                                  <SelectItem key={i} value={String(i).padStart(2, '0')}>
-                                    {String(i).padStart(2, '0')}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setActivePicker('start'); setPickerMode('hour'); setMinutePage(0); }}
+                            className={cn(
+                              "p-3 rounded-xl border-2 transition-all text-center",
+                              activePicker === 'start'
+                                ? "bg-blue-600 text-white border-blue-600 shadow-lg scale-[1.02]"
+                                : "bg-white text-gray-700 border-gray-200 hover:border-blue-300"
+                            )}
+                          >
+                            <div className={cn("text-[10px] font-bold uppercase tracking-wide", activePicker === 'start' ? "text-blue-100" : "text-gray-400")}>
+                              🔵 Od
+                            </div>
+                            <div className="text-2xl font-black tabular-nums mt-0.5">
+                              {startHour}<span className={cn(activePicker === 'start' ? "text-blue-200" : "text-gray-300")}>:</span>{startMinute}
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setActivePicker('end'); setPickerMode('hour'); setMinutePage(0); }}
+                            className={cn(
+                              "p-3 rounded-xl border-2 transition-all text-center",
+                              activePicker === 'end'
+                                ? "bg-blue-600 text-white border-blue-600 shadow-lg scale-[1.02]"
+                                : "bg-white text-gray-700 border-gray-200 hover:border-blue-300"
+                            )}
+                          >
+                            <div className={cn("text-[10px] font-bold uppercase tracking-wide", activePicker === 'end' ? "text-blue-100" : "text-gray-400")}>
+                              🟢 Do
+                            </div>
+                            <div className="text-2xl font-black tabular-nums mt-0.5">
+                              {endHour}<span className={cn(activePicker === 'end' ? "text-blue-200" : "text-gray-300")}>:</span>{endMinute}
+                            </div>
+                          </button>
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-[11px] text-gray-500">Do</Label>
-                          <div className="flex items-center gap-1">
-                            <Select value={endHour} onValueChange={(v) => setEndHour(v || "17")}>
-                              <SelectTrigger className="h-9 flex-1 text-sm font-semibold px-2 min-w-0">
-                                {endHour}
-                              </SelectTrigger>
-                              <SelectContent className="max-h-48">
-                                {Array.from({ length: 24 }, (_, i) => (
-                                  <SelectItem key={i} value={String(i).padStart(2, '0')}>
-                                    {String(i).padStart(2, '0')}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <span className="text-gray-400 font-bold text-sm shrink-0">:</span>
-                            <Select value={endMinute} onValueChange={(v) => setEndMinute(v || "00")}>
-                              <SelectTrigger className="h-9 w-[52px] text-sm font-semibold px-1.5">
-                                {endMinute}
-                              </SelectTrigger>
-                              <SelectContent className="max-h-48">
-                                {Array.from({ length: 60 }, (_, i) => (
-                                  <SelectItem key={i} value={String(i).padStart(2, '0')}>
-                                    {String(i).padStart(2, '0')}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
 
-                      {(() => {
-                        const sh = parseInt(startHour) || 0;
-                        const sm = parseInt(startMinute) || 0;
-                        const eh = parseInt(endHour) || 0;
-                        const em = parseInt(endMinute) || 0;
-                        const totalMinutes = (eh * 60 + em) - (sh * 60 + sm);
-                        const hours = totalMinutes > 0 ? Math.round((totalMinutes / 60) * 10) / 10 : 0;
-                        return (
-                          <div className="text-center py-2 bg-blue-100 rounded-lg">
-                            <span className="text-sm font-bold text-blue-800">
-                              {hours} {hours === 1 ? 'godzina' : hours >= 2 && hours <= 4 ? 'godziny' : 'godzin'}
-                            </span>
+                        <div className="flex items-center justify-center gap-3 bg-white rounded-xl border border-gray-200 py-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setPickerMode('hour')}
+                            className={cn(
+                              "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                              pickerMode === 'hour'
+                                ? "bg-blue-600 text-white shadow"
+                                : "text-gray-500 hover:bg-gray-100"
+                            )}
+                          >
+                            🕐 Godzina
+                          </button>
+                          <span className="text-gray-500 text-lg font-bold tabular-nums">
+                            {pickerMode === 'hour'
+                              ? (activePicker === 'start' ? startHour : endHour)
+                              : (activePicker === 'start' ? startMinute : endMinute)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => { setPickerMode('minute'); setMinutePage(0); }}
+                            className={cn(
+                              "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                              pickerMode === 'minute'
+                                ? "bg-blue-600 text-white shadow"
+                                : "text-gray-500 hover:bg-gray-100"
+                            )}
+                          >
+                            ⏱️ Minuta
+                          </button>
+                        </div>
+
+                        <div className="relative mx-auto" style={{ width: '280px', height: '280px' }}>
+                          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-50 to-indigo-50 border-4 border-blue-200 shadow-inner">
+                            {pickerMode === 'hour' ? (
+                              <>
+                                {Array.from({ length: 24 }, (_, i) => {
+                                  const angle = (i / 24) * 2 * Math.PI - Math.PI / 2;
+                                  const radius = 105;
+                                  const cx = 140 + radius * Math.cos(angle);
+                                  const cy = 140 + radius * Math.sin(angle);
+                                  const currentH = activePicker === 'start' ? parseInt(startHour) : parseInt(endHour);
+                                  const isSelected = i === currentH;
+                                  const isPrimary = i >= 6 && i <= 20;
+                                  return (
+                                    <button
+                                      key={i}
+                                      type="button"
+                                      onClick={() => {
+                                        const val = String(i).padStart(2, '0');
+                                        if (activePicker === 'start') setStartHour(val);
+                                        else setEndHour(val);
+                                        setPickerMode('minute');
+                                      }}
+                                      className={cn(
+                                        "absolute flex items-center justify-center rounded-full font-bold transition-all text-xs -translate-x-1/2 -translate-y-1/2",
+                                        isSelected
+                                          ? "w-9 h-9 bg-blue-600 text-white shadow-lg scale-110 ring-2 ring-blue-300"
+                                          : isPrimary
+                                            ? "w-8 h-8 bg-white text-gray-700 border-2 border-gray-200 hover:bg-blue-100 hover:text-blue-700 hover:scale-110 hover:border-blue-400"
+                                            : "w-7 h-7 bg-gray-50 text-gray-400 border border-gray-200 hover:bg-blue-50 hover:text-blue-600 hover:scale-110"
+                                      )}
+                                      style={{ left: cx, top: cy }}
+                                    >
+                                      {String(i).padStart(2, '0')}
+                                    </button>
+                                  );
+                                })}
+                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                                  <div className="text-[9px] font-bold text-gray-400 uppercase">
+                                    {activePicker === 'start' ? 'Początek zmiany' : 'Koniec zmiany'}
+                                  </div>
+                                  <div className="text-2xl font-black text-blue-600 tabular-nums mt-0.5">
+                                    {activePicker === 'start' ? `${startHour}:${startMinute}` : `${endHour}:${endMinute}`}
+                                  </div>
+                                  <div className="text-[9px] font-bold text-blue-400 mt-1">
+                                    Kliknij godzinę →
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                {Array.from({ length: 60 }, (_, i) => {
+                                  const angle = (i / 60) * 2 * Math.PI - Math.PI / 2;
+                                  const isBig = i % 5 === 0;
+                                  const radiusBig = 115;
+                                  const radiusSmall = 92;
+                                  const radius = isBig ? radiusBig : radiusSmall;
+                                  const cx = 140 + radius * Math.cos(angle);
+                                  const cy = 140 + radius * Math.sin(angle);
+                                  const currentM = activePicker === 'start' ? parseInt(startMinute) : parseInt(endMinute);
+                                  const isSelected = i === currentM;
+                                  return (
+                                    <button
+                                      key={i}
+                                      type="button"
+                                      onClick={() => {
+                                        const val = String(i).padStart(2, '0');
+                                        if (activePicker === 'start') setStartMinute(val);
+                                        else setEndMinute(val);
+                                      }}
+                                      className={cn(
+                                        "absolute flex items-center justify-center font-bold transition-all -translate-x-1/2 -translate-y-1/2 rounded-full",
+                                        isSelected
+                                          ? isBig
+                                            ? "w-8 h-8 bg-blue-600 text-white shadow-lg scale-110 ring-2 ring-blue-300 text-xs z-10"
+                                            : "w-4 h-4 bg-blue-500 shadow-md scale-150 z-10"
+                                          : isBig
+                                            ? "w-8 h-8 bg-white text-gray-700 border-2 border-gray-300 hover:bg-blue-100 hover:text-blue-700 hover:scale-110 hover:border-blue-400 text-xs z-10"
+                                            : "w-2.5 h-2.5 bg-gray-300 hover:bg-blue-400 hover:scale-150"
+                                      )}
+                                      style={{ left: cx, top: cy }}
+                                    >
+                                      {isBig ? String(i).padStart(2, '0') : ''}
+                                    </button>
+                                  );
+                                })}
+                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                                  <div className="text-[9px] font-bold text-gray-400 uppercase">
+                                    Wybierz minutę
+                                  </div>
+                                  <div className="text-2xl font-black text-blue-600 tabular-nums mt-0.5">
+                                    :{activePicker === 'start' ? startMinute : endMinute}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setPickerMode('hour')}
+                                    className="text-[10px] font-bold text-blue-500 hover:text-blue-700 mt-1 underline underline-offset-2 pointer-events-auto"
+                                  >
+                                    ← wróć do godzin
+                                  </button>
+                                </div>
+                              </>
+                            )}
                           </div>
-                        );
-                      })()}
+                        </div>
+
+                        {(() => {
+                          const sh = parseInt(startHour) || 0;
+                          const sm = parseInt(startMinute) || 0;
+                          const eh = parseInt(endHour) || 0;
+                          const em = parseInt(endMinute) || 0;
+                          let totalMinutes = (eh * 60 + em) - (sh * 60 + sm);
+                          if (totalMinutes <= 0) totalMinutes += 24 * 60;
+                          const hours = Math.floor(totalMinutes / 60);
+                          const mins = totalMinutes % 60;
+                          const timeStr = mins === 0
+                            ? `${hours} ${hours === 1 ? 'godzina' : hours >= 2 && hours <= 4 ? 'godziny' : 'godzin'}`
+                            : `${hours}h ${mins}min`;
+                          return (
+                            <div className="text-center py-2.5 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-lg border border-blue-200">
+                              <span className="text-sm font-black text-blue-900">
+                                ⏱️ {timeStr}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
 
                       <div className="flex gap-2 pt-1">
                         <Button

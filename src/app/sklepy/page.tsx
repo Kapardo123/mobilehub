@@ -14,13 +14,14 @@ import {
   Edit2,
   ArrowLeft,
   Building2,
-  Users
+  Users,
+  Phone,
+  Hash
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getSessionStorageSafe } from "@/lib/storage";
-import { usersService } from "@/lib/supabase/users";
 import { shopsService } from "@/lib/supabase/shops";
 import { salesService } from "@/lib/supabase/sales";
 import { costsService } from "@/lib/supabase/costs";
@@ -39,17 +40,43 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/toast";
 
 interface Shop {
   id: string;
+  code: string;
   name: string;
   address: string;
+  city: string | null;
+  postal_code: string | null;
+  phone: string | null;
+  email: string | null;
   employees: number;
   is_active?: boolean;
 }
 
+interface NewShopForm {
+  name: string;
+  address: string;
+  city: string;
+  postal_code: string;
+  phone: string;
+  email: string;
+}
+
+interface EditShopForm {
+  id: string;
+  name: string;
+  address: string;
+  city: string | null;
+  postal_code: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
 export default function SklepyPage() {
   const router = useRouter();
+  const { addToast } = useToast();
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,17 +99,13 @@ export default function SklepyPage() {
     try {
       setIsLoading(true);
       const shopsData = await shopsService.getAll();
-      console.log('Pobrano sklepy z bazy:', shopsData);
       
       const shopsWithEmployees = await Promise.all(shopsData.map(async (shop) => {
-        // Join with users table, exclude owners, deleted, and inactive users
-        const { data: userShops, error } = await supabase
+        const { data: userShops } = await supabase
           .from('user_shops')
           .select('user_id, users!inner(role, first_name, last_name, deleted_at, is_active)')
           .eq('shop_id', shop.id)
           .is('unassigned_at', null);
-        
-        console.log(`Sklep: ${shop.name}, userShops:`, userShops, 'error:', error);
         
         const employeeCount = userShops?.filter((us: any) => {
           return (
@@ -92,12 +115,15 @@ export default function SklepyPage() {
           );
         }).length || 0;
         
-        console.log(`Sklep: ${shop.name}, employeeCount:`, employeeCount);
-        
         return {
           id: shop.id,
+          code: shop.code,
           name: shop.name,
-          address: shop.address || 'Brak adresu',
+          address: shop.address,
+          city: shop.city,
+          postal_code: shop.postal_code,
+          phone: shop.phone,
+          email: shop.email,
           employees: employeeCount,
           is_active: shop.is_active
         };
@@ -106,34 +132,94 @@ export default function SklepyPage() {
       setShops(shopsWithEmployees);
     } catch (error) {
       console.error('Błąd podczas ładowania sklepów:', error);
+      addToast({
+        type: "error",
+        title: "Błąd ładowania",
+        message: "Nie udało się załadować listy sklepów"
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const [newShop, setNewShop] = useState({
+  const [newShop, setNewShop] = useState<NewShopForm>({
     name: "",
-    address: ""
+    address: "",
+    city: "",
+    postal_code: "",
+    phone: "",
+    email: ""
   });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingShop, setEditingShop] = useState<Shop | null>(null);
+  const [editingShop, setEditingShop] = useState<EditShopForm | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  const validateShop = (shop: { name: string; address: string; city: string; postal_code: string; email: string }): string | null => {
+    if (!shop.name.trim()) return "Nazwa sklepu jest wymagana";
+    if (shop.name.trim().length < 2) return "Nazwa sklepu musi mieć co najmniej 2 znaki";
+    if (!shop.address.trim()) return "Adres jest wymagany";
+    if (!shop.city.trim()) return "Miasto jest wymagane";
+    if (!shop.postal_code.trim()) return "Kod pocztowy jest wymagany";
+    
+    const postalCodeRegex = /^\d{2}-\d{3}$/;
+    if (!postalCodeRegex.test(shop.postal_code.trim())) {
+      return "Kod pocztowy musi być w formacie XX-XXX";
+    }
+    
+    if (shop.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(shop.email.trim())) {
+        return "Nieprawidłowy format adresu email";
+      }
+    }
+    
+    return null;
+  };
+
+  const generateCode = (name: string, existingShops: Shop[]): string => {
+    let baseCode = name.toLowerCase()
+      .replace(/[ęóąśłżźćń]/g, (c) => ({
+        'ę': 'e', 'ó': 'o', 'ą': 'a', 'ś': 's',
+        'ł': 'l', 'ż': 'z', 'ź': 'z', 'ć': 'c', 'ń': 'n'
+      }[c] || c))
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, '_')
+      .substring(0, 15);
+    
+    if (existingShops.some(s => s.code === baseCode)) {
+      baseCode = baseCode + '_' + Date.now().toString(36);
+    }
+    
+    return baseCode;
+  };
 
   const handleAddShop = async () => {
-    if (!newShop.name || !newShop.address) return;
+    const validationError = validateShop(newShop);
+    if (validationError) {
+      addToast({
+        type: "warning",
+        title: "Upełnij dane",
+        message: validationError
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
     
     try {
-      console.log('Dodawanie nowego sklepu:', newShop);
-      
       const createdShop = await shopsService.create({
-        code: newShop.name.toLowerCase().replace(/\s+/g, '_').substring(0, 20),
-        name: newShop.name,
-        address: newShop.address,
+        code: generateCode(newShop.name, shops),
+        name: newShop.name.trim(),
+        address: newShop.address.trim(),
+        city: newShop.city.trim(),
+        postal_code: newShop.postal_code.trim(),
+        phone: newShop.phone.trim() || null,
+        email: newShop.email.trim() || null,
         is_active: true
       });
-      
-      console.log('Utworzono sklep w bazie:', createdShop);
       
       const { data: owners } = await supabase
         .from('users')
@@ -142,8 +228,7 @@ export default function SklepyPage() {
         .eq('is_active', true)
         .is('deleted_at', null);
       
-      console.log('Znaleziono właścicieli:', owners?.length || 0);
-      
+      let ownerCount = 0;
       if (owners && owners.length > 0) {
         const ownerAssignments = owners.map((owner: any, index: number) => ({
           user_id: owner.id,
@@ -155,166 +240,190 @@ export default function SklepyPage() {
           .from('user_shops')
           .insert(ownerAssignments);
         
-        if (assignError) {
-          console.error('Błąd przypisywania właścicieli do sklepu:', assignError);
-        } else {
-          console.log(`Przypisano ${owners.length} właścicieli do sklepu ${createdShop.name}`);
-          
-          const shopWithEmployees: Shop = {
-            id: createdShop.id,
-            name: createdShop.name,
-            address: createdShop.address || newShop.address,
-            employees: 0,
-            is_active: createdShop.is_active
-          };
-
-          setShops([...shops, shopWithEmployees]);
-          setNewShop({ name: "", address: "" });
-          setIsDialogOpen(false);
-          
-          window.dispatchEvent(new CustomEvent('shops_updated'));
-          alert(`✅ Dodano sklep: ${createdShop.name}\n👤 Automatycznie przypisano ${owners.length} właścicieli`);
-          return;
+        if (!assignError) {
+          ownerCount = owners.length;
         }
       }
       
-      const shop: Shop = {
+      const shopWithEmployees: Shop = {
         id: createdShop.id,
+        code: createdShop.code,
         name: createdShop.name,
-        address: createdShop.address || newShop.address,
+        address: createdShop.address,
+        city: createdShop.city,
+        postal_code: createdShop.postal_code,
+        phone: createdShop.phone,
+        email: createdShop.email,
         employees: 0,
         is_active: createdShop.is_active
       };
 
-      setShops([...shops, shop]);
-      setNewShop({ name: "", address: "" });
+      setShops([...shops, shopWithEmployees]);
+      setNewShop({ name: "", address: "", city: "", postal_code: "", phone: "", email: "" });
       setIsDialogOpen(false);
       
       window.dispatchEvent(new CustomEvent('shops_updated'));
-      alert(`✅ Dodano sklep: ${createdShop.name}`);
+      window.dispatchEvent(new CustomEvent('data_updated'));
+      
+      addToast({
+        type: "success",
+        title: "Dodano sklep",
+        message: `Pomyślnie dodano sklep: ${createdShop.name}${ownerCount > 0 ? ` (przypisano ${ownerCount} właścicieli)` : ''}`
+      });
     } catch (error: any) {
       console.error('Błąd podczas dodawania sklepu:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      console.error('Error message:', error?.message);
-      console.error('Error code:', error?.code);
-      console.error('Error details (supabase):', error?.details);
-      console.error('Error hint:', error?.hint);
       
-      alert('Błąd podczas dodawania sklepu:\n\n' + 
-        (error?.message || 'Nieznany błąd') + 
-        '\n\nCode: ' + (error?.code || 'brak') +
-        '\nDetails: ' + (error?.details || 'brak'));
+      let errorMessage = "Wystąpił nieoczekiwany błąd podczas dodawania sklepu";
+      
+      if (error?.code === '23505' || error?.message?.toLowerCase().includes('unique') || error?.message?.toLowerCase().includes('duplicate')) {
+        errorMessage = "Sklep z taką nazwą lub kodem już istnieje";
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      addToast({
+        type: "error",
+        title: "Błąd dodawania sklepu",
+        message: errorMessage
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleEditClick = (shop: Shop) => {
-    setEditingShop(shop);
+    setEditingShop({
+      id: shop.id,
+      name: shop.name,
+      address: shop.address,
+      city: shop.city,
+      postal_code: shop.postal_code,
+      phone: shop.phone,
+      email: shop.email
+    });
     setIsEditDialogOpen(true);
   };
 
   const handleUpdateShop = async () => {
-    if (!editingShop || !editingShop.name || !editingShop.address) return;
+    if (!editingShop) return;
+    
+    const validationError = validateShop({
+      name: editingShop.name,
+      address: editingShop.address,
+      city: editingShop.city || "",
+      postal_code: editingShop.postal_code || "",
+      email: editingShop.email || ""
+    });
+    
+    if (validationError) {
+      addToast({
+        type: "warning",
+        title: "Upełnij dane",
+        message: validationError
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
     
     try {
-      console.log('Aktualizacja sklepu:', editingShop);
-      
       const updatedShop = await shopsService.update(editingShop.id, {
-        name: editingShop.name,
-        address: editingShop.address
+        name: editingShop.name.trim(),
+        address: editingShop.address.trim(),
+        city: editingShop.city?.trim() || null,
+        postal_code: editingShop.postal_code?.trim() || null,
+        phone: editingShop.phone?.trim() || null,
+        email: editingShop.email?.trim() || null
       });
-      
-      console.log('Zaktualizowano sklep w bazie:', updatedShop);
       
       setShops(prev => prev.map(s => s.id === editingShop.id ? {
         ...s,
         name: updatedShop.name,
-        address: updatedShop.address || editingShop.address
+        address: updatedShop.address,
+        city: updatedShop.city,
+        postal_code: updatedShop.postal_code,
+        phone: updatedShop.phone,
+        email: updatedShop.email
       } : s));
+      
       setEditingShop(null);
       setIsEditDialogOpen(false);
       
       window.dispatchEvent(new CustomEvent('shops_updated'));
-      alert(`✅ Zaktualizowano sklep: ${updatedShop.name}`);
-    } catch (error) {
+      window.dispatchEvent(new CustomEvent('data_updated'));
+      
+      addToast({
+        type: "success",
+        title: "Zaktualizowano sklep",
+        message: `Pomyślnie zaktualizowano dane sklepu: ${updatedShop.name}`
+      });
+    } catch (error: any) {
       console.error('Błąd podczas aktualizacji sklepu:', error);
-      alert('Błąd podczas aktualizacji sklepu: ' + (error instanceof Error ? error.message : 'Nieznany błąd'));
+      
+      let errorMessage = "Wystąpił nieoczekiwany błąd podczas aktualizacji sklepu";
+      if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      addToast({
+        type: "error",
+        title: "Błąd aktualizacji",
+        message: errorMessage
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleDeleteShop = async (id: string, name: string) => {
     if (typeof window !== 'undefined' && window.confirm(`CZY NA PEWNO CHCESZ USUNĄĆ SKLEP: ${name.toUpperCase()}?\n\n⚠️ UWAGA: Usunięcie sklepu spowoduje TRWAŁE usunięcie wszystkich powiązanych danych:\n\n• 📊 Sprzedaże i pozycje sprzedaży\n• 💰 Koszty i doładowania\n• 📄 Faktury i ich pozycje\n• 📋 Dokumenty\n• 📦 Magazyn/towar\n• 🕐 Zmiany pracowników\n• 💵 Zamknięcia kasy\n• 📝 Logi audytowe\n• 👥 Powiązania pracowników\n\nTej operacji nie można cofnąć!`)) {
+      setIsDeleting(id);
+      
       try {
-        console.log('🗑️ Rozpoczynam kaskadowe usuwanie sklepu:', id, name);
-        
-        // 1. Usuń powiązania użytkowników ze sklepem (tabela user_shops)
-        console.log('1️⃣ Usuwanie powiązań użytkowników...');
-        await supabase
-          .from('user_shops')
-          .delete()
-          .eq('shop_id', id);
-        
-        // 2. Usuń audyt log (najpierw bo może mieć foreign keys)
-        console.log('2️⃣ Usuwanie logów audytowych...');
+        await supabase.from('user_shops').delete().eq('shop_id', id);
         await auditService.deleteByShopId(id);
-        
-        // 3. Usuń zamknięcia kasy
-        console.log('3️⃣ Usuwanie zamknięć kasy...');
         await cashRegisterService.deleteByShopId(id);
-        
-        // 4. Usuń zmiany pracowników
-        console.log('4️⃣ Usuwanie zmian pracowników...');
         await shiftsService.deleteByShopId(id);
         
-        // 5. Usuń dokumenty (również z storage!)
-        console.log('5️⃣ Usuwanie dokumentów...');
-        const { data: docs } = await supabase
-          .from('documents')
-          .select('id, file_path')
-          .eq('shop_id', id);
-        
+        const { data: docs } = await supabase.from('documents').select('id, file_path').eq('shop_id', id);
         if (docs && docs.length > 0) {
-          // Usuń pliki z Storage
           for (const doc of docs) {
             if (doc.file_path) {
               try {
                 await supabase.storage.from('documents').remove([doc.file_path]);
               } catch (storageError) {
-                console.warn('⚠️ Błąd usuwania pliku z storage:', storageError);
+                console.warn('Błąd usuwania pliku z storage:', storageError);
               }
             }
           }
         }
         await documentsService.deleteByShopId(id);
-        
-        // 6. Usuń faktury i ich pozycje
-        console.log('6️⃣ Usuwanie faktur...');
-        await invoicesService.deleteByShopId(id); // invoice_items usunie się przez CASCADE
-        
-        // 7. Usuń koszty
-        console.log('7️⃣ Usuwanie kosztów...');
+        await invoicesService.deleteByShopId(id);
         await costsService.deleteByShopId(id);
-        
-        // 8. Usuń sprzedaż i pozycje sprzedaży
-        console.log('8️⃣ Usuwania sprzedaży...');
-        await salesService.deleteByShopId(id); // sale_items usunie się przez CASCADE
-        
-        // 9. Usuń magazyn/towar
-        console.log('9️⃣ Usuwanie magazynu...');
+        await salesService.deleteByShopId(id);
         await inventoryService.deleteByShopId(id);
-        
-        // 10. Na końcu soft-delete samego sklepu
-        console.log('🔟 Soft-deleting sklepu...');
         await shopsService.softDelete(id);
-        
-        console.log('✅ Pomyślnie usunięto sklep i wszystkie powiązane dane:', name);
         
         setShops(prev => prev.filter(s => s.id !== id));
         
         window.dispatchEvent(new CustomEvent('shops_updated'));
-        alert(`✅ Usunięto sklep: ${name}\n\nWszystkie powiązane dane zostały trwale usunięte.`);
+        window.dispatchEvent(new CustomEvent('data_updated'));
+        
+        addToast({
+          type: "success",
+          title: "Usunięto sklep",
+          message: `Pomyślnie usunięto sklep: ${name}`
+        });
       } catch (error) {
-        console.error('❌ Błąd podczas kaskadowego usuwania sklepu:', error);
-        alert('Błąd podczas usuwania sklepu: ' + (error instanceof Error ? error.message : 'Nieznany błąd') + '\n\nSklep mógł zostać częściowo usunięty. Skontaktuj się z administratorem.');
+        console.error('Błąd podczas usuwania sklepu:', error);
+        
+        addToast({
+          type: "error",
+          title: "Błąd usuwania",
+          message: "Wystąpił błąd podczas usuwania sklepu. Niektóre dane mogą nie zostać usunięte."
+        });
+      } finally {
+        setIsDeleting(null);
       }
     }
   };
@@ -324,7 +433,6 @@ export default function SklepyPage() {
       <Navbar />
       
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full space-y-6 pb-24">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Link href="/">
@@ -345,17 +453,17 @@ export default function SklepyPage() {
                 Dodaj Sklep
               </Button>
             }></DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] rounded-3xl border-none p-0 overflow-hidden">
+            <DialogContent className="sm:max-w-[500px] rounded-3xl border-none p-0 overflow-hidden">
               <DialogHeader className="p-8 bg-primary text-white text-left">
                 <DialogTitle className="text-2xl font-black mb-1">Nowy Sklep</DialogTitle>
                 <p className="text-white/70 text-xs font-bold uppercase tracking-widest">Dodaj nowy punkt sprzedaży do systemu</p>
               </DialogHeader>
 
-              <div className="p-8 space-y-6">
+              <div className="p-8 space-y-5">
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                      <Store className="h-3 w-3" /> Nazwa Sklepu
+                      <Store className="h-3 w-3" /> Nazwa Sklepu <span className="text-red-500">*</span>
                     </Label>
                     <Input 
                       value={newShop.name}
@@ -367,50 +475,100 @@ export default function SklepyPage() {
 
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                      <MapPin className="h-3 w-3" /> Adres
+                      <MapPin className="h-3 w-3" /> Adres <span className="text-red-500">*</span>
                     </Label>
                     <Input 
                       value={newShop.address}
                       onChange={(e) => setNewShop({ ...newShop, address: e.target.value })}
-                      placeholder="ul. Kolorowa 1, 00-000 Miasto"
+                      placeholder="ul. Kolorowa 1"
                       className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
                     />
                   </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                        <Building2 className="h-3 w-3" /> Miasto <span className="text-red-500">*</span>
+                      </Label>
+                      <Input 
+                        value={newShop.city}
+                        onChange={(e) => setNewShop({ ...newShop, city: e.target.value })}
+                        placeholder="Włocławek"
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                        <Hash className="h-3 w-3" /> Kod <span className="text-red-500">*</span>
+                      </Label>
+                      <Input 
+                        value={newShop.postal_code}
+                        onChange={(e) => setNewShop({ ...newShop, postal_code: e.target.value })}
+                        placeholder="00-000"
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                        <Phone className="h-3 w-3" /> Telefon
+                      </Label>
+                      <Input 
+                        value={newShop.phone}
+                        onChange={(e) => setNewShop({ ...newShop, phone: e.target.value })}
+                        placeholder="+48 123 456 789"
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                        <Mail className="h-3 w-3" /> Email
+                      </Label>
+                      <Input 
+                        value={newShop.email}
+                        onChange={(e) => setNewShop({ ...newShop, email: e.target.value })}
+                        placeholder="sklep@firma.pl"
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 pt-2">
                   <Button 
                     variant="ghost"
                     className="flex-1 h-12 rounded-xl font-bold text-muted-foreground hover:bg-accent"
                     onClick={() => setIsDialogOpen(false)}
+                    disabled={isSubmitting}
                   >
                     Anuluj
                   </Button>
                   <Button 
                     onClick={handleAddShop}
-                    disabled={!newShop.name || !newShop.address}
-                    className="flex-[2] h-12 bg-primary hover:bg-primary/90 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/10"
+                    disabled={isSubmitting}
+                    className="flex-[2] h-12 bg-primary hover:bg-primary/90 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/10 disabled:opacity-50"
                   >
-                    Dodaj Punkt
+                    {isSubmitting ? "Dodawanie..." : "Dodaj Punkt"}
                   </Button>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
 
-          {/* Edit Shop Dialog */}
           <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-            <DialogContent className="sm:max-w-[425px] rounded-3xl border-none p-0 overflow-hidden">
+            <DialogContent className="sm:max-w-[500px] rounded-3xl border-none p-0 overflow-hidden">
               <DialogHeader className="p-8 bg-secondary text-white text-left">
                 <DialogTitle className="text-2xl font-black mb-1">Edytuj Sklep</DialogTitle>
                 <p className="text-white/70 text-xs font-bold uppercase tracking-widest">Zmień dane punktu sprzedaży</p>
               </DialogHeader>
 
-              <div className="p-8 space-y-6">
+              <div className="p-8 space-y-5">
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                      <Store className="h-3 w-3" /> Nazwa Sklepu
+                      <Store className="h-3 w-3" /> Nazwa Sklepu <span className="text-red-500">*</span>
                     </Label>
                     <Input 
                       value={editingShop?.name || ""}
@@ -422,32 +580,82 @@ export default function SklepyPage() {
 
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                      <MapPin className="h-3 w-3" /> Adres
+                      <MapPin className="h-3 w-3" /> Adres <span className="text-red-500">*</span>
                     </Label>
                     <Input 
                       value={editingShop?.address || ""}
                       onChange={(e) => setEditingShop(prev => prev ? { ...prev, address: e.target.value } : null)}
-                      placeholder="ul. Kolorowa 1, 00-000 Miasto"
+                      placeholder="ul. Kolorowa 1"
                       className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
                     />
                   </div>
 
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                        <Building2 className="h-3 w-3" /> Miasto <span className="text-red-500">*</span>
+                      </Label>
+                      <Input 
+                        value={editingShop?.city || ""}
+                        onChange={(e) => setEditingShop(prev => prev ? { ...prev, city: e.target.value } : null)}
+                        placeholder="Włocławek"
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                        <Hash className="h-3 w-3" /> Kod <span className="text-red-500">*</span>
+                      </Label>
+                      <Input 
+                        value={editingShop?.postal_code || ""}
+                        onChange={(e) => setEditingShop(prev => prev ? { ...prev, postal_code: e.target.value } : null)}
+                        placeholder="00-000"
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                        <Phone className="h-3 w-3" /> Telefon
+                      </Label>
+                      <Input 
+                        value={editingShop?.phone || ""}
+                        onChange={(e) => setEditingShop(prev => prev ? { ...prev, phone: e.target.value } : null)}
+                        placeholder="+48 123 456 789"
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                        <Mail className="h-3 w-3" /> Email
+                      </Label>
+                      <Input 
+                        value={editingShop?.email || ""}
+                        onChange={(e) => setEditingShop(prev => prev ? { ...prev, email: e.target.value } : null)}
+                        placeholder="sklep@firma.pl"
+                        className="h-12 bg-accent/30 border-none rounded-xl font-bold text-xs uppercase"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 pt-2">
                   <Button 
                     variant="ghost"
                     className="flex-1 h-12 rounded-xl font-bold text-muted-foreground hover:bg-accent"
                     onClick={() => setIsEditDialogOpen(false)}
+                    disabled={isSubmitting}
                   >
                     Anuluj
                   </Button>
                   <Button 
                     onClick={handleUpdateShop}
-                    disabled={!editingShop?.name || !editingShop?.address}
-                    className="flex-[2] h-12 bg-secondary hover:bg-secondary/90 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-secondary/10"
+                    disabled={isSubmitting}
+                    className="flex-[2] h-12 bg-secondary hover:bg-secondary/90 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg shadow-secondary/10 disabled:opacity-50"
                   >
-                    Zapisz Zmiany
+                    {isSubmitting ? "Zapisywanie..." : "Zapisz Zmiany"}
                   </Button>
                 </div>
               </div>
@@ -455,7 +663,6 @@ export default function SklepyPage() {
           </Dialog>
         </div>
 
-        {/* Shops List */}
         <div className="grid grid-cols-1 gap-4">
           {shops.map((shop) => (
             <Card key={shop.id} className="border-none shadow-sm bg-white overflow-hidden rounded-3xl border border-primary/5 group hover:shadow-md transition-all">
@@ -469,14 +676,20 @@ export default function SklepyPage() {
                       </div>
                       <div className="space-y-1">
                         <h3 className="text-xl font-black text-foreground uppercase tracking-tight">{shop.name}</h3>
-                        <div className="flex items-center gap-4">
+                        <div className="space-y-0.5">
                           <div className="flex items-center gap-1.5 text-muted-foreground">
                             <MapPin className="h-3 w-3 text-primary/50" />
-                            <span className="text-[10px] font-bold uppercase tracking-widest">{shop.address}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest">
+                              {shop.address}
+                              {shop.city && `, ${shop.city}`}
+                              {shop.postal_code && ` ${shop.postal_code}`}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <Users className="h-3 w-3 text-primary/50" />
-                            <span className="text-[10px] font-bold uppercase tracking-widest">{shop.employees} Pracowników</span>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              <Users className="h-3 w-3 text-primary/50" />
+                              <span className="text-[10px] font-bold uppercase tracking-widest">{shop.employees} Pracowników</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -496,6 +709,7 @@ export default function SklepyPage() {
                         size="icon" 
                         className="h-10 w-10 rounded-xl hover:bg-red-50 text-red-500"
                         onClick={() => handleDeleteShop(shop.id, shop.name)}
+                        disabled={isDeleting === shop.id}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

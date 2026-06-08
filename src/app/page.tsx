@@ -580,8 +580,8 @@ export default function Home() {
   const sumaTotal = kasaDzis + cardSalesToday;
   const dzienTotal = totalSalesToday - totalCostsToday;
   
-  // ✅ ZYSK NETTO = Zysk ze sprzedaży (marże) - Koszty
-  const zyskNetto = totalProfitToday - totalCostsToday;
+  // ✅ ZYSK NETTO = Wpływy (sprzedaż) - Wydatki (wszystkie koszty)
+  const zyskNetto = totalSalesToday - totalCostsToday;
   
   console.log('');
   console.log('=== KOŃCOWY WYNIK ===');
@@ -834,7 +834,7 @@ export default function Home() {
                         <span className="text-sm font-bold uppercase tracking-wide">Zysk Netto</span>
                       </div>
                       <div className="text-right">
-                        <p className={`text-2xl font-black ${zyskNetto >= 0 ? 'text-white' : 'text-primary/80'}`}>
+                        <p className={`text-2xl font-black ${zyskNetto >= 0 ? 'text-white' : 'text-red-200'}`}>
                           {zyskNetto >= 0 ? '+' : ''}{zyskNetto.toFixed(0)}
                         </p>
                       </div>
@@ -914,9 +914,9 @@ export default function Home() {
                   <span className="text-red-600 font-bold">Koszty</span>
                   <span className="font-black text-red-600">{totalCostsToday.toFixed(2)} zł</span>
                 </div>
-                <div className="flex justify-between p-3 bg-emerald-50 rounded-xl">
-                  <span className="text-emerald-600 font-bold">Zysk</span>
-                  <span className="font-black text-emerald-700">{zyskNetto >= 0 ? '+' : ''}{zyskNetto.toFixed(2)} zł</span>
+                <div className={`flex justify-between p-3 rounded-xl ${zyskNetto >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                  <span className={`font-bold ${zyskNetto >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>Zysk</span>
+                  <span className={`font-black ${zyskNetto >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{zyskNetto >= 0 ? '+' : ''}{zyskNetto.toFixed(2)} zł</span>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground text-center font-bold">

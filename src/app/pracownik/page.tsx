@@ -247,6 +247,11 @@ export default function PracownikDashboard() {
   const totalCostsToday = todayCosts
     .filter((c: any) => c.category !== 'gotowka')  // ← Wykluczamy doładowania!
     .reduce((sum: number, c: any) => sum + c.amount, 0);
+
+  // Koszty zapłacone gotówką (np. skup telefonów) - do odejmowania od kasy!
+  const cashCostsToday = todayCosts
+    .filter((c: any) => c.paymentMethod === 'gotowka' && c.category !== 'gotowka')
+    .reduce((sum: number, c: any) => sum + c.amount, 0);
   
   // Doładowania (osobno, nie wliczane do kosztów!)
   const doladowaniaToday = todayCosts
@@ -256,15 +261,15 @@ export default function PracownikDashboard() {
   // Stan kasy z poprzedniego dnia (pobierany z bazy danych)
   // const stanKasyPoprzedniegoDnia = 2698; // Stara wersja - teraz z bazy
   
-  // Stan kasy dzisiaj (poprzedni dzień + gotówka + doładowania)
-  const kasaDzis = stanKasyPoprzedniegoDnia + cashSalesToday + doladowaniaToday;
+  // ✅ Stan kasy dzisiaj = poprzedni dzień + sprzedaż gotówką + doładowania - koszty gotówkowe
+  const kasaDzis = stanKasyPoprzedniegoDnia + cashSalesToday + doladowaniaToday - cashCostsToday;
   const sumaTotal = kasaDzis + cardSalesToday;
   
   // Dzień (sprzedaż - koszty)
   const dzienTotal = totalSalesToday - totalCostsToday;
   
-  // ✅ ZYSK NETTO = Zysk ze sprzedaży (marże) - TAKO JAK W page.tsx I SPRZEDAŻ!
-  const zyskNetto = totalProfitToday;
+  // ✅ ZYSK NETTO = Wpływy (sprzedaż) - Wydatki (wszystkie koszty)
+  const zyskNetto = totalSalesToday - totalCostsToday;
   
   console.log('');
   console.log('=== PRACOWNIK - OBLICZENIA ZYSKU ===');
@@ -535,9 +540,9 @@ export default function PracownikDashboard() {
                   <span className="text-red-500">Koszty</span>
                   <span className="font-bold text-red-600">{totalCostsToday.toFixed(2)} zł</span>
                 </div>
-                <div className="flex justify-between p-2 bg-emerald-50 rounded-lg">
-                  <span className="text-emerald-600">Zysk</span>
-                  <span className="font-bold text-emerald-700">{zyskNetto >= 0 ? '+' : ''}{zyskNetto.toFixed(2)} zł</span>
+                <div className={`flex justify-between p-2 rounded-lg ${zyskNetto >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                  <span className={zyskNetto >= 0 ? 'text-emerald-600' : 'text-red-600'}>Zysk</span>
+                  <span className={`font-bold ${zyskNetto >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{zyskNetto >= 0 ? '+' : ''}{zyskNetto.toFixed(2)} zł</span>
                 </div>
               </div>
               <p className="text-xs text-gray-400 text-center">
@@ -559,6 +564,7 @@ export default function PracownikDashboard() {
                       totalCashSales: cashSalesToday,
                       totalCardSales: cardSalesToday,
                       totalCosts: totalCostsToday,
+                      totalCashCosts: cashCostsToday,
                       totalDoladowania: doladowaniaToday,
                       createdBy: userId
                     });
